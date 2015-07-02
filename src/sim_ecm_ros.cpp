@@ -1,0 +1,94 @@
+// Simulate ECM Node
+// Zihan Chen
+// 2014-10-15
+
+// standard
+#include <iostream>
+#include <ros/ros.h>
+#include <ros/package.h>
+#include <cisst_ros_bridge/mtsROSBridge.h>
+#include <sawIntuitiveResearchKit/mtsIntuitiveResearchKitECM.h>
+#include "mtsSimHWECM.h"
+
+
+int main(int argc, char *argv[])
+{
+    std::cout << "Sim ECM ROS" << std::endl;
+
+    // Cisst Logging Setup
+    cmnLogger::SetMask( CMN_LOG_ALLOW_ALL );
+    cmnLogger::SetMaskFunction( CMN_LOG_ALLOW_ALL );
+    cmnLogger::SetMaskDefaultLog( CMN_LOG_ALLOW_ALL );
+    cmnLogger::AddChannelToStdOut( CMN_LOG_ALLOW_ERRORS_AND_WARNINGS );
+
+    ros::init(argc, argv, "sim_ecm_ros");
+    ros::NodeHandle node;
+
+    // task manager
+    mtsManagerLocal* taskManager = mtsManagerLocal::GetInstance();
+	
+    // Simulated ECM Hardware
+    mtsSimHWECM hwECM(&node, "hwECM", 5 * cmn_ms);
+    taskManager->AddComponent(&hwECM);
+    
+    // ECM Arm
+    mtsIntuitiveResearchKitECM ecm("ECM", 5 * cmn_ms);
+    taskManager->AddComponent(&ecm);
+    std::string ecmConfigFile = ros::package::getPath("dvrk_robot");;
+    ecmConfigFile.append("/config/dvecm.rob");
+    ecm.Configure(ecmConfigFile);
+
+    // Connect (Required -> Provided)
+    taskManager->Connect(ecm.GetName(), "PID", hwECM.GetName(), "PID");
+    taskManager->Connect(ecm.GetName(), "RobotIO", hwECM.GetName(), "RobotIO");
+    taskManager->Connect(ecm.GetName(), "ManipClutch", hwECM.GetName(), "ManipClutch");
+    taskManager->Connect(ecm.GetName(), "SUJClutch", hwECM.GetName(), "SUJClutch");
+
+
+#if 1
+    //-------------------------------------------------------
+    // Start ROS Bridge
+    // ------------------------------------------------------
+    // ros wrapper
+    mtsROSBridge robotBridge("ROSECM",     // name
+                             5 * cmn_ms,   // period
+                             false,        // spin
+                             true,         // signal handler
+                             &node);       // node handle
+
+    // connect to ECM
+    robotBridge.AddPublisherFromReadCommand<prmPositionCartesianGet, geometry_msgs::Pose>(
+                "Robot", "GetPositionCartesian", "/dvrk_ecm/cartesian_pose_current");
+    robotBridge.AddSubscriberToWriteCommand<std::string, std_msgs::String>(
+                "Robot", "SetRobotControlState", "/dvrk_ecm/set_robot_state");
+    robotBridge.AddSubscriberToWriteCommand<prmPositionCartesianSet, geometry_msgs::Pose>(
+                "Robot", "SetPositionCartesian", "/dvrk_ecm/set_position_cartesian");
+
+    // PID
+    robotBridge.AddPublisherFromReadCommand<prmPositionJointGet, sensor_msgs::JointState>(
+                "PID", "GetPositionJoint", "/dvrk_ecm/joint_position_current");
+    robotBridge.AddSubscriberToWriteCommand<prmPositionJointSet, sensor_msgs::JointState>(
+                "PID", "SetPositionJoint","/dvrk_ecm/set_position_joint");
+
+    // Connect
+    taskManager->AddComponent(&robotBridge);
+    taskManager->Connect(robotBridge.GetName(), "Robot", ecm.GetName(), "Robot");
+    taskManager->Connect(robotBridge.GetName(), "PID", hwECM.GetName(), "PID");
+
+    //-------------------------------------------------------
+    // End ROS Bridge
+    // ------------------------------------------------------
+#endif
+
+    // -------- Start & Run ---------------
+    taskManager->CreateAllAndWait(1.0 * cmn_s);
+    taskManager->StartAll();
+
+    ros::spin();
+
+    taskManager->KillAllAndWait(1.0 * cmn_s);
+    taskManager->Cleanup();
+    cmnLogger::Kill();
+
+    return 0;
+}
