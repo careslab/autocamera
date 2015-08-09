@@ -25,9 +25,7 @@
     <arg name="ns" default="/dvrk_psm2"/>
   </include>
   
-  <group ns="/dvrk_ecm">
-	  
-	      
+  <group ns="/dvrk_ecm">	      
 	  <node name="autocamera_ecm_jp"
 	    	pkg="autocamera"
 	        type="sim_ecmjoint.py"/>

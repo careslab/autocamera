@@ -8,7 +8,6 @@ import os
 from sensor_msgs.msg import JointState
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}
 cam_info = None

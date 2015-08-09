@@ -13,7 +13,6 @@ import os
 import hrl_geom
 import geometry_msgs
 
-
 from hrl_geom.pose_converter import PoseConv
 from hrl_geom import transformations
 from geometry_msgs.msg import Point
@@ -29,6 +28,7 @@ from numpy.linalg import norm
 from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
+import image_geometry
 
 
 ecm_robot = None
@@ -204,14 +204,6 @@ def point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose):
         output_msg.position = p
     return output_msg
 
-def get_2d_point_from_3d_point_relative_to_world_rf(cam_info, TEW_inv, point):
-    P = numpy.array(cam_info.P).reshape(3,4)
-    m = TEW_inv * point
-    u,v,w = P * m
-    x = u/w
-    y = v/w
-    
-    return (x,y)
 def zoom_fitness(cam_info, inner_margin, deadzone_margin, tool_point):
     x = cam_info.width; y = cam_info.height
     mid_point = [x/2, y/2]
@@ -241,10 +233,11 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         
         T2E = TEW_inv * T2W
        
-        x1, y1 = get_2d_point_from_3d_point_relative_to_world_rf(cam_info, TEW_inv, T1W[0:4,3])
-        x2, y2 = get_2d_point_from_3d_point_relative_to_world_rf(cam_info, TEW_inv, T2W[0:4,3])
-        xm, ym = get_2d_point_from_3d_point_relative_to_world_rf(cam_info, TEW_inv, mid_point)
-#         rospy.logerr('\n xm = ' + xm.__str__() + ' , ym = ' + ym.__str__())
+        ig = image_geometry.PinholeCameraModel()
+        ig.fromCameraInfo(cam_info)
+        x1, y1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3])
+        x2, y2 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3])
+        xm, ym = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0])
         
         msg.position[3] = 0
         msg.position[2] += zoom_fitness(cam_info, .30, .60, [x1,y1])/30
@@ -252,11 +245,11 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
             msg.position[2] = 0
         elif msg.position[2] > .23:
             msg.position[2] = .23
-            
         rospy.logerr('\nx1 = '  + x1.__str__() + ', y1 = ' + y1.__str__() + ', x2 = '  + x2.__str__() + ', y2 = ' + y2.__str__())
     return msg
 
 def compute_viewangle(joint, cam_info):
+    rospy.logerr('hello')
     global ecm_robot, ecm_kin, psm1_robot, psm1_kin, psm2_robot, psm2_kin
     if ecm_robot is None:
         ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
