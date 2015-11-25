@@ -10,26 +10,29 @@
   </include>
 
   <!-- psm one -->
-  <include file="$(find dvrk_model)/launch/psm_one_rviz.launch">
-    <arg name="model" default="$(find simulation)/model/psm_one.urdf.xacro"/>
+  <include file="$(find autocamera)/launch/psm_one_rviz.launch">
+    <arg name="model" default="$(find autocamera)/model/psm_one.urdf.xacro"/>
     <arg name="rate" default="200" />
     <arg name="rviz" value="false"/>
     <arg name="ns" default="/dvrk_psm1"/>
   </include>
 
   <!-- psm two -->
-  <include file="$(find dvrk_model)/launch/psm_one_rviz.launch">
+  <include file="$(find autocamera)/launch/psm_one_rviz.launch">
     <arg name="model" default="$(find simulation)/model/psm_two.urdf.xacro"/>
     <arg name="rate" default="200" />
     <arg name="rviz" value="false"/>
     <arg name="ns" default="/dvrk_psm2"/>
   </include>
-   <group ns="/dvrk_ecm">
- 	<node name="feedback_ecm_jp"
-    	pkg="autocamera"
-        type="ecm_joint_publisher.py"/>
+  
+  <group ns="/dvrk_ecm">	      
+	  <node name="autocamera_ecm_jp"
+	    	pkg="autocamera"
+	        type="sim_ecmjoint.py"/>
+	  <node name="autocamera_node"
+	    	pkg="autocamera"
+	        type="autocamera_node.py"/>
   </group>
-
   <!-- rviz  -->
   <node name="rviz" pkg="rviz" type="rviz"
 	args="-d $(find simulation)/rviz/simulation.rviz"/>  
