@@ -2,7 +2,11 @@
 
 import sys
 import rospy
+import tf
+
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
+from robot import *
 
 jnt_msg = JointState()
 # rate = rospy.Rate(50);     # 50 hz
@@ -32,7 +36,7 @@ def jnt_vel_cb(msg):
         pass
 
 def set_joint_angles_cb(msg):
-    global rate, jnt_pub
+    global rate, jnt_pub, psm1_robot
     msg.header.stamp = rospy.Time.now()
     
     if len(msg.name) != len(msg.position):
@@ -42,18 +46,30 @@ def set_joint_angles_cb(msg):
 
     # publish jointstate
     jnt_pub.publish(msg)
+    
+#     psm1_msg = JointState()
+#     psm1_msg.position = [0.2, -0.3564890722070776, 0.11702387604000002, -0.013420156383009559, 0.02404802395871752, -0.0305545022294055, 0.21790098422312854]
+#     psm1_robot.move_joint_list(psm1_msg.position, interpolate=True)
 
 def main():
     global jnt_msg
     global jnt_pub
+    global psm1_robot
     global rate
     
     
     # initialize ROS node
     rospy.init_node('autocamera_joint_publisher')
-
+    
     # create a psm publisher
     jnt_pub = rospy.Publisher('joint_states_robot', JointState, queue_size=10)
+    
+    # move arm
+#     psm1_robot = robot('PSM1')
+#     psm1_robot.home()
+    
+    
+    
     # create psm joint position subscriber
     jnt_pos_sub = rospy.Subscriber(
         'joint_position_current',

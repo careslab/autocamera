@@ -32,6 +32,9 @@
 	  <node name="autocamera_node"
 	    	pkg="autocamera"
 	        type="autocamera_node.py"/>
+	  <node name="robot_api"
+		pkg="autocamera"
+		type="robot.py" />
   </group>
   <!-- rviz  -->
   <node name="rviz" pkg="rviz" type="rviz"

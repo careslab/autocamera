@@ -2,7 +2,6 @@ from __future__ import division
 
 import sys
 import rospy
-import cisstMultiTaskPython
 import roslib
 import xacro
 import re
@@ -29,7 +28,6 @@ from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
-
 
 ecm_robot = None
 ecm_kin = None
@@ -245,11 +243,11 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
             msg.position[2] = 0
         elif msg.position[2] > .23:
             msg.position[2] = .23
-        rospy.logerr('\nx1 = '  + x1.__str__() + ', y1 = ' + y1.__str__() + ', x2 = '  + x2.__str__() + ', y2 = ' + y2.__str__())
+#         rospy.logerr('\nx1 = '  + x1.__str__() + ', y1 = ' + y1.__str__() + ', x2 = '  + x2.__str__() + ', y2 = ' + y2.__str__())
     return msg
 
 def compute_viewangle(joint, cam_info):
-    rospy.logerr('hello')
+    
     global ecm_robot, ecm_kin, psm1_robot, psm1_kin, psm2_robot, psm2_kin
     if ecm_robot is None:
         ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
@@ -261,6 +259,9 @@ def compute_viewangle(joint, cam_info):
         psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         psm2_kin = KDLKinematics(psm2_robot, psm2_robot.links[0].name, psm2_robot.links[-1].name)
             
+    rospy.logerr(joint.__str__())
+    
+    
     
     kinematics = lambda name: psm1_kin if name == 'psm1' else psm2_kin if name == 'psm2' else ecm_kin 
     clean_joints = joint
@@ -279,6 +280,8 @@ def compute_viewangle(joint, cam_info):
     output_msg = clean_joints['ecm']
     output_msg = point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
     output_msg = find_zoom_level(output_msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints)
+    
+    rospy.logerr(clean_joints.__str__())
     
     return output_msg
 
