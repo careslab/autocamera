@@ -94,16 +94,33 @@ def find_rotation_matrix_between_two_vectors(a,b):
     return R 
     
     
-def extract_positions(joint, arm_name, joint_kin):
-#     rospy.logerr("jonit = " + joint.__str__())
+def extract_positions(joint, arm_name, joint_kin=None):
+    global ecm_robot, ecm_kin, psm1_robot, psm1_kin, psm2_robot, psm2_kin
+    
+    if ecm_robot is None:
+        ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        ecm_kin = KDLKinematics(ecm_robot, ecm_robot.links[0].name, ecm_robot.links[-1].name)
+    if psm1_robot is None:
+        psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        psm1_kin = KDLKinematics(psm1_robot, psm1_robot.links[0].name, psm1_robot.links[-1].name)
+    if psm2_robot is None:
+        psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        psm2_kin = KDLKinematics(psm2_robot, psm2_robot.links[0].name, psm2_robot.links[-1].name)
+    
+    if arm_name=="ecm": joint_kin = ecm_kin
+    elif arm_name =="psm1" : joint_kin = psm1_kin
+    elif arm_name =="psm2" : joint_kin = psm2_kin
+            
     pos = []
     name = []
+    effort = []
+    velocity = []
     
     new_joint = JointState()
-    for i in range(len(joint[arm_name].position)):
-        if joint[arm_name].name[i] in joint_kin.get_joint_names():
-            pos.append(joint[arm_name].position[i])
-            name.append(joint[arm_name].name[i])
+    for i in range(len(joint.position)):
+        if joint.name[i] in joint_kin.get_joint_names():
+            pos.append(joint.position[i])
+            name.append(joint.name[i])
     new_joint.name = name
     new_joint.position = pos
     return new_joint
@@ -258,16 +275,13 @@ def compute_viewangle(joint, cam_info):
     if psm2_robot is None:
         psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         psm2_kin = KDLKinematics(psm2_robot, psm2_robot.links[0].name, psm2_robot.links[-1].name)
-            
-    rospy.logerr(joint.__str__())
-    
-    
+
     
     kinematics = lambda name: psm1_kin if name == 'psm1' else psm2_kin if name == 'psm2' else ecm_kin 
     clean_joints = joint
     try:
         for i in range(len(clean_joints.keys())):
-            clean_joints[clean_joints.keys()[i]] = extract_positions(joint, clean_joints.keys()[i], kinematics(clean_joints.keys()[i]))
+            clean_joints[clean_joints.keys()[i]] = extract_positions(joint[clean_joints.keys()[i]], clean_joints.keys()[i], kinematics(clean_joints.keys()[i]))
     
         key_hole, _ = ecm_kin.FK([0,0,0,0]) # The position of the keyhole, is the end-effector's
         psm1_pos,_ = psm1_kin.FK(clean_joints['psm1'].position)
@@ -275,14 +289,20 @@ def compute_viewangle(joint, cam_info):
         psm1_pose = psm1_kin.forward(clean_joints['psm1'].position)
         ecm_pose = ecm_kin.forward(clean_joints['ecm'].position)
     except Exception as e:
-        return joint['ecm']
+        output_msg = joint['ecm']
+#         output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+#         output_msg.position = [joint['ecm'].position[x] for x in [0,1,5,6]]
+        return output_msg
     
     output_msg = clean_joints['ecm']
     output_msg = point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
     output_msg = find_zoom_level(output_msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints)
     
-    rospy.logerr(clean_joints.__str__())
-    
+    if len(output_msg.name) > 4:
+        output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+    if len(output_msg.position) >= 7:
+        output_msg.position = [output_msg.position[x] for x in [0,1,5,6]]
+        
     return output_msg
 
     

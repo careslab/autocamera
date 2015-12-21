@@ -133,7 +133,7 @@ class robot:
         self.set_position_joint = rospy.Publisher(full_ros_namespace + '/set_position_joint',
                                                   JointState, latch=True, queue_size=1)
         self.set_position_goal_joint = rospy.Publisher(full_ros_namespace + '/set_position_goal_joint',
-                                                       JointState, latch=True, queue_size=1)
+                                                       JointState, latch=True, queue_size=10)
         self.set_position_cartesian = rospy.Publisher(full_ros_namespace + '/set_position_cartesian',
                                                       Pose, latch=True, queue_size=1)
         self.set_position_goal_cartesian = rospy.Publisher(full_ros_namespace + '/set_position_goal_cartesian',
@@ -609,6 +609,9 @@ class robot:
         :param value: the incremental amount in which you want to move index by, this is a list
         :param index: the incremental joint you want to move, this is a list
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
+        
+        result = [] # Shahab
+        
         rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
         # check if value is a list
         if(self.__check_input_type(value, [list,float])):
@@ -628,8 +631,9 @@ class robot:
                             for i in range (len(initial_joint_position)):
                                 if i == index[j]:
                                     abs_joint[i] = value[j]
-                    self.__move_joint(abs_joint, interpolate)
-
+                    return self.__move_joint(abs_joint, interpolate) #Shahab
+        return False #Shahab
+    
     def __move_joint(self, abs_joint, interpolate = True):
         """Absolute move by vector in joint plane.
 
@@ -638,7 +642,7 @@ class robot:
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move joint vector')
         if(self.__check_input_type(abs_joint, [list,float])):
             if (interpolate):
-                self.__move_joint_goal(abs_joint)
+                return self.__move_joint_goal(abs_joint)
             else:
                 self.__move_joint_direct(abs_joint)
         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move joint vector')
@@ -672,7 +676,7 @@ class robot:
                 return False
             joint_state = JointState()
             joint_state.position[:] = end_joint
-            self.__set_position_goal_joint_publish_and_wait(joint_state)
+            return self.__set_position_goal_joint_publish_and_wait(joint_state) # Shahab
             return True
 
     def __set_position_goal_joint_publish_and_wait(self, end_position):
@@ -684,7 +688,7 @@ class robot:
         self.__goal_reached_event.clear()
         self.__goal_reached = False
         self.set_position_goal_joint.publish(end_position)
-        self.__goal_reached_event.wait(20) # 1 minute at most
+        self.__goal_reached_event.wait(5) # 1 minute at most
         if not self.__goal_reached:
             return False
         rospy.loginfo(rospy.get_caller_id() + ' -> completing set position goal joint publish and wait')

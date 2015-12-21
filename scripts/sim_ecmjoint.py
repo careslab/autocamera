@@ -3,6 +3,7 @@
 import sys
 import rospy
 import tf
+import traceback
 
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
@@ -43,7 +44,7 @@ def set_joint_angles_cb(msg):
         rospy.logerr("ERROR Size mismatch")
         rospy.logerr("len.name = " + str(len(msg.name)))
         rospy.logerr("len.pos = " + str(len(msg.position)))
-
+        return
     # publish jointstate
     jnt_pub.publish(msg)
     
