@@ -2,7 +2,7 @@
   <arg name="rviz" default="true"/>
   <arg name="ns" default="/dvrk_psm1"/>
   <arg name="prefix" default="one_"/>
-  <arg name="model" default="$(find simulation)/model/psm_one.urdf.xacro"/>
+  <arg name="model" default="$(find autocamera)/model/psm_one.urdf.xacro"/>
 
   <!-- simulated ecm -->
   <group ns="$(arg ns)">
@@ -22,7 +22,7 @@
 
   <!-- rviz  -->
   <node name="rviz" pkg="rviz" type="rviz"
-	args="-d $(find simulation)/rviz/simulation.rviz"
+	args="-d $(find autocamera)/rviz/simulation.rviz"
     if="$(arg rviz)"/>  
 </launch>
 

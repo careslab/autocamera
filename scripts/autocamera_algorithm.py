@@ -97,6 +97,7 @@ def find_rotation_matrix_between_two_vectors(a,b):
 def extract_positions(joint, arm_name, joint_kin=None):
     global ecm_robot, ecm_kin, psm1_robot, psm1_kin, psm2_robot, psm2_kin
     
+    arm_name = arm_name.lower()
     if ecm_robot is None:
         ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         ecm_kin = KDLKinematics(ecm_robot, ecm_robot.links[0].name, ecm_robot.links[-1].name)
