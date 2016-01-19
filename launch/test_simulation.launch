@@ -25,6 +25,23 @@
     <arg name="ns" default="/dvrk_psm2"/>
   </include>
   
+  <!-- mtm left -->
+  <include file="$(find autocamera)/launch/mtm_rviz.launch">
+  	<arg name="model" default="$(find autocamera)/model/mtm_left.urdf.xacro"/>
+    <arg name="rate" default="200" />
+    <arg name="rviz" value="false"/>
+    <arg name="ns" default="/dvrk_mtml"/>
+  </include> 
+  
+  <!-- mtm right -->
+  <include file="$(find autocamera)/launch/mtm_rviz.launch">
+  	<arg name="model" default="$(find autocamera)/model/mtm_right.urdf.xacro"/>
+    <arg name="rate" default="200" />
+    <arg name="rviz" value="false"/>
+    <arg name="ns" default="/dvrk_mtmr"/>
+  </include>
+  
+  
   <group ns="/dvrk_ecm">	      
 	  <node name="autocamera_ecm_jp"
 	    	pkg="autocamera"
@@ -33,6 +50,8 @@
 	    	pkg="autocamera"
 	        type="autocamera_node.py"/>
   </group>
+  
+  
   <!-- rviz  -->
   <node name="rviz" pkg="rviz" type="rviz"
 	args="-d $(find autocamera)/rviz/simulation.rviz"/>  
