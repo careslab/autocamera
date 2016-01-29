@@ -214,8 +214,6 @@ def point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose):
     except Exception as e:
         rospy.logerr('error')
     if p != None:  
-#         rospy.logerr("p = " + p.__str__())
-#         rospy.logerr("l = " + l.__str__())
         p[3] = 0
         output_msg.position = p
     return output_msg
@@ -234,13 +232,10 @@ def zoom_fitness(cam_info, inner_margin, deadzone_margin, tool_point):
         return -1   
         
 def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
-#     rospy.logerr('cam_info = ' + cam_info.__str__())
     if cam_info != None:
         T1W = psm1_kin.forward(clean_joints['psm1'].position)
         T2W = psm2_kin.forward(clean_joints['psm2'].position)
         TEW = ecm_kin.forward(clean_joints['ecm'].position)
-#         TEW[0,3] -= 0.05
-        
         TEW_inv = numpy.linalg.inv(TEW)
         
         mid_point = (T1W[0:4,3] + T2W[0:4,3])/2
@@ -261,7 +256,6 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
             msg.position[2] = 0
         elif msg.position[2] > .23:
             msg.position[2] = .23
-#         rospy.logerr('\nx1 = '  + x1.__str__() + ', y1 = ' + y1.__str__() + ', x2 = '  + x2.__str__() + ', y2 = ' + y2.__str__())
     return msg
 
 def compute_viewangle(joint, cam_info):

@@ -36,10 +36,25 @@ mtml_kin=None
 
 camera_clutch_pressed = False
 
-def ecm_manual_control(start, end):
+def ecm_manual_control_lock(msg, fun):
+    if fun == 'ecm':
+        ecm_manual_control_lock.ecm_msg = msg
+    elif fun == 'mtml':
+        ecm_manual_control_lock.mtml_msg = msg
+    
+    if ecm_manual_control_lock.mtml_msg != None and ecm_manual_control_lock.ecm_msg != None:
+        ecm_manual_control(ecm_manual_control_lock.mtml_msg, ecm_manual_control_lock.ecm_msg)
+        ecm_manual_control_lock.mtml_msg = None
+        ecm_manual_control_lock.ecm_msg = None
+
+        
+ecm_manual_control_lock.mtml_msg = None
+ecm_manual_control_lock.ecm_msg = None
+
+def ecm_manual_control(mtml_msg, ecm_msg):
     # TODO: Find forward kinematics from mtmr and ecm. Move mtmr. Find the movement vector. Add it to the 
     # ecm position, use inverse kinematics and move the ecm.
-    global ecm_robot, ecm_robot, mtmr_robot, mtmr_kin, mtml_robot, mtml_kin
+    global ecm_robot, ecm_kin, mtmr_robot, mtmr_kin, mtml_robot, mtml_kin
     if ecm_robot is None:
         ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         ecm_kin = KDLKinematics(ecm_robot, ecm_robot.links[0].name, ecm_robot.links[-1].name)
@@ -53,16 +68,43 @@ def ecm_manual_control(start, end):
         mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
         mtml_kin = KDLKinematics(mtml_robot, mtml_robot.links[0].name, mtml_robot.links[-1].name)
         
+    global mtml_start_position, mtml_end_position, ecm_pub
     rospy.logerr("mtml" + mtml_kin.get_joint_names().__str__())
-    start_coordinates,_ = mtml_kin.FK(start.position[:-1]) # Returns (position, rotation)
-    end_coordinates,_ = mtml_kin.FK(end.position[:-1])
+    start_coordinates,_ = mtml_kin.FK(mtml_start_position.position[:-1]) # Returns (position, rotation)
+    end_coordinates,_ = mtml_kin.FK(mtml_msg.position[:-1])
     
     rospy.logerr(start_coordinates.__str__())
     rospy.logerr(end_coordinates.__str__())
     
     diff = np.subtract(end_coordinates, start_coordinates)
-    
     rospy.logerr("diff = " + diff.__str__())
+    
+    # Find the ecm 3d coordinates, add the 'diff' to it, then do an inverse kinematics
+    ecm_coordinates,_ = ecm_kin.FK(ecm_msg.position[0:2] + ecm_msg.position[-2:]) # There are a lot of excessive things here that we don't need
+    ecm_pose = ecm_kin.forward(ecm_msg.position[0:2] + ecm_msg.position[-2:])
+    
+    # Figure out the new orientation and position to be used in the inverse kinematics
+    b,_ = ecm_kin.FK([ecm_msg.position[0],ecm_msg.position[1],.14,ecm_msg.position[3]])
+    keyhole, _ = ecm_kin.FK([0,0,0,0])
+    ecm_current_direction = b-keyhole
+    new_ecm_coordinates = np.add(ecm_coordinates, diff)
+    ecm_new_direction = new_ecm_coordinates - keyhole
+    r = autocamera_algorithm.find_rotation_matrix_between_two_vectors(ecm_current_direction, ecm_new_direction)
+    
+    ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3] 
+    ecm_pose[0:3,3] = new_ecm_coordinates
+    new_ecm_joint_angles = ecm_kin.inverse(ecm_pose)
+    
+    new_ecm_msg = ecm_msg; new_ecm_msg.position = new_ecm_joint_angles; new_ecm_msg.name = ecm_kin.get_joint_names()
+    
+    rospy.logerr("ecm_new_direction " + ecm_new_direction.__str__())
+    rospy.logerr('ecm_coordinates' + ecm_coordinates.__str__())
+    rospy.logerr("ecm_pose " + ecm_pose.__str__())
+    rospy.logerr("new_ecm_joint_angles " + new_ecm_joint_angles.__str__())
+    rospy.logerr("new_ecm_msg" + new_ecm_msg.__str__())
+    
+    ecm_pub.publish(new_ecm_msg)
+    
     
 def camera_clutch_cb(msg):
     global camera_clutch_pressed
@@ -79,7 +121,7 @@ def mtml_cb(msg):
         mtml_end_position = msg
         
         # move the ecm based on the movement of MTML
-        ecm_manual_control(mtml_start_position, mtml_end_position)
+        ecm_manual_control_lock(msg, 'mtml')
     else:
         mtml_start_position = msg
         mtml_end_position = None
@@ -110,6 +152,8 @@ def add_ecm_jnt(msg):
     if camera_clutch_pressed == False and msg != None:
         global ecm_hw
         add_jnt('ecm', msg)
+    else:
+        ecm_manual_control_lock(msg, 'ecm')
         
 # psm1 callback    
 def add_psm1_jnt(msg):

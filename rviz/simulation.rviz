@@ -27,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: CameraRight
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -339,7 +339,7 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
@@ -350,12 +350,12 @@ Visualization Manager:
       Robot Description: /dvrk_mtml/robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
@@ -366,7 +366,7 @@ Visualization Manager:
       Robot Description: /dvrk_mtmr/robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Class: rviz/Camera
       Enabled: false
@@ -432,22 +432,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.0045
+      Distance: 3.19155
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.0437734
-        Y: -0.693757
-        Z: 0.0972017
+        X: 0.0426158
+        Y: -0.529241
+        Z: 0.140828
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.469799
+      Pitch: -1.3102
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.51859
+      Yaw: 1.68358
     Saved: ~
 Window Geometry:
   CameraLeft:
