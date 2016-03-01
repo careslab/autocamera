@@ -17,6 +17,11 @@ from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 
+# move the actual ecm with sliders?
+MOVE_ECM_WITH_SLIDERS = False
+
+AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
+
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}
 cam_info = None
@@ -134,7 +139,7 @@ def move_psm1(msg):
     msg.name = msg.name + ['jaw']
     msg.position = msg.position + [jaw]
     
-    psm1_hw.move_joint_list(msg.position, interpolate=first_run)
+    psm1_hw.move_joint_list(msg.position, interpolate=True)
 
 def move_psm2(msg):
     global psm2_hw
@@ -150,8 +155,14 @@ def move_psm2(msg):
 # ecm callback    
 def add_ecm_jnt(msg):
     if camera_clutch_pressed == False and msg != None:
-        global ecm_hw
-        add_jnt('ecm', msg)
+        global ecm_hw, first_run
+        if MOVE_ECM_WITH_SLIDERS == False:
+            add_jnt('ecm', msg)
+        else:
+            temp = list(msg.position[:2]+msg.position[-2:])
+            r = ecm_hw.move_joint_list(temp, interpolate=first_run)
+            if r == True:
+                first_run = False
     else:
         ecm_manual_control_lock(msg, 'ecm')
         
@@ -160,8 +171,9 @@ def add_psm1_jnt(msg):
     if camera_clutch_pressed == False and msg != None:
         global psm1_pub
         # We need to set the names, otherwise the simulation won't move
-        msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        psm1_pub.publish(msg)
+        if AUTOCAMERA_MODE == "HARDWARE" :
+            msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            psm1_pub.publish(msg)
         add_jnt('psm1', msg)
             
      
@@ -169,8 +181,9 @@ def add_psm1_jnt(msg):
 def add_psm2_jnt(msg):
     if camera_clutch_pressed == False and msg != None:
         global psm2_pub
-        msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        psm2_pub.publish(msg)
+        if AUTOCAMERA_MODE == "HARDWARE" :
+            msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            psm2_pub.publish(msg)
         add_jnt('psm2', msg)
             
 def add_jnt(name, msg):
@@ -181,23 +194,30 @@ def add_jnt(name, msg):
             jnt_msg = 'error'
             jnt_msg = autocamera_algorithm.compute_viewangle(joint_angles, cam_info)
             t = time.time()
-            jnt_msg.position = [ round(i,6) for i in jnt_msg.position]
+            
+#             rospy.logerr(jnt_msg.__str__())
+            ecm_pub.publish(jnt_msg)
+            jnt_msg.position = [ round(i,4) for i in jnt_msg.position]
             if len(jnt_msg.position) != 4 or len(jnt_msg.name) != 4 :
                 return
-            ecm_pub.publish(jnt_msg)
             
-            pos = jnt_msg.position; pos[2] = 0 # don't move the insertion joint at this stage 
-            result = ecm_hw.move_joint_list(jnt_msg.position, interpolate=first_run)
-            
-            # Interpolate the insertion joint individually and the rest without interpolation
-            pos = jnt_msg.position; pos[0:2] = 0; pos[3] = 0
-            result = result * ecm_hw.move_joint_list(pos, interpolate=True)
-            
-            if result == True:
-                first_run = False
+            if AUTOCAMERA_MODE == "HARDWARE":
+                pos = jnt_msg.position[0:2] + [jnt_msg.position[3] ]  # don't move the insertion joint at this stage 
                 
+                result = ecm_hw.move_joint_list(pos, index=[0,1,3], interpolate=first_run)
+                 
+                # Interpolate the insertion joint individually and the rest without interpolation
+                pos = [jnt_msg.position[2]]
+                
+                rospy.logerr('result = ' + result.__str__() + ', first_run = ' + first_run.__str__())
+                if result:
+                    first_run = False
+                result = result * ecm_hw.move_joint_list(pos, index=[2], interpolate=True)
+#              
+            
+#                 
         except TypeError:
-#             rospy.logerr('jnt_msg = ' + jnt_msg.__str__())
+#             rospy.logerr('Exception : ' + TypeError.message.__str__())
             pass
             
         joint_angles = dict.fromkeys(joint_angles, None)    
@@ -228,10 +248,15 @@ def main():
     rospy.Subscriber('/dvrk_ecm/joint_states', JointState, add_ecm_jnt)
     rospy.Subscriber('/fakecam_node/camera_info', CameraInfo, get_cam_info)
     
-    # Get the joint angles from the hardware and move the simulation from hardware
-    rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, add_psm1_jnt)
-    rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, add_psm2_jnt)
-    
+    if AUTOCAMERA_MODE == "HARDWARE" :
+        # Get the joint angles from the hardware and move the simulation from hardware
+        rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, add_psm1_jnt)
+        rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, add_psm2_jnt)
+    elif AUTOCAMERA_MODE == "SIMULATION":
+        # Get the joint angles from the simulation
+        rospy.Subscriber('/dvrk_psm1/joint_states', JointState, add_psm1_jnt)
+        rospy.Subscriber('/dvrk_psm2/joint_states', JointState, add_psm2_jnt)
+        
     # Get the joint angles from MTM hardware
     rospy.Subscriber('/dvrk/MTML/position_joint_current', JointState, mtml_cb)
 #     rospy.Subscriber('/dvrk/MTMR/position_joint_current', JointState, add_psm1_jnt)

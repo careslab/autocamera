@@ -216,7 +216,7 @@ class robot:
         self.__robot_state_event.wait(timeout)
         # if the state is not changed return False
         if (self.__robot_state != state):
-            rospy.logfatal(rospy.get_caller_id() + ' -> failed to reach state ' + state)
+#             rospy.logfatal(rospy.get_caller_id() + ' -> failed to reach state ' + state)
             return False
         return True
 
@@ -612,7 +612,7 @@ class robot:
         
         result = [] # Shahab
         
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
         # check if value is a list
         if(self.__check_input_type(value, [list,float])):
             initial_joint_position = self.__position_joint_desired
@@ -644,7 +644,7 @@ class robot:
             if (interpolate):
                 return self.__move_joint_goal(abs_joint)
             else:
-                self.__move_joint_direct(abs_joint)
+                return self.__move_joint_direct(abs_joint)
         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move joint vector')
 
     def __move_joint_direct(self, end_joint):
@@ -691,5 +691,5 @@ class robot:
         self.__goal_reached_event.wait(5) # 1 minute at most
         if not self.__goal_reached:
             return False
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing set position goal joint publish and wait')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> completing set position goal joint publish and wait')
         return True
