@@ -21,6 +21,7 @@ from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 MOVE_ECM_WITH_SLIDERS = False
 
 AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
+# AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
 
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}
@@ -189,7 +190,15 @@ def add_psm2_jnt(msg):
 def add_jnt(name, msg):
     global joint_angles, ecm_pub, ecm_hw, first_run
     joint_angles[name] = msg
+    
+            
     if not None in joint_angles.values():
+        
+        if initialize_psms.initialized>0:        
+            initialize_psms()
+            time.sleep(.01)
+            initialize_psms.initialized -= 1
+        
         try:
             jnt_msg = 'error'
             jnt_msg = autocamera_algorithm.compute_viewangle(joint_angles, cam_info)
@@ -202,9 +211,9 @@ def add_jnt(name, msg):
                 return
             
             if AUTOCAMERA_MODE == "HARDWARE":
-                pos = jnt_msg.position[0:2] + [jnt_msg.position[3] ]  # don't move the insertion joint at this stage 
-                
-                result = ecm_hw.move_joint_list(pos, index=[0,1,3], interpolate=first_run)
+#                 pos = jnt_msg.position[0:2] + [jnt_msg.position[3] ]  # don't move the insertion joint at this stage 
+                pos = jnt_msg.position
+                result = ecm_hw.move_joint_list(pos, index=[0,1,2,3], interpolate=first_run)
                  
                 # Interpolate the insertion joint individually and the rest without interpolation
                 pos = [jnt_msg.position[2]]
@@ -212,7 +221,7 @@ def add_jnt(name, msg):
                 rospy.logerr('result = ' + result.__str__() + ', first_run = ' + first_run.__str__())
                 if result:
                     first_run = False
-                result = result * ecm_hw.move_joint_list(pos, index=[2], interpolate=True)
+#                 result = result * ecm_hw.move_joint_list(pos, index=[2], interpolate=True)
 #              
             
 #                 
@@ -228,6 +237,18 @@ def get_cam_info(msg):
     global cam_info
     cam_info = msg      
         
+
+def initialize_psms():
+    global psm1_pub, psm2_pub
+    if AUTOCAMERA_MODE == "SIMULATION" : 
+        msg = JointState()
+        msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+        msg.position = [0.84 , -0.65, 0.10, 0.00, 0.00, 0.00, 0.00]
+        psm1_pub.publish(msg)
+        msg.position = [-0.84 , -0.53, 0.10, 0.00, 0.00, 0.00, 0.00]
+        psm2_pub.publish(msg)
+        rospy.logerr('psms initialized')
+initialize_psms.initialized = 30
 
 def main():
     
@@ -267,6 +288,7 @@ def main():
     # Move the hardware from the simulation
 #     rospy.Subscriber('/dvrk_psm1/joint_states', JointState, move_psm1)
 #     rospy.Subscriber('/dvrk_psm2/joint_states', JointState, move_psm2)
+    
     
     rospy.spin()
 

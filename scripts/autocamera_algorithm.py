@@ -1,3 +1,4 @@
+# TO DO: Write interpolation function that returns a list of interpolated data
 from __future__ import division
 
 import sys
@@ -29,6 +30,8 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
 
+DEBUG = True # Print debug messages?
+
 ecm_robot = None
 ecm_kin = None
 
@@ -38,9 +41,12 @@ psm1_kin = None
 psm2_robot = None
 psm2_kin = None
 
+def logerror(msg):
+    if DEBUG:
+        rospy.logerr(msg)
+        
 
 def dotproduct(v1, v2):
-#     rospy.logerr("v1 = "+ v1.__str__())
     return sum((a*b) for a, b in zip(v1, v2))
 
 def length(v):
@@ -58,8 +64,6 @@ def find_rotation_matrix_between_two_vectors(a,b):
     
     vector_orig = a / norm(a)
     vector_fin = b / norm(b)
-#     rospy.logerr('a = ' + vector_orig.__str__())
-#     rospy.logerr('b = ' + vector_fin.__str__())
                  
     # The rotation axis (normalised).
     axis = cross(vector_orig, vector_fin)
@@ -178,7 +182,6 @@ def point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose):
     add_marker(PoseConv.to_homo_mat([mid_point, [0,0,0]]), '/marker_subscriber',color=[1,0,0], scale=[0.047/5,0.047/5,0.047/5])
     add_marker(PoseConv.to_homo_mat([key_hole,[0,0,0]]), '/keyhole_subscriber',[0,0,1])
     add_marker(ecm_pose, '/current_ecm_pose', [1,0,0], Marker.ARROW, scale=[.1,.005,.005])
-#     rospy.logerr('old_ecm_pose = ' +  ecm_pose.__str__())
     temp = clean_joints['ecm'].position
     b,_ = ecm_kin.FK([temp[0],temp[1],.14,temp[3]])
     # find the equation of the line that goes through the key_hole and the 
@@ -224,15 +227,41 @@ def zoom_fitness(cam_info, mid_point, inner_margin, deadzone_margin, tool_point)
     
     # if tool in inner zone
     if abs(tool_point[0]-mid_point[0]) <= inner_margin * x/2 and abs(tool_point[1] - mid_point[1]) < inner_margin * y/2:
-        return min((x/2) * inner_margin , (y/2) * inner_margin) - min([abs(tool_point[0]-mid_point[0])/(x/2),abs(tool_point[1] - mid_point[1])/(y/2)])
+        r = inner_margin  - max([abs(tool_point[0]-mid_point[0])/(x/2),abs(tool_point[1] - mid_point[1])/(y/2)])
+        return r
     # if tool in deadzone
     elif abs(tool_point[0]-mid_point[0]) <= deadzone_margin * x/2 and abs(tool_point[1] - mid_point[1]) < deadzone_margin * y/2:
         return 0
     #if tool in outer zone
     elif abs(tool_point[0]-mid_point[0]) <= x/2 and abs(tool_point[1] - mid_point[1]) <  y/2:
-        return -min( [ abs(min([abs(tool_point[0] - x), tool_point[0]])-(deadzone_margin * (x/2)))/(x/2),  abs(min([abs(tool_point[1] - y), tool_point[1]]) - deadzone_margin*(y/2))/(y/2)])
+        return -min( [ abs(min([abs(tool_point[0] - x), tool_point[0]])/(x/2) - deadzone_margin),  abs(min([abs(tool_point[1] - y), tool_point[1]])/(y/2) - deadzone_margin)])
     else:
         return -.1
+    
+# radius is a percentage of the width of the screen
+def zoom_fitness2(cam_info, mid_point, tool_point, tool_point2, radius, deadzone_radius):
+    r = radius * cam_info.width # r is in pixels
+    dr = deadzone_radius * cam_info.width # dr is in pixels
+    
+    tool_in_view = lambda tool, safespace : \
+    tool[0] > safespace or tool[1] > safespace or tool_point[0] < (cam_info.width-safespace) or \
+    tool[1] < (cam_info.height-safespace) 
+    dist = lambda a,b : norm( [i-j for i,j in zip(a,b)] )
+
+    logerror(dist(tool_point, tool_point2))
+    
+    
+    if dist(tool_point, mid_point) < abs(r - dr): # the tool's distance from the mid_point > r
+        # return positive value
+        return 0.001 # in meters 
+    elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
+        # return a negative value
+        return -0.001
+    elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
+        return -0.001
+    else:
+        return 0
+
         
 def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
     if cam_info != None:
@@ -247,21 +276,28 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         
         T2E = TEW_inv * T2W
        
-        ig = image_geometry.PinholeCameraModel()
-        ig.fromCameraInfo(cam_info)
-        x1, y1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3])
-        x2, y2 = ig.project3dToPixel( (TEW_inv * T2W)[0:3,3])
-        xm, ym = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0])
+#         ig = image_geometry.PinholeCameraModel()
+        ig = image_geometry.StereoCameraModel()
+        ig.fromCameraInfo(cam_info, cam_info)
+
+        l1,r1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3])
+        l2, r2 = ig.project3dToPixel( (TEW_inv * T2W)[0:3,3])
+        lm, rm = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0])
+            
+        
+#         logerror('xm=%f,'%lm[0] +  'ym=%f'%lm[1])
         
         msg.position[3] = 0
-        zoom_percentage = zoom_fitness(cam_info=cam_info, mid_point=[xm, ym], inner_margin=.10,
-                                        deadzone_margin= .70, tool_point= [x1,y1])
-        rospy.logerr(zoom_percentage)
-        msg.position[2] =  msg.position[2] + msg.position[2] * zoom_percentage 
-        if msg.position[2] < 0 :
-            msg.position[2] = 0
-        elif msg.position[2] > .23:
-            msg.position[2] = .23
+#         zoom_percentage = zoom_fitness(cam_info=cam_info, mid_point=[xm, ym], inner_margin=.20,
+#                                         deadzone_margin= .70, tool_point= [x1,y1])
+        
+        zoom_percentage = zoom_fitness2(cam_info, mid_point=lm, tool_point=l1, 
+                                        tool_point2=l2, radius=.1, deadzone_radius=.01)
+        msg.position[2] =  msg.position[2] + zoom_percentage 
+        if msg.position[2] < 0 : # minimum 0
+            msg.position[2] = 0.00
+        elif msg.position[2] > .21: # maximum .23
+            msg.position[2] = .21
     return msg
 
 def compute_viewangle(joint, cam_info):
@@ -299,13 +335,19 @@ def compute_viewangle(joint, cam_info):
     
     output_msg = clean_joints['ecm']
     
-    output_msg = point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
-    output_msg = find_zoom_level(output_msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints)
+    gripper= max( [ abs(joint['psm1'].position[-1]), abs(joint['psm2'].position[-1])] ) < math.pi/8
+#     rospy.logerr('psm1 gripper = ' + joint['psm1'].position[-1].__str__() + 'gripper = ' + gripper.__str__())
+    
+    if gripper == gripper or gripper != gripper: # luke was here
+        output_msg = point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
+        output_msg = find_zoom_level(output_msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints)
     
     if len(output_msg.name) > 4:
         output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
     if len(output_msg.position) >= 7:
         output_msg.position = [output_msg.position[x] for x in [0,1,5,6]]
+        
+        
         
     return output_msg
 
