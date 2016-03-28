@@ -20,8 +20,8 @@ from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 # move the actual ecm with sliders?
 MOVE_ECM_WITH_SLIDERS = False
 
-AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
-# AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
+# AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
+AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
 
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}

@@ -23,7 +23,7 @@ def psm1_read_cb(msg):
         psm1_read_cb.save = False
         p, _ = psm1_kin.FK(msg.position[0:-1])
         
-        if psm1_read_cb.count == 0 and not file.haskey('psm1_angles'):
+        if psm1_read_cb.count == 0 and not file.has_key('psm1_angles'):
             file["psm1_angles"] = []
             file["psm1_xyz"] = []
         temp = file["psm1_angles"];temp.append(msg.position); file['psm1_angles'] = temp
@@ -41,7 +41,7 @@ def psm2_read_cb(msg):
         psm2_read_cb.save = False
         p, _ = psm2_kin.FK(msg.position[0:-1])
         
-        if psm2_read_cb.count == 0 and not file.haskey('psm2_angles'):
+        if psm2_read_cb.count == 0 and not file.has_key('psm2_angles'):
             file["psm2_angles"] = []
             file["psm2_xyz"] = []
         temp = file["psm2_angles"];temp.append(msg.position); file['psm2_angles'] = temp
@@ -58,7 +58,7 @@ def ecm_read_cb(msg):
         ecm_read_cb.save = False
         p, _ = ecm_kin.FK(msg.position)
         
-        if ecm_read_cb.count == 0 and not file.haskey('ecm_angles'):
+        if ecm_read_cb.count == 0 and not file.has_key('ecm_angles'):
             file["ecm_angles"] = []
             file["ecm_xyz"] = []
         temp = file["ecm_angles"];temp.append(msg.position); file['ecm_angles'] = temp
