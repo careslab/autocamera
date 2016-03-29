@@ -7,6 +7,8 @@ import os
 import tf
 import time
 import numpy as np
+import cv2
+import cv_bridge
 
 from robot import *
 from sensor_msgs.msg import JointState
@@ -16,12 +18,13 @@ from std_msgs.msg import Bool
 from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
+import sensor_msgs
 
 # move the actual ecm with sliders?
 MOVE_ECM_WITH_SLIDERS = False
 
-# AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
-AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
+AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
+# AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
 
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}
@@ -42,6 +45,11 @@ mtml_kin=None
 
 camera_clutch_pressed = False
 
+DEBUG = True
+def logerror(msg):
+    if DEBUG:
+        rospy.logerr(msg)
+        
 def ecm_manual_control_lock(msg, fun):
     if fun == 'ecm':
         ecm_manual_control_lock.ecm_msg = msg
@@ -191,7 +199,6 @@ def add_jnt(name, msg):
     global joint_angles, ecm_pub, ecm_hw, first_run
     joint_angles[name] = msg
     
-            
     if not None in joint_angles.values():
         
         if initialize_psms.initialized>0:        
@@ -204,7 +211,6 @@ def add_jnt(name, msg):
             jnt_msg = autocamera_algorithm.compute_viewangle(joint_angles, cam_info)
             t = time.time()
             
-#             rospy.logerr(jnt_msg.__str__())
             ecm_pub.publish(jnt_msg)
             jnt_msg.position = [ round(i,4) for i in jnt_msg.position]
             if len(jnt_msg.position) != 4 or len(jnt_msg.name) != 4 :
@@ -218,7 +224,7 @@ def add_jnt(name, msg):
                 # Interpolate the insertion joint individually and the rest without interpolation
                 pos = [jnt_msg.position[2]]
                 
-                rospy.logerr('result = ' + result.__str__() + ', first_run = ' + first_run.__str__())
+#                 logerror('result = ' + result.__str__() + ', first_run = ' + first_run.__str__())
                 if result:
                     first_run = False
 #                 result = result * ecm_hw.move_joint_list(pos, index=[2], interpolate=True)
@@ -238,6 +244,36 @@ def get_cam_info(msg):
     cam_info = msg      
         
 
+def left_image_cb( image_msg):
+    global image_left_pub
+    bridge = cv_bridge.CvBridge()
+    
+    im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
+    
+    l1 = autocamera_algorithm.find_zoom_level.positions['l1']; l1 = tuple(int(i) for i in l1)
+    l2 = autocamera_algorithm.find_zoom_level.positions['l2']; l2 = tuple(int(i) for i in l2)
+    lm = autocamera_algorithm.find_zoom_level.positions['lm']; lm = tuple(int(i) for i in lm)
+    
+    logerror('l1 = ' + l1.__str__())
+    cv2.circle(im, l1, 10, (0,255,0), -1)
+    cv2.circle(im, l2, 10, (0,255,255), -1)
+    cv2.circle(im, lm, 10, (0,0,255), -1)
+    
+    cv2.circle(im, (0,0), 20, (255,0,0), -1)
+    cv2.circle(im, (640,480), 20, (255,0,255), -1)
+    
+    new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
+
+    new_image.header.seq = image_msg.header.seq
+    new_image.header.stamp = image_msg.header.stamp
+    new_image.header.frame_id = image_msg.header.frame_id
+    
+    image_left_pub.publish(new_image)
+    
+def right_image_cb( image_msg):
+    pass
+
+
 def initialize_psms():
     global psm1_pub, psm2_pub
     if AUTOCAMERA_MODE == "SIMULATION" : 
@@ -252,7 +288,7 @@ initialize_psms.initialized = 30
 
 def main():
     
-    global ecm_pub, psm1_pub, psm2_pub, ecm_hw, psm1_hw, psm2_hw
+    global ecm_pub, psm1_pub, psm2_pub, ecm_hw, psm1_hw, psm2_hw, image_left_pub, image_right_pub
     
     ecm_hw = robot('ECM')
     psm1_hw = robot('PSM1')
@@ -289,6 +325,13 @@ def main():
 #     rospy.Subscriber('/dvrk_psm1/joint_states', JointState, move_psm1)
 #     rospy.Subscriber('/dvrk_psm2/joint_states', JointState, move_psm2)
     
+    # Subscribe to fakecam images
+    rospy.Subscriber('/fakecam_node/fake_image_left', Image, left_image_cb)
+    rospy.Subscriber('/fakecam_node/fake_image_right', Image, right_image_cb)
+    
+    # Publish images
+    image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
+    image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
     
     rospy.spin()
 

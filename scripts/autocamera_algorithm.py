@@ -30,7 +30,7 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
 
-DEBUG = True # Print debug messages?
+DEBUG = False # Print debug messages?
 
 ecm_robot = None
 ecm_kin = None
@@ -275,15 +275,16 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         p2 = T2W[0:4,3]
         
         T2E = TEW_inv * T2W
-       
+
 #         ig = image_geometry.PinholeCameraModel()
+        rospy.logerr('cam_info = ' + cam_info.__str__())
         ig = image_geometry.StereoCameraModel()
         ig.fromCameraInfo(cam_info, cam_info)
-
-        l1,r1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3])
-        l2, r2 = ig.project3dToPixel( (TEW_inv * T2W)[0:3,3])
-        lm, rm = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0])
-            
+        
+        l1, r1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3]) # tool1 left and right pixel positions
+        l2, r2 = ig.project3dToPixel( (TEW_inv * T2W)[0:3,3]) # tool2 left and right pixel positions
+        lm, rm = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0]) # midpoint left and right pixel positions
+        find_zoom_level.positions = {'l1':l1, 'r1':r1, 'l2':l2, 'r2':r2, 'lm':lm, 'rm':rm}    
         
 #         logerror('xm=%f,'%lm[0] +  'ym=%f'%lm[1])
         
@@ -299,6 +300,8 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         elif msg.position[2] > .21: # maximum .23
             msg.position[2] = .21
     return msg
+
+find_zoom_level.positions = {'l1':None, 'r1':None, 'l2':None, 'r2':None, 'lm':None, 'rm':None}   
 
 def compute_viewangle(joint, cam_info):
     
