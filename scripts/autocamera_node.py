@@ -255,6 +255,8 @@ def left_image_cb( image_msg):
     lm = autocamera_algorithm.find_zoom_level.positions['lm']; lm = tuple(int(i) for i in lm)
     
     logerror('l1 = ' + l1.__str__())
+    rotate_180 = lambda  p : (640-p[0], 480-p[2])
+
     cv2.circle(im, l1, 10, (0,255,0), -1)
     cv2.circle(im, l2, 10, (0,255,255), -1)
     cv2.circle(im, lm, 10, (0,0,255), -1)

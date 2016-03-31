@@ -30,7 +30,7 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
 
-DEBUG = False # Print debug messages?
+DEBUG = True # Print debug messages?
 
 ecm_robot = None
 ecm_kin = None
@@ -262,6 +262,7 @@ def zoom_fitness2(cam_info, mid_point, tool_point, tool_point2, radius, deadzone
     else:
         return 0
 
+
         
 def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
     if cam_info != None:
@@ -269,6 +270,8 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         T2W = psm2_kin.forward(clean_joints['psm2'].position)
         TEW = ecm_kin.forward(clean_joints['ecm'].position)
         TEW_inv = numpy.linalg.inv(TEW)
+        T1W_inv = numpy.linalg.inv(T1W)
+        T2W_inv = numpy.linalg.inv(T2W)
         
         mid_point = (T1W[0:4,3] + T2W[0:4,3])/2
         p1 = T1W[0:4,3]
@@ -277,15 +280,26 @@ def find_zoom_level(msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints):
         T2E = TEW_inv * T2W
 
 #         ig = image_geometry.PinholeCameraModel()
-        rospy.logerr('cam_info = ' + cam_info.__str__())
         ig = image_geometry.StereoCameraModel()
+        
         ig.fromCameraInfo(cam_info, cam_info)
         
-        l1, r1 = ig.project3dToPixel( (TEW_inv * T1W)[0:3,3]) # tool1 left and right pixel positions
-        l2, r2 = ig.project3dToPixel( (TEW_inv * T2W)[0:3,3]) # tool2 left and right pixel positions
+        negate_z = lambda x : [-x[1], x[0], -x[2]] # We don't know why yet
+        
+        l1, r1 = ig.project3dToPixel( negate_z(( TEW_inv * T1W)[0:3,3])) # tool1 left and right pixel positions
+        l2, r2 = ig.project3dToPixel( negate_z((TEW_inv * T2W)[0:3,3])) # tool2 left and right pixel positions
         lm, rm = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0]) # midpoint left and right pixel positions
+
+#         l1, r1 = ig.project3dToPixel( ( T1W * TEW_inv )[0:3,3]) # tool1 left and right pixel positions
+#         l2, r2 = ig.project3dToPixel( ( T2W * TEW_inv )[0:3,3]) # tool2 left and right pixel positions
+#         lm, rm = ig.project3dToPixel( (TEW_inv * mid_point)[0:3,0]) # midpoint left and right pixel positions
+
+        
         find_zoom_level.positions = {'l1':l1, 'r1':r1, 'l2':l2, 'r2':r2, 'lm':lm, 'rm':rm}    
         
+        test1_l, test1_r = ig.project3dToPixel( [1,0,0])
+        test2_l, test2_r = ig.project3dToPixel( [0,0,1])
+        logerror('\ntest1_l = ' + test1_l.__str__() + '\ntest2_l = ' + test2_l.__str__() )
 #         logerror('xm=%f,'%lm[0] +  'ym=%f'%lm[1])
         
         msg.position[3] = 0
@@ -344,6 +358,7 @@ def compute_viewangle(joint, cam_info):
     if gripper == gripper or gripper != gripper: # luke was here
         output_msg = point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
         output_msg = find_zoom_level(output_msg, cam_info, ecm_kin, psm1_kin, psm2_kin, clean_joints)
+        pass
     
     if len(output_msg.name) > 4:
         output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
