@@ -2,7 +2,7 @@
 
 import sys
 import rospy
-import autocamera_algorithm 
+from autocamera_algorithm import Autocamera
 import os
 import tf
 import time
@@ -23,12 +23,14 @@ import sensor_msgs
 # move the actual ecm with sliders?
 MOVE_ECM_WITH_SLIDERS = False
 
-AUTOCAMERA_MODE = "SIMULATION" # "SIMULATION" or "HARDWARE"
-# AUTOCAMERA_MODE = "HARDWARE" # "SIMULATION" or "HARDWARE"
+MODE = lambda x: {"S":"SIMULATION", "H":"HARDWARE"}[x.capitalize()]
+AUTOCAMERA_MODE = MODE('s') # 'S' or 's' for "SIMULATION", 'H' or 'h' for "HARDWARE"
+
+autocamera = Autocamera() # Instantiate the Autocamera Class
 
 jnt_msg = JointState()
 joint_angles = {'ecm':None, 'psm1':None, 'psm2':None}
-cam_info = None
+cam_info = {}
 
 last_ecm_jnt_pos = None
 
@@ -103,7 +105,7 @@ def ecm_manual_control(mtml_msg, ecm_msg):
     ecm_current_direction = b-keyhole
     new_ecm_coordinates = np.add(ecm_coordinates, diff)
     ecm_new_direction = new_ecm_coordinates - keyhole
-    r = autocamera_algorithm.find_rotation_matrix_between_two_vectors(ecm_current_direction, ecm_new_direction)
+    r = autocamera.find_rotation_matrix_between_two_vectors(ecm_current_direction, ecm_new_direction)
     
     ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3] 
     ecm_pose[0:3,3] = new_ecm_coordinates
@@ -143,7 +145,7 @@ def mtml_cb(msg):
 def move_psm1(msg):
     global psm1_hw
     jaw = msg.position[-3]
-    msg = autocamera_algorithm.extract_positions(msg, 'psm1')
+    msg = autocamera.extract_positions(msg, 'psm1')
     
     msg.name = msg.name + ['jaw']
     msg.position = msg.position + [jaw]
@@ -154,7 +156,7 @@ def move_psm2(msg):
     global psm2_hw
     time.sleep(.5)
     jaw = msg.position[-3]
-    msg = autocamera_algorithm.extract_positions(msg, 'psm2')
+    msg = autocamera.extract_positions(msg, 'psm2')
     
     msg.name = msg.name + ['jaw']
     msg.position = msg.position + [jaw]
@@ -208,7 +210,7 @@ def add_jnt(name, msg):
         
         try:
             jnt_msg = 'error'
-            jnt_msg = autocamera_algorithm.compute_viewangle(joint_angles, cam_info)
+            jnt_msg = autocamera.compute_viewangle(joint_angles, cam_info)
             t = time.time()
             
             ecm_pub.publish(jnt_msg)
@@ -241,25 +243,33 @@ def add_jnt(name, msg):
 # camera info callback
 def get_cam_info(msg):
     global cam_info
-    cam_info = msg      
-        
+    if msg.header.frame_id == '/fake_cam_left_optical_link':
+        cam_info['left'] = msg
+    elif msg.header.frame_id == '/fake_cam_right_optical_link':
+        cam_info['right'] = msg
+    
 
-def left_image_cb( image_msg):
-    global image_left_pub
+def image_cb( image_msg, camera_name):
+    global image_left_pub, image_right_pub
+    image_pub = {'left':image_left_pub, 'right':image_right_pub}[camera_name]
+    
     bridge = cv_bridge.CvBridge()
     
     im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
     
-    l1 = autocamera_algorithm.find_zoom_level.positions['l1']; l1 = tuple(int(i) for i in l1)
-    l2 = autocamera_algorithm.find_zoom_level.positions['l2']; l2 = tuple(int(i) for i in l2)
-    lm = autocamera_algorithm.find_zoom_level.positions['lm']; lm = tuple(int(i) for i in lm)
+    tool1_name = {'left':'l1', 'right':'r1'}
+    tool2_name = {'left':'l2', 'right':'r2'}
+    toolm_name = {'left':'lm', 'right':'rm'}
     
-    logerror('l1 = ' + l1.__str__())
+    tool1 = autocamera.zoom_level_positions[tool1_name[camera_name]]; tool1 = tuple(int(i) for i in tool1)
+    tool2 = autocamera.zoom_level_positions[tool2_name[camera_name]]; tool2 = tuple(int(i) for i in tool2)
+    toolm = autocamera.zoom_level_positions[toolm_name[camera_name]]; toolm = tuple(int(i) for i in toolm)
+    
     rotate_180 = lambda  p : (640-p[0], 480-p[2])
 
-    cv2.circle(im, l1, 10, (0,255,0), -1)
-    cv2.circle(im, l2, 10, (0,255,255), -1)
-    cv2.circle(im, lm, 10, (0,0,255), -1)
+    cv2.circle(im, tool1, 10, (0,255,0), -1)
+    cv2.circle(im, tool2, 10, (0,255,255), -1)
+    cv2.circle(im, toolm, 10, (0,0,255), -1)
     
     cv2.circle(im, (0,0), 20, (255,0,0), -1)
     cv2.circle(im, (640,480), 20, (255,0,255), -1)
@@ -270,10 +280,13 @@ def left_image_cb( image_msg):
     new_image.header.stamp = image_msg.header.stamp
     new_image.header.frame_id = image_msg.header.frame_id
     
-    image_left_pub.publish(new_image)
+    image_pub.publish(new_image)
+    
+def left_image_cb( image_msg):
+    image_cb(image_msg, 'left')    
     
 def right_image_cb( image_msg):
-    pass
+    image_cb(image_msg, 'right')
 
 
 def initialize_psms():
@@ -330,10 +343,11 @@ def main():
     # Subscribe to fakecam images
     rospy.Subscriber('/fakecam_node/fake_image_left', Image, left_image_cb)
     rospy.Subscriber('/fakecam_node/fake_image_right', Image, right_image_cb)
-    
+#     
     # Publish images
     image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
     image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
+    
     
     rospy.spin()
 

@@ -4,7 +4,8 @@
 
   <!-- fakecam node   -->
   <node pkg="fakecam" type="fakecam_node" name="fakecam_node">
-    <param name="calibration_file_uri" value="package://fakecam/data/camera_parameters.txt"/>
+    <param name="calibration_file_uri_left" value="package://fakecam/data/camera_parameters_left.txt"/>
+    <param name="calibration_file_uri_right" value="package://fakecam/data/camera_parameters_right.txt"/>
     <param name="camera_name" value="fake_stereo"/>
   </node>
 
