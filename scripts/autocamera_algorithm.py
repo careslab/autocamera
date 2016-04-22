@@ -297,10 +297,10 @@ class Autocamera:
     #         ig = image_geometry.PinholeCameraModel()
             ig = image_geometry.StereoCameraModel()
             
-            ig.fromCameraInfo(cam_info['left'], cam_info['right'])
+            ig.fromCameraInfo(cam_info['right'], cam_info['left'])
             
-            negate_z = lambda x : [-x[1], x[0], -x[2]] # We don't know why yet
-    #         negate_z = lambda x : x
+#             negate_z = lambda x : [-x[1], x[0], x[2]] # We don't know why yet
+            negate_z = lambda x : x
              
             self.add_marker(T2W, '/left_arm', scale=[.002,.002,.002])
             

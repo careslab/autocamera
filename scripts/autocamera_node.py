@@ -72,7 +72,7 @@ class Autocamera_node_handler:
         self.mtml_start_position = None
         self.mtml_end_position = None
         self.initialize_psms_initialized = 30
-        
+        self.__DEBUG_GRAPHICS__ = False
         self.__init_nodes__() # initialize all the nodes, subscribers and publishers
         
     def __init_nodes__(self):
@@ -91,14 +91,23 @@ class Autocamera_node_handler:
         rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.add_ecm_jnt)
         rospy.Subscriber('/fakecam_node/camera_info', CameraInfo, self.get_cam_info)
         
+        try:
+            self.sub_psm1_sim.unregister()
+            self.sub_psm2_sim.unregister()
+            self.sub_psm1_hw.unregister()
+            self.sub_psm2_hw.unregister()
+        except Exception:
+            pass
         if self.__AUTOCAMERA_MODE__ == "HARDWARE" :
             # Get the joint angles from the hardware and move the simulation from hardware
-            rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, self.add_psm1_jnt)
-            rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, self.add_psm2_jnt)
+            self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, self.add_psm1_jnt)
+            self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, self.add_psm2_jnt)
+            
+            
         elif self.__AUTOCAMERA_MODE__ == "SIMULATION":
             # Get the joint angles from the simulation
-            rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt)
-            rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
+            self.sub_psm1_sim = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt)
+            self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
             
         # Get the joint angles from MTM hardware
         rospy.Subscriber('/dvrk/MTML/position_joint_current', JointState, self.mtml_cb)
@@ -111,10 +120,11 @@ class Autocamera_node_handler:
     #     rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.move_psm1)
     #     rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.move_psm2)
         
-        # Subscribe to fakecam images
-        rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb)
-        rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb)
-    #     
+        if self.__DEBUG_GRAPHICS__ == True:
+            # Subscribe to fakecam images
+            rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb)
+            rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb)
+         
         # Publish images
         self.image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
         self.image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
@@ -122,8 +132,8 @@ class Autocamera_node_handler:
     def spin(self):
         rospy.spin()
                 
-    def logerror(self, msg):
-        if self.DEBUG:
+    def logerror(self, msg, debug = False):
+        if self.DEBUG or debug:
             rospy.logerr(msg)
             
     def ecm_manual_control_lock(self, msg, fun):
@@ -230,6 +240,7 @@ class Autocamera_node_handler:
             
     # psm1 callback    
     def add_psm1_jnt(self, msg):
+        self.logerror( msg.__str__())
         if self.camera_clutch_pressed == False and msg != None:
             # We need to set the names, otherwise the simulation won't move
             if self.__AUTOCAMERA_MODE__ == "HARDWARE" :
@@ -251,7 +262,7 @@ class Autocamera_node_handler:
         
         if not None in self.joint_angles.values():
             
-            if self.initialize_psms_initialized>0:        
+            if self.initialize_psms_initialized>0 and self.__AUTOCAMERA_MODE__ == "SIMULATION":        
                 self.initialize_psms()
                 time.sleep(.01)
                 self.initialize_psms_initialized -= 1
@@ -348,11 +359,12 @@ class Autocamera_node_handler:
             MODE.hardware
         """
         self.__AUTOCAMERA_MODE__ = mode
+        self.__init_nodes__()
         
 
 def main():
     node_handler = Autocamera_node_handler()
-    node_handler.set_mode(node_handler.MODE.simulation)
+    node_handler.set_mode(node_handler.MODE.hardware)
     node_handler.spin()
 
 if __name__ == "__main__":
