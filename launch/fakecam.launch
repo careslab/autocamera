@@ -7,6 +7,7 @@
     <param name="calibration_file_uri_left" value="package://fakecam/data/camera_parameters_left.txt"/>
     <param name="calibration_file_uri_right" value="package://fakecam/data/camera_parameters_right.txt"/>
     <param name="camera_name" value="fake_stereo"/>
+    <param name="transform" value="$(arg transform)"/>
   </node>
 
   <!-- static publisher used when we need static  -->

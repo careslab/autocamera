@@ -13,6 +13,7 @@ import os
 import hrl_geom
 import geometry_msgs
 import cv2
+import tf
 
 from hrl_geom.pose_converter import PoseConv
 from hrl_geom import transformations
@@ -45,8 +46,8 @@ class Autocamera:
         self.zoom_level_positions = {'l1':None, 'r1':None, 'l2':None, 'r2':None, 'lm':None, 'rm':None}
         self.logerror("autocamera_initialized")
         
-    def logerror(self, msg):
-        if self.DEBUG:
+    def logerror(self, msg, debug = False):
+        if self.DEBUG or debug:
             rospy.logerr(msg)
             
     def dotproduct(self, v1, v2):
@@ -299,14 +300,22 @@ class Autocamera:
             
             ig.fromCameraInfo(cam_info['right'], cam_info['left'])
             
-#             negate_z = lambda x : [-x[1], x[0], x[2]] # We don't know why yet
-            negate_z = lambda x : x
+            # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+            # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+            r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+            r_inv = numpy.linalg.inv(r);
+            
+#             r = numpy.linalg.inv(r)
+            self.logerror( r.__str__(), debug=True)
+            
+#             rotate_vector = lambda x: (r * numpy.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
              
             self.add_marker(T2W, '/left_arm', scale=[.002,.002,.002])
             
-            l1, r1 = ig.project3dToPixel( negate_z(( TEW_inv * T1W)[0:3,3])) # tool1 left and right pixel positions
-            l2, r2 = ig.project3dToPixel( negate_z((TEW_inv * T2W)[0:3,3])) # tool2 left and right pixel positions
-            lm, rm = ig.project3dToPixel( negate_z((TEW_inv * mid_point)[0:3,0])) # midpoint left and right pixel positions
+            
+            l1, r1 = ig.project3dToPixel( ( r_inv * TEW_inv * T1W )[0:3,3]) # tool1 left and right pixel positions
+            l2, r2 = ig.project3dToPixel( ( r_inv * TEW_inv * T2W )[0:3,3]) # tool2 left and right pixel positions
+            lm, rm = ig.project3dToPixel( ( r_inv * TEW_inv * mid_point)[0:3,0]) # midpoint left and right pixel positions
     #         add_100 = lambda x : (x[0] *.5 + cam_info.width/2, x[1])
     #         l1 = add_100(l1)
     #         l2 = add_100(l2)

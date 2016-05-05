@@ -19,7 +19,6 @@ from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 import sensor_msgs
-from rospy.core import logerror
 
 class Autocamera_node_handler:
     # move the actual ecm with sliders?
@@ -31,7 +30,7 @@ class Autocamera_node_handler:
     
     
     
-    DEBUG = True
+    DEBUG = False
     
     def __init__(self):
         self.__AUTOCAMERA_MODE__ = self.MODE.simulation
@@ -73,7 +72,7 @@ class Autocamera_node_handler:
         self.mtml_end_position = None
         self.initialize_psms_initialized = 30
         self.__DEBUG_GRAPHICS__ = False
-        self.__init_nodes__() # initialize all the nodes, subscribers and publishers
+        
         
     def __init_nodes__(self):
         self.ecm_hw = robot('ECM')
@@ -129,9 +128,15 @@ class Autocamera_node_handler:
         self.image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
         self.image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
 
+    # This needs to be run before anything can be expected
     def spin(self):
+        self.__init_nodes__() # initialize all the nodes, subscribers and publishers
+        
         rospy.spin()
-                
+         
+    def debug_graphics(self, has_graphics):
+        self.__DEBUG_GRAPHICS__ = has_graphics
+            
     def logerror(self, msg, debug = False):
         if self.DEBUG or debug:
             rospy.logerr(msg)
@@ -359,12 +364,13 @@ class Autocamera_node_handler:
             MODE.hardware
         """
         self.__AUTOCAMERA_MODE__ = mode
-        self.__init_nodes__()
+        
         
 
 def main():
     node_handler = Autocamera_node_handler()
-    node_handler.set_mode(node_handler.MODE.hardware)
+    node_handler.set_mode(node_handler.MODE.simulation)
+    node_handler.debug_graphics(True)
     node_handler.spin()
 
 if __name__ == "__main__":
