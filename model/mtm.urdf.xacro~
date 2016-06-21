@@ -188,7 +188,7 @@
       </inertial>
     </link>
 
-    <transmission name="tran1" >
+    <transmission name="tran1" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="outer_yaw"/>
       <actuator name="motor1">
@@ -196,7 +196,7 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
-    <transmission name="tran2">
+    <transmission name="tran2" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="shoulder_pitch"/>
       <actuator name="motor2">
@@ -204,7 +204,7 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
-    <transmission name="tran3">
+    <transmission name="tran3" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="elbow_pitch"/>
       <actuator name="motor3">
@@ -526,7 +526,7 @@
       </inertial>
     </link>
 
-    <transmission name="tran4">
+    <transmission name="tran4" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="wrist_platform"/>
       <actuator name="motor4">
@@ -534,7 +534,7 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
-    <transmission name="tran5">
+    <transmission name="tran5" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="wrist_pitch"/>
       <actuator name="motor5">
@@ -542,7 +542,7 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
-    <transmission name="tran6">
+    <transmission name="tran6" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="wrist_yaw"/>
       <actuator name="motor6">
@@ -550,7 +550,7 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
-    <transmission name="tran7">
+    <transmission name="tran7" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
       <joint name="wrist_roll"/>
       <actuator name="motor7">

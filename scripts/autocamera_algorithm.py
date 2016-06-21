@@ -306,7 +306,7 @@ class Autocamera:
             r_inv = numpy.linalg.inv(r);
             
 #             r = numpy.linalg.inv(r)
-            self.logerror( r.__str__(), debug=True)
+            self.logerror( r.__str__())
             
 #             rotate_vector = lambda x: (r * numpy.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
              

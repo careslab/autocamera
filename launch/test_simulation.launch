@@ -41,7 +41,6 @@
     <arg name="ns" default="/dvrk_mtmr"/>
   </include>
   
-  
   <group ns="/dvrk_ecm">	      
 	  <node name="autocamera_ecm_jp"
 	    	pkg="autocamera"
@@ -50,7 +49,6 @@
 	    	pkg="autocamera"
 	        type="autocamera_node.py"/>
   </group>
-  
   
   <!-- rviz  -->
   <node name="rviz" pkg="rviz" type="rviz"
