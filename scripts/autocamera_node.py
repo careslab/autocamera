@@ -87,7 +87,7 @@ class Autocamera_node_handler:
         # Publishers to the simulation
         self.ecm_pub = rospy.Publisher('autocamera_node', JointState, queue_size=10)
         self.psm1_pub = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
-        self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+#         self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
         
         # Get the joint angles from the simulation
         rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.add_ecm_jnt)
@@ -103,13 +103,13 @@ class Autocamera_node_handler:
         if self.__AUTOCAMERA_MODE__ == self.MODE.hardware :
             # Get the joint angles from the hardware and move the simulation from hardware
             self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, self.add_psm1_jnt)
-            self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, self.add_psm2_jnt)
+#             self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, self.add_psm2_jnt)
             
             
         elif self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
             # Get the joint angles from the simulation
             self.sub_psm1_sim = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt)
-            self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
+#             self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
             
         # Get the joint angles from MTM hardware
         ##rospy.Subscriber('/dvrk/MTML/position_joint_current', JointState, self.mtml_cb)
@@ -134,7 +134,6 @@ class Autocamera_node_handler:
     # This needs to be run before anything can be expected
     def spin(self):
         self.__init_nodes__() # initialize all the nodes, subscribers and publishers
-        
         rospy.spin()
          
     def debug_graphics(self, has_graphics):
@@ -268,12 +267,10 @@ class Autocamera_node_handler:
         self.joint_angles[name] = msg
         
         if not None in self.joint_angles.values():
-            
             if self.initialize_psms_initialized>0 and self.__AUTOCAMERA_MODE__ == self.MODE.simulation:        
                 self.initialize_psms()
                 time.sleep(.01)
                 self.initialize_psms_initialized -= 1
-            
             try:
                 jnt_msg = 'error'
                 jnt_msg = self.autocamera.compute_viewangle(self.joint_angles, self.cam_info)
@@ -374,7 +371,7 @@ def main():
     rospy.logerr('Start')
     node_handler = Autocamera_node_handler()
     node_handler.set_mode(node_handler.MODE.simulation)
-    node_handler.debug_graphics(True)
+    node_handler.debug_graphics(False)
     node_handler.spin()
 
 if __name__ == "__main__":
