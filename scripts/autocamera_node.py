@@ -280,7 +280,7 @@ class Autocamera_node_handler:
                 jnt_msg.position = [ round(i,4) for i in jnt_msg.position]
                 if len(jnt_msg.position) != 4 or len(jnt_msg.name) != 4 :
                     return
-                
+                return # stop here until we co-register the arms
                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
                     pos = jnt_msg.position
                     result = self.ecm_hw.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
