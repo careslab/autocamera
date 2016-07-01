@@ -282,9 +282,9 @@ class Autocamera_node_handler:
                     return
                 #return # stop here until we co-register the arms
                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
-                    pos = jnt_msg.position
+                    pos = jnt_msg.position[0:2] + [jnt_msg.position[3]]
                     self.logerror("insertion = " +pos.__str__(), debug=True)
-                    result = self.ecm_hw.move_joint_list(pos, index=[0,1,2,3], interpolate=True)
+                    result = self.ecm_hw.move_joint_list(pos, index=[0,1,3], interpolate=True)
                      
                     # Interpolate the insertion joint individually and the rest without interpolation
  #                   pos = [jnt_msg.position[2]]
