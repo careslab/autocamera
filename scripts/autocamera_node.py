@@ -11,6 +11,7 @@ import cv2
 import cv_bridge
 
 from robot import *
+# from dvrk.arm import *
 from sensor_msgs.msg import JointState
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
@@ -25,7 +26,7 @@ class Autocamera_node_handler:
     __MOVE_ECM_WITH_SLIDERS__ = False
     class MODE:
         simulation = "SIMULATION"
-        hardware = "HARDWARE"
+        hardware = "HARDW    ARE"
         sliders = "SLIDERS"
     
     
@@ -45,20 +46,7 @@ class Autocamera_node_handler:
         
         self.first_run = True
         
-        self.ecm_robot=None
-        self.psm1_robot=None
-        
-        self.mtmr_robot=None
-        self.mtmr_kin=None
-        
-        self.mtml_robot=None
-        self.mtml_kin=None
-        
-        self.camera_clutch_pressed = False
-        
-        self.ecm_manual_control_lock_mtml_msg = None
-        self.ecm_manual_control_lock_ecm_msg = None
-        
+        # For forward and inverse kinematics
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
@@ -67,9 +55,14 @@ class Autocamera_node_handler:
         self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
         self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
         self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
-            
+        
+        # For camera clutch control    
+        self.camera_clutch_pressed = False        
+        self.ecm_manual_control_lock_mtml_msg = None
+        self.ecm_manual_control_lock_ecm_msg = None
         self.mtml_start_position = None
         self.mtml_end_position = None
+        
         self.initialize_psms_initialized = 30
         self.__DEBUG_GRAPHICS__ = False
         
@@ -163,9 +156,6 @@ class Autocamera_node_handler:
         start_coordinates,_ = self.mtml_kin.FK( self.mtml_start_position.position[:-1]) # Returns (position, rotation)
         end_coordinates,_ = self.mtml_kin.FK(mtml_msg.position[:-1])
         
-        self.logerror(start_coordinates.__str__())
-        self.logerror(end_coordinates.__str__())
-        
         diff = np.subtract(end_coordinates, start_coordinates)
         self.logerror("diff = " + diff.__str__())
         
@@ -206,6 +196,9 @@ class Autocamera_node_handler:
             if self.mtml_start_position == None:
                 self.mtml_start_position = msg
             self.mtml_end_position = msg
+            
+            #Freeze mtms
+            ### CODE HERE ###
             
             # move the ecm based on the movement of MTML
             self.ecm_manual_control_lock(msg, 'mtml')
