@@ -21,15 +21,46 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 import sensor_msgs
 
+from PyQt4.QtGui import *
+from PyQt4.QtCore import pyqtSlot
+
+import threading
+
+class camera_handler:
+    """
+        This is a base class for all classes that will manipulate the camera movements
+    """
+    class MODE:
+        """
+            simulation mode: Use the hardware for the master side, 
+                            and simulation for the ECM
+            hardware mode: Use hardware for both the master side,
+                            and the ECM
+        """
+        simulation = "SIMULATION"
+        hardware = "HARDWARE"
+
+    
+    def shutdown(self):
+        rospy.signal_shutdown('shutting down ' + self.__name__)
+        
+    def set_mode(self, mode):
+        """ Values:
+            MODE.simulation
+            MODE.hardware
+        """
+        self.__clutchNGo_mode__ = mode
+        
+    def spin(self):
+        rospy.spin()
+        
 class Autocamera_node_handler:
     # move the actual ecm with sliders?
     __MOVE_ECM_WITH_SLIDERS__ = False
     class MODE:
         simulation = "SIMULATION"
-        hardware = "HARDW    ARE"
-        sliders = "SLIDERS"
-    
-    
+        hardware = "HARDWARE"
+        sliders = "SLIDERS"    
     
     DEBUG = True
     
@@ -124,6 +155,9 @@ class Autocamera_node_handler:
         self.image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
         self.image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
 
+    def shutdown(self):
+        rospy.signal_shutdown('shutting down Autocamera')
+        
     # This needs to be run before anything can be expected
     def spin(self):
         self.__init_nodes__() # initialize all the nodes, subscribers and publishers
@@ -361,11 +395,239 @@ class Autocamera_node_handler:
         
         
 
+class ClutchNGo_node_handler :
+    """
+    Here is the idea:
+        While camera clutch is being pressed:
+            1. Find the vector between two of MTML consecutive positions
+            2. Use forward kinematics to find ECM current position
+            3. Add the vector to ECM's current position
+            4. Use inverse kinematics to find joint angles for new position
+        
+            
+    """
+    
+    class MODE:
+        """
+            simulation mode: Use the hardware for the master side, 
+                            and simulation for the ECM
+            hardware mode: Use hardware for both the master side,
+                            and the ECM
+        """
+        simulation = "SIMULATION"
+        hardware = "HARDWARE"
+        
+    def __init__(self):
+        # For forward and inverse kinematics
+        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
+        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
+        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
+        
+        # For camera clutch control    
+        self.camera_clutch_pressed = False        
+        self.ecm_manual_control_lock_mtml_msg = None
+        self.ecm_manual_control_lock_ecm_msg = None
+        self.mtml_start_position = None
+        self.mtml_end_position = None
+        
+        self.ecm_msg = None
+        
+        self.__clutchNGo_mode__ = self.MODE.simulation
+        
+        self.autocamera = Autocamera()
+        
+        
+    def __init_nodes__(self):
+        # Publishers to the simulation
+        self.ecm_pub = rospy.Publisher('autocamera_node', JointState, queue_size=10)
+        self.psm1_pub = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
+        self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        
+        
+        if self.__clutchNGo_mode__ == self.MODE.simulation:
+            # Get the ECM joint angles from the simulation
+            rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+        elif self.__clutchNGo_mode__ == self.MODE.hardware:
+            # Get the ECM joint angles from the hardware
+            rospy.Subscriber('/dvrk/ECM/position_joint_current', JointState, self.ecm_cb)
+        
+        # Get the joint angles from MTM hardware
+        rospy.Subscriber('/dvrk/MTML/position_joint_current', JointState, self.mtml_cb)
+        #rospy.Subscriber('/dvrk/MTMR/position_joint_current', JointState, add_psm1_jnt)
+        
+        # Detect whether or not the camera clutch is being pressed
+        rospy.Subscriber('/dvrk/footpedals/camera', Bool, self.camera_clutch_cb)
+
+    def camera_clutch_cb(self, msg):
+        self.camera_clutch_pressed = msg.data
+    
+    def mtml_cb(self, msg):
+        if self.camera_clutch_pressed == True:
+            if self.current_mtml_pos == None:
+                self.current_mtml_joint_angles = msg.pos
+            else:
+                self.move_ecm( self.current_mtml_joint_angles, msg.pos)
+                self.current_mtml_joint_angles = msg.pos
+            
+        else:
+            self.current_mtml_joint_angles = None
+    
+    def mtmr_cb(self, msg):
+        pass
+    
+    def ecm_cb(self, msg):
+        self.ecm_msg = msg
+        pass
+    
+    def move_ecm(self, first_joint_angles, second_joint_angles):
+        """
+         1. Use forward kinematics to determine the 3d coordinates of the two sets of joint angles
+         2. Find the vector between those coordinates
+         3. Use that vector to find a new 3d position for the ECM
+         4. Use inverse kinematics to find joint angles for the ECM
+         5. Move the ECM to those joint angles
+        """
+        
+        # (1)
+        start_coordinates,_ = self.mtml_kin.FK( first_joint_angles[:-1]) # Returns (position, rotation)
+        end_coordinates,_ = self.mtml_kin.FK(second_joint_angles[:-1])
+        
+        # (2)
+        diff = np.subtract(end_coordinates, start_coordinates)
+        
+        # (3)
+        ecm_coordinates,_ = self.ecm_kin.FK(self.ecm_msg.position[0:2] + ecm_msg.position[-2:]) # There are a lot of excessive things here that we don't need
+        ecm_pose = self.ecm_kin.forward(ecm_msg.position[0:2] + ecm_msg.position[-2:])
+        
+        # Figure out the new orientation and position to be used in the inverse kinematics
+        b,_ = self.ecm_kin.FK([ecm_msg.position[0],ecm_msg.position[1],.14,ecm_msg.position[3]])
+        keyhole, _ = self.ecm_kin.FK([0,0,0,0])
+        ecm_current_direction = b-keyhole
+        new_ecm_coordinates = np.add(ecm_coordinates, diff)
+        ecm_new_direction = new_ecm_coordinates - keyhole
+        r = self.autocamera.find_rotation_matrix_between_two_vectors(ecm_current_direction, ecm_new_direction)
+        
+        # (4)
+        ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3] 
+        ecm_pose[0:3,3] = new_ecm_coordinates
+        new_ecm_joint_angles = self.ecm_kin.inverse(ecm_pose)
+        
+        new_ecm_msg = ecm_msg; new_ecm_msg.position = new_ecm_joint_angles; new_ecm_msg.name = self.ecm_kin.get_joint_names()
+        
+        self.logerror("ecm_new_direction " + ecm_new_direction.__str__())
+        self.logerror('ecm_coordinates' + ecm_coordinates.__str__())
+        self.logerror("ecm_pose " + ecm_pose.__str__())
+        self.logerror("new_ecm_joint_angles " + new_ecm_joint_angles.__str__())
+        self.logerror("new_ecm_msg" + new_ecm_msg.__str__())
+        
+        self.ecm_pub.publish(new_ecm_msg)
+        
+        pass
+    
+    def shutdown(self):
+        rospy.signal_shutdown('shutting down clutchNGo')
+        
+    def set_mode(self, mode):
+        """ Values:
+            MODE.simulation
+            MODE.hardware
+        """
+        self.__clutchNGo_mode__ = mode
+        
+    def spin(self):
+        rospy.spin()
+
+class camera_qt_qui:
+    
+    class node_name:
+        clutchNGo = 'clutch and go'
+        autocamera = 'Autocamera'
+        
+    def __init__(self):
+        
+        self.node_handler = None
+        
+        self.a = QApplication(sys.argv) # Application handle
+        self.w = QWidget() # Widget handle
+        
+        # Set window size.
+        self.w.resize(320, 240)
+         
+        # Set window title
+        self.w.setWindowTitle("Hello World!")
+         
+        # Add radio button for autocamera
+        self.radio_autocamera = QRadioButton('Autocamera', self.w)
+        self.radio_autocamera.setToolTip('Activate autocamera')
+        self.radio_autocamera.clicked.connect(self.on_autocamera_select)
+        self.radio_autocamera.resize(self.radio_autocamera.sizeHint())
+        self.radio_autocamera.move(20,30)
+        
+        # Add radio button for clutch and Go
+        self.radio_clutchNGo = QRadioButton('Clutch and Go', self.w)
+        self.radio_clutchNGo.setToolTip('Activate camera clutch mechanism')
+        self.radio_clutchNGo.clicked.connect(self.on_clutchNGo_select)
+        self.radio_clutchNGo.resize(self.radio_clutchNGo.sizeHint())
+        self.radio_clutchNGo.move(20,60)
+        
+        # Add exit button
+        self.btn_exit = QPushButton(self.w)
+        self.btn_exit.setText('Exit')
+        self.btn_exit.clicked.connect(self.exit_program)
+        self.btn_exit.move(20,90)
+        
+        # Show window
+        self.w.show()
+    
+        sys.exit(self.a.exec_())
+       
+    @pyqtSlot()
+    def exit_program(self):
+        if self.node_handler != None:
+            self.node_handler.shutdown()
+        sys.exit(self.a.exec_())
+    
+    @pyqtSlot()
+    def on_autocamera_select(self):  
+        self.start_node_handler(self.node_name.autocamera)
+        #threading.Thread(target=self.start_node_handler, args=(self.node_name.autocamera))
+        
+    @pyqtSlot()
+    def on_clutchNGo_select(self):
+        self.start_node_handler(self.node_name.clutchNGo)
+    
+    def start_node_handler(self, name=node_name.clutchNGo):
+        msg = QMessageBox()
+        msg.setText('running something')
+        retval = msg.exec_()
+        
+        if self.node_handler != None:
+            self.node_handler.shutdown()
+        
+        if name == self.node_name.clutchNGo :
+            self.node_handler = ClutchNGo_node_handler()
+            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.spin()
+            
+        elif name == self.node_name.autocamera:
+            self.node_handler = Autocamera_node_handler()
+            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.debug_graphics(False)
+            self.node_handler.spin()
+            
+        
 def main():
+    camera_qt_qui()
+    """
     node_handler = Autocamera_node_handler()
     node_handler.set_mode(node_handler.MODE.hardware)
     node_handler.debug_graphics(False)
     node_handler.spin()
-
+    """
 if __name__ == "__main__":
     main()
