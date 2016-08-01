@@ -42,12 +42,9 @@
   </include>
   
   <group ns="/dvrk_ecm">	      
-	  <node name="autocamera_ecm_jp"
-	    	pkg="autocamera"
-	        type="sim_ecmjoint.py"/>
-	  <node name="autocamera_node"
-	    	pkg="autocamera"
-	        type="autocamera_node.py"/>
+	  <node name="camera_control_node"
+	    	pkg="autocamera"				
+	        type="camera_control_node.py"/>
   </group>
   
   <!-- rviz  -->

@@ -25,6 +25,7 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import pyqtSlot
 
 import threading
+from PyQt4.QtCore import QThread
 
 class camera_handler:
     """
@@ -104,12 +105,12 @@ class Autocamera_node_handler:
         self.psm1_hw = robot('PSM1')
         self.psm2_hw = robot('PSM2')
             
-        rospy.init_node('autocamera_node')
+        #rospy.init_node('autocamera_node')
         
         self.logerror("start", debug=True)
         
         # Publishers to the simulation
-        self.ecm_pub = rospy.Publisher('autocamera_node', JointState, queue_size=10)
+        self.ecm_pub = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
         self.psm1_pub = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
         self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
         
@@ -464,6 +465,7 @@ class ClutchNGo_node_handler :
         rospy.Subscriber('/dvrk/footpedals/camera', Bool, self.camera_clutch_cb)
 
     def camera_clutch_cb(self, msg):
+        rospy.logerr('Camera Clutch Pressed : ' + msg.data.__str__())
         self.camera_clutch_pressed = msg.data
     
     def mtml_cb(self, msg):
@@ -547,10 +549,33 @@ class camera_qt_qui:
     class node_name:
         clutchNGo = 'clutch and go'
         autocamera = 'Autocamera'
+    
+    # The following classes help create threads so the GUI would not freeze
+    class thread_autocamera(QThread):
+        def run(self):
+            self.node_handler = Autocamera_node_handler()
+            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.debug_graphics(False)
+            self.node_handler.spin()
+        
+        def kill(self):
+            self.node_handler.shutdown()
+            
+    class thread_clutchNGo(QThread):
+        def run(self):
+            self.node_handler = ClutchNGo_node_handler()
+            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.spin()
+        
+        def kill(self):
+            self.node_handler.shutdown()
         
     def __init__(self):
         
-        self.node_handler = None
+        self.thread = None
+        
+        # We have to initialize the node inside the main thread otherwise it would not work
+        rospy.init_node('camera_control_node')
         
         self.a = QApplication(sys.argv) # Application handle
         self.w = QWidget() # Widget handle
@@ -559,7 +584,7 @@ class camera_qt_qui:
         self.w.resize(320, 240)
          
         # Set window title
-        self.w.setWindowTitle("Hello World!")
+        self.w.setWindowTitle("Camera Options")
          
         # Add radio button for autocamera
         self.radio_autocamera = QRadioButton('Autocamera', self.w)
@@ -588,8 +613,8 @@ class camera_qt_qui:
        
     @pyqtSlot()
     def exit_program(self):
-        if self.node_handler != None:
-            self.node_handler.shutdown()
+        if self.thread != None:
+            self.thread.kill()
         sys.exit(self.a.exec_())
     
     @pyqtSlot()
@@ -606,19 +631,17 @@ class camera_qt_qui:
         msg.setText('running something')
         retval = msg.exec_()
         
-        if self.node_handler != None:
-            self.node_handler.shutdown()
+        if self.thread != None:
+            self.thread.kill()
         
         if name == self.node_name.clutchNGo :
-            self.node_handler = ClutchNGo_node_handler()
-            self.node_handler.set_mode(self.node_handler.MODE.simulation)
-            self.node_handler.spin()
+            self.thread = self.thread_clutchNGo()
+            self.thread.start()
             
         elif name == self.node_name.autocamera:
-            self.node_handler = Autocamera_node_handler()
-            self.node_handler.set_mode(self.node_handler.MODE.simulation)
-            self.node_handler.debug_graphics(False)
-            self.node_handler.spin()
+            self.thread = self.thread_autocamera()
+            
+            self.thread.start()
             
         
 def main():
