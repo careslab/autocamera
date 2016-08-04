@@ -136,6 +136,11 @@ class Autocamera_node_handler:
             self.sub_psm1_sim = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt)
             self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
             
+            # If hardware is connected, subscribe to it and set the psm joint angles in the simulation from the hardware
+            self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/position_joint_current', JointState, self.add_psm1_jnt_from_hw)
+            self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/position_joint_current', JointState, self.add_psm2_jnt_from_hw)
+            
+            
         # Get the joint angles from MTM hardware
         ##rospy.Subscriber('/dvrk/MTML/position_joint_current', JointState, self.mtml_cb)
     #     rospy.Subscriber('/dvrk/MTMR/position_joint_current', JointState, add_psm1_jnt)
@@ -272,7 +277,20 @@ class Autocamera_node_handler:
                     self.first_run = False
         else:
             self.ecm_manual_control_lock(msg, 'ecm')
-            
+       
+    
+    def add_psm1_jnt_from_hw(self, msg):
+        if self.camera_clutch_pressed == False and msg != None:
+            if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
+                msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                self.psm1_pub.publish(msg)
+
+    def add_psm2_jnt_from_hw(self, msg):
+        if self.camera_clutch_pressed == False and msg != None:
+            if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
+                msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                self.psm2_pub.publish(msg)
+                
     # psm1 callback    
     def add_psm1_jnt(self, msg):
         if self.camera_clutch_pressed == False and msg != None:
