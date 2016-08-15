@@ -9,6 +9,8 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from sensor_msgs.msg import JointState
 from hrl_geom import pose_converter
 
+MODE = 'ecm_psm1'  # 'ecm_psm1' or 'psm2_psm1'
+
 psm1_robot = None
 psm1_kin = None
 
@@ -88,7 +90,7 @@ def objective_function(xyzrpy):
 objective_function.psm1_data = None
 objective_function.psm2_data = None
 objective_function.ecm_data = None
-objective_function.mode = 'ecm_psm1' # 'ecm_psm1' or 'psm2_psm1'
+objective_function.mode = MODE  # 'ecm_psm1' or 'psm2_psm1'
 
 def find_everything_related_to_world(arm_name, xyzrpy):
     global psm1_kin,psm1_robot, psm2_kin, psm2_robot, ecm_kin, ecm_robot
@@ -131,11 +133,13 @@ def main():
     print(res)
     print(res.x)
     file.close()
-    
+    print(objective_function.mode)   
     if objective_function.mode == 'psm2_psm1':
+	print('psm2 relative to world: ')
         print(find_everything_related_to_world('psm2', res.x))
         
     if objective_function.mode == 'ecm_psm1':
+	print('ecm relative to world: ')
         print(find_everything_related_to_world('ecm', res.x))
     
 if __name__ == "__main__":

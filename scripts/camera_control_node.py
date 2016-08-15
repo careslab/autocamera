@@ -88,6 +88,7 @@ class Autocamera_node_handler:
         self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
         self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
         
+        
         # For camera clutch control    
         self.camera_clutch_pressed = False        
         self.ecm_manual_control_lock_mtml_msg = None
@@ -572,7 +573,7 @@ class camera_qt_qui:
     class thread_autocamera(QThread):
         def run(self):
             self.node_handler = Autocamera_node_handler()
-            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.set_mode(self.node_handler.MODE.hardware)
             self.node_handler.debug_graphics(False)
             self.node_handler.spin()
         
