@@ -1,0 +1,4 @@
+M- cisst 1.0.4 (git: 1.0.4)
+M- CISST_ROOT: /home/shahab/dev/cisst/build/cisst
+M- cisst share: /home/shahab/dev/cisst/build/cisst/share/cisst-1.0
+M- cmn_m: 1, cmn_kg: 1, CISST_USE_SI_UNITS is set to 1
