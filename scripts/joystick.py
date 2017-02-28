@@ -19,10 +19,11 @@ class Joystick:
         hardware = "HARDWARE"
         
     def __init__(self, mode = MODE.simulation):        
-        self.mode = mode
+        self.__mode__ = mode
         self.joint_angles = []
         self.center = [0,0,0,0]
         self.joystick_at_zero = True
+        self.movement_scale = .2 
         
         self.__init_nodes__()
         self.__spin__()
@@ -35,10 +36,12 @@ class Joystick:
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
-        if self.mode == self.MODE.simulation:
+        if self.__mode__ == self.MODE.simulation:
             rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
-        elif self.mode == self.MODE.hardware:
+        elif self.__mode__ == self.MODE.hardware:
             rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+            self.ecm_hw.home()
+            self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
         rospy.Subscriber('/joy', msg.Joy, self.on_joystick_change_cb)
         
@@ -46,10 +49,10 @@ class Joystick:
         rospy.spin()
 
     def ecm_cb(self, msg):
-        if self.mode == self.MODE.hardware:
+        if self.__mode__ == self.MODE.simulation:
             self.joint_angles = msg.position[0:2] + msg.position[-2:]
-        elif self.mode == self.MODE.hardware:
-            self.joint_angles = msg.position
+        elif self.__mode__ == self.MODE.hardware:
+            self.joint_angles = msg.position[0:2] + (0,0)
     
     def ecm_joystick_recenter(self):
         self.center = self.joint_angles
@@ -73,44 +76,29 @@ class Joystick:
     
     def ecm_pan_tilt(self, movement_vector):
         q = []
-        if self.mode == self.MODE.simulation:
-            q = self.joint_angles
-        elif self.mode == self.MODE.hardware:
-            q = self.ecm_hw.get_current_joint_position()
+        q = self.joint_angles
         
-        if q:
-            ee = self.ecm_kin.forward(q)
-            
-            ee[0,3] += movement_vector[0] * .001
-            ee[1,3] += movement_vector[1] * .001
-            
-            ee_inv = self.ecm_kin.inverse(ee)
-            
-            if type(ee_inv) == NoneType:
-                return
-            
-            new_joint_angles = [float(i) for i in ee_inv]
-            
+        if q:            
             q = list(q)
-            q[0] = movement_vector[0] *.2
-            q[1] = movement_vector[1] *.2
-            q = [float(i) for i in q]
+            q[0] = movement_vector[0] * self.movement_scale
+            q[1] = movement_vector[1] * self.movement_scale
+            q = [round(i,4) for i in q]
             q = [i+j for i,j in zip(self.center, q)]
             print(q)
             self.move_ecm(q)
     
     # move ecm based on joint angles either in simulation or hardware
     def move_ecm(self, joint_angles):
-        if self.mode == self.MODE.simulation:
+        if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = joint_angles
             msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
             self.ecm_sim.publish(msg)            
-        elif self.mode == self.MODE.hardware:
+        elif self.__mode__ == self.MODE.hardware:
             self.ecm_hw.move_joint_list(joint_angles, interpolate=False)
-            rospy.sleep(.01)
+#             rospy.sleep(.01)
         
 if __name__ == "__main__":
-    j = Joystick()
+    j = Joystick( Joystick.MODE.hardware)
     
     
