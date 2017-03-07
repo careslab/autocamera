@@ -7,6 +7,9 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 from types import NoneType
 from sensor_msgs.msg._JointState import JointState
 
+# TODO:
+#     Add zooming capability
+
 class Joystick:
     class MODE:
         """
@@ -77,15 +80,26 @@ class Joystick:
     def ecm_pan_tilt(self, movement_vector):
         q = []
         q = self.joint_angles
-        
-        if q:            
-            q = list(q)
-            q[0] = movement_vector[0] * self.movement_scale
-            q[1] = movement_vector[1] * self.movement_scale
-            q = [round(i,4) for i in q]
-            q = [i+j for i,j in zip(self.center, q)]
-            print(q)
-            self.move_ecm(q)
+        if q:
+            ee = np.array(self.ecm_kin.FK(q)[0])
+            ee[0] += movement_vector[0] * .001
+            ee[1] += movement_vector[1] * .001
+            
+            ee_inv = self.ecm_inverse(ee)
+            
+            if type(ee_inv) == NoneType:
+                return
+            
+            new_joint_angles = [float(i) for i in ee_inv]
+            self.move_ecm(new_joint_angles)
+            
+#             q = list(q)
+#             q[0] = movement_vector[0] * self.movement_scale
+#             q[1] = movement_vector[1] * self.movement_scale
+#             q = [round(i,4) for i in q]
+#             q = [i+j for i,j in zip(self.center, q)]
+#             print(q)
+#             self.move_ecm(q)
     
     # move ecm based on joint angles either in simulation or hardware
     def move_ecm(self, joint_angles):
@@ -96,9 +110,91 @@ class Joystick:
             self.ecm_sim.publish(msg)            
         elif self.__mode__ == self.MODE.hardware:
             self.ecm_hw.move_joint_list(joint_angles, interpolate=False)
-#             rospy.sleep(.01)
+    
+    def ecm_inverse(self, goal_pos):
+        key_hole,_ = self.ecm_kin.FK([0,0,0,0])
+        safe_angles = list(self.joint_angles)
+        safe_angles[2] += 0.14
+        
+        ecm_pose = self.ecm_kin.forward(safe_angles)
+        ab_vector = (goal_pos - key_hole)
+        
+        b, _ = self.ecm_kin.FK(safe_angles)
+        
+        ecm_current_direction = b - key_hole
+        
+        r = self.find_rotation_matrix_between_two_vectors(ecm_current_direction, ab_vector)
+        m = np.sqrt(ab_vector[0]**2 + ab_vector[1]**2 + ab_vector[2]**2) # ab_vector's length
+        
+        # insertion joint length
+        l = np.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+        
+        # Equation of the line that passes through the midpoint of the tools and the key hole
+        x = lambda t: key_hole[0] + ab_vector[0] * t
+        y = lambda t: key_hole[1] + ab_vector[1] * t
+        z = lambda t: key_hole[2] + ab_vector[2] * t
+        
+        t = l/m
+        
+        new_ecm_position = np.array([x(t), y(t), z(t)]).reshape(3,1)
+        
+        ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3]  
+        ecm_pose[0:3,3] = new_ecm_position
+        
+        
+        new_joint_angles = self.joint_angles
+        
+        p = None
+        try:
+            p = self.ecm_kin.inverse(ecm_pose)
+        except Exception as e:
+            rospy.logerr('error')
+        if p != None:  
+            p[3] = 0
+            p[2] -= 0.14
+            new_joint_angles = p
+        return new_joint_angles
+    
+    def find_rotation_matrix_between_two_vectors(self, a,b):
+        a = np.array(a).reshape(1,3)[0].tolist()
+        b = np.array(b).reshape(1,3)[0].tolist()
+        
+        vector_orig = a / np.linalg.norm(a)
+        vector_fin = b / np.linalg.norm(b)
+                     
+        # The rotation axis (normalised).
+        axis = np.cross(vector_orig, vector_fin)
+        axis_len = np.linalg.norm(axis)
+        if axis_len != 0.0:
+            axis = axis / axis_len
+    
+        # Alias the axis coordinates.
+        x = axis[0]
+        y = axis[1]
+        z = axis[2]
+        
+        # The rotation angle.
+        angle = np.math.acos(np.dot(vector_orig, vector_fin))
+    
+        # Trig functions (only need to do this maths once!).
+        ca = np.math.cos(angle)
+        sa = np.math.sin(angle)
+        R = np.identity(3)
+        # Calculate the rotation matrix elements.
+        R[0,0] = 1.0 + (1.0 - ca)*(x**2 - 1.0)
+        R[0,1] = -z*sa + (1.0 - ca)*x*y
+        R[0,2] = y*sa + (1.0 - ca)*x*z
+        R[1,0] = z*sa+(1.0 - ca)*x*y
+        R[1,1] = 1.0 + (1.0 - ca)*(y**2 - 1.0)
+        R[1,2] = -x*sa+(1.0 - ca)*y*z
+        R[2,0] = -y*sa+(1.0 - ca)*x*z
+        R[2,1] = x*sa+(1.0 - ca)*y*z
+        R[2,2] = 1.0 + (1.0 - ca)*(z**2 - 1.0)
+        
+        R = np.matrix(R)
+        return R 
         
 if __name__ == "__main__":
-    j = Joystick( Joystick.MODE.hardware)
+    j = Joystick( Joystick.MODE.simulation)
     
     
