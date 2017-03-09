@@ -253,8 +253,8 @@ class coregistrator:
 
 if __name__ == "__main__":
     c = coregistrator()
-    c.collect()
-    c.save_to_db("whatever.db")
+#     c.collect()
+#     c.save_to_db("whatever.db")
     c.read_from_db("joint_angles.db_10_19_16")
     
     print("\n\n\nPSM1_ECM \n")
