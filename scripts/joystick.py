@@ -1,6 +1,8 @@
 import rospy
 from sensor_msgs import msg 
-from robot import robot
+# from robot import robot
+from arm import arm as robot
+
 import numpy as np
 from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
@@ -81,25 +83,25 @@ class Joystick:
         q = []
         q = self.joint_angles
         if q:
-            ee = np.array(self.ecm_kin.FK(q)[0])
-            ee[0] += movement_vector[0] * .001
-            ee[1] += movement_vector[1] * .001
+#             ee = np.array(self.ecm_kin.FK(q)[0])
+#             ee[0] += movement_vector[0] * .001
+#             ee[1] += movement_vector[1] * .001
+#             
+#             ee_inv = self.ecm_inverse(ee)
+#             
+#             if type(ee_inv) == NoneType:
+#                 return
+#             
+#             new_joint_angles = [float(i) for i in ee_inv]
+#             self.move_ecm(new_joint_angles)
             
-            ee_inv = self.ecm_inverse(ee)
-            
-            if type(ee_inv) == NoneType:
-                return
-            
-            new_joint_angles = [float(i) for i in ee_inv]
-            self.move_ecm(new_joint_angles)
-            
-#             q = list(q)
-#             q[0] = movement_vector[0] * self.movement_scale
-#             q[1] = movement_vector[1] * self.movement_scale
-#             q = [round(i,4) for i in q]
-#             q = [i+j for i,j in zip(self.center, q)]
-#             print(q)
-#             self.move_ecm(q)
+            q = list(q)
+            q[0] = movement_vector[0] * self.movement_scale
+            q[1] = movement_vector[1] * self.movement_scale
+            q = [round(i,4) for i in q]
+            q = [i+j for i,j in zip(self.center, q)]
+            print(q)
+            self.move_ecm(q)
     
     # move ecm based on joint angles either in simulation or hardware
     def move_ecm(self, joint_angles):
@@ -195,6 +197,6 @@ class Joystick:
         return R 
         
 if __name__ == "__main__":
-    j = Joystick( Joystick.MODE.simulation)
+    j = Joystick( Joystick.MODE.hardware)
     
     

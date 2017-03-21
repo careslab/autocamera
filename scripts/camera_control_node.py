@@ -367,26 +367,55 @@ class Autocamera_node_handler:
         tool2_name = {'left':'l2', 'right':'r2'}
         toolm_name = {'left':'lm', 'right':'rm'}
         
-        tool1 = self.autocamera.zoom_level_positions[tool1_name[camera_name]]; tool1 = tuple(int(i) for i in tool1)
-        tool2 = self.autocamera.zoom_level_positions[tool2_name[camera_name]]; tool2 = tuple(int(i) for i in tool2)
-        toolm = self.autocamera.zoom_level_positions[toolm_name[camera_name]]; toolm = tuple(int(i) for i in toolm)
+        if not None in self.autocamera.zoom_level_positions:
+            tool1 = self.autocamera.zoom_level_positions[tool1_name[camera_name]]; tool1 = tuple(int(i) for i in tool1)
+            tool2 = self.autocamera.zoom_level_positions[tool2_name[camera_name]]; tool2 = tuple(int(i) for i in tool2)
+            toolm = self.autocamera.zoom_level_positions[toolm_name[camera_name]]; toolm = tuple(int(i) for i in toolm)
+            
+            rotate_180 = lambda  p : (640-p[0], 480-p[2])
+            w = 640 ; h = 480;
+#             outer_margin = .7; inner_margin = .2;
+#             ozone = [[int(outer_margin * w), int(outer_margin * h)],
+#                      [int( (1-outer_margin) * w), int(outer_margin * h)],
+#                      [int((1-outer_margin) * w), int((1-outer_margin) * h)],
+#                      [int(outer_margin * w), int((1-outer_margin) * h)]]
+#             # Draw the outer margin
+#             for i in range(-1, len(ozone)-1):
+#                 first = i
+#                 second = i+1
+#                 if i == -1: first = len(ozone) - 1
+#                 cv2.line(im, tuple(ozone[first]),tuple(ozone[second]), (255,0,0))
+#                 
+#             izone = [[int(inner_margin * w), int(inner_margin * h)],
+#                      [int( (1-inner_margin) * w), int(inner_margin * h)],
+#                      [int((1-inner_margin) * w), int((1-inner_margin) * h)],
+#                      [int(inner_margin * w), int((1-inner_margin) * h)]]
+#             # Draw the outer margin
+#             for i in range(-1, len(izone)-1):
+#                 first = i
+#                 second = i+1
+#                 if i == -1: first = len(izone) - 1
+#                 cv2.line(im, tuple(izone[first]),tuple(izone[second]), (0,0,255))
+            
+            inner_radius = 0.1 ; deadzone_radius = 0.1 + inner_radius;
+            mid_point = ( int(tool1[0]+tool2[0])/2, int(tool1[1] + tool2[1])/2)  
+
+            cv2.circle(im, mid_point, int(deadzone_radius * w), (128,128,128))
+            cv2.circle(im, mid_point, int(inner_radius * w), (255,255,255))    
+            cv2.circle(im, tool1, 10, (0,255,0), -1)
+            cv2.circle(im, tool2, 10, (0,255,255), -1)
+            cv2.circle(im, toolm, 10, (0,0,255), -1)
+            
+            cv2.circle(im, (0,0), 20, (255,0,0), -1)
+            cv2.circle(im, (640,480), 20, (255,0,255), -1)
+            
+            new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
         
-        rotate_180 = lambda  p : (640-p[0], 480-p[2])
-    
-        cv2.circle(im, tool1, 10, (0,255,0), -1)
-        cv2.circle(im, tool2, 10, (0,255,255), -1)
-        cv2.circle(im, toolm, 10, (0,0,255), -1)
-        
-        cv2.circle(im, (0,0), 20, (255,0,0), -1)
-        cv2.circle(im, (640,480), 20, (255,0,255), -1)
-        
-        new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
-    
-        new_image.header.seq = image_msg.header.seq
-        new_image.header.stamp = image_msg.header.stamp
-        new_image.header.frame_id = image_msg.header.frame_id
-        
-        image_pub.publish(new_image)
+            new_image.header.seq = image_msg.header.seq
+            new_image.header.stamp = image_msg.header.stamp
+            new_image.header.frame_id = image_msg.header.frame_id
+            
+            image_pub.publish(new_image)
         
     def left_image_cb(self, image_msg):
         self.image_cb(image_msg, 'left')    
@@ -573,7 +602,7 @@ class camera_qt_gui:
     class thread_autocamera(QThread):
         def run(self):
             self.node_handler = Autocamera_node_handler()
-            self.node_handler.set_mode(self.node_handler.MODE.hardware)
+            self.node_handler.set_mode(self.node_handler.MODE.simulation)
             self.node_handler.debug_graphics(True)
             self.node_handler.spin()
         

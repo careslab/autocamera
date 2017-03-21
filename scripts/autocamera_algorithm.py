@@ -245,14 +245,14 @@ class Autocamera:
         self.logerror(dist(tool_point, tool_point2))
         
         
-        if dist(tool_point, mid_point) < abs(r - dr): # the tool's distance from the mid_point > r
+        if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point > r
             # return positive value
             return 0.001 # in meters 
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
             return -0.001
-        elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
-            return -0.001
+#         elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
+#             return -0.001
         else:
             return 0
     
@@ -321,20 +321,20 @@ class Autocamera:
     #         l2 = add_100(l2)
     #         lm = add_100(lm)
     
-            
             self.zoom_level_positions = {'l1':l1, 'r1':r1, 'l2':l2, 'r2':r2, 'lm':lm, 'rm':rm}    
-            
+
             test1_l, test1_r = ig.project3dToPixel( [1,0,0])
             test2_l, test2_r = ig.project3dToPixel( [0,0,1])
             self.logerror('\ntest1_l = ' + test1_l.__str__() + '\ntest2_l = ' + test2_l.__str__() )
     #         logerror('xm=%f,'%lm[0] +  'ym=%f'%lm[1])
             
             msg.position[3] = 0
-    #         zoom_percentage = zoom_fitness(cam_info=cam_info, mid_point=[xm, ym], inner_margin=.20,
-    #                                         deadzone_margin= .70, tool_point= [x1,y1])
-            
-            zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=lm, tool_point=l1, 
-                                            tool_point2=l2, radius=.1, deadzone_radius=.01)
+#             zoom_percentage = self.zoom_fitness(cam_info=cam_info['left'], mid_point=lm, inner_margin=.20,
+#                                             deadzone_margin= .70, tool_point= l1)
+             
+            mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
+            zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
+                                            tool_point2=l2, radius=.1, deadzone_radius=.1)
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00

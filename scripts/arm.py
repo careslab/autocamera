@@ -177,8 +177,8 @@ class arm:
                          PoseStamped, self.__position_cartesian_current_callback)
         # create node
         # rospy.init_node('arm_api', anonymous = True)
-        rospy.init_node('arm_api',anonymous = True, log_level = rospy.WARN)
-        rospy.loginfo(rospy.get_caller_id() + ' -> started arm: ' + self.__arm_name)
+#         rospy.init_node('arm_api',anonymous = True, log_level = rospy.WARN)
+#         rospy.loginfo(rospy.get_caller_id() + ' -> started arm: ' + self.__arm_name)
 
     def __robot_state_callback(self, data):
         """Callback for arm state.
