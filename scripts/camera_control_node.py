@@ -397,7 +397,7 @@ class Autocamera_node_handler:
 #                 if i == -1: first = len(izone) - 1
 #                 cv2.line(im, tuple(izone[first]),tuple(izone[second]), (0,0,255))
             
-            inner_radius = 0.1 ; deadzone_radius = 0.1 + inner_radius;
+            inner_radius = 0.1 ; deadzone_radius = 0.2 + inner_radius;
             mid_point = ( int(tool1[0]+tool2[0])/2, int(tool1[1] + tool2[1])/2)  
 
             cv2.circle(im, mid_point, int(deadzone_radius * w), (128,128,128))
@@ -602,7 +602,7 @@ class camera_qt_gui:
     class thread_autocamera(QThread):
         def run(self):
             self.node_handler = Autocamera_node_handler()
-            self.node_handler.set_mode(self.node_handler.MODE.simulation)
+            self.node_handler.set_mode(self.node_handler.MODE.hardware)
             self.node_handler.debug_graphics(True)
             self.node_handler.spin()
         

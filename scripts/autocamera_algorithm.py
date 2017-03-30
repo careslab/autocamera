@@ -247,10 +247,10 @@ class Autocamera:
         
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point > r
             # return positive value
-            return 0.001 # in meters 
+            return 0.0003 # in meters 
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
-            return -0.001
+            return -0.0003
 #         elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
 #             return -0.001
         else:
@@ -334,7 +334,7 @@ class Autocamera:
              
             mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
-                                            tool_point2=l2, radius=.1, deadzone_radius=.1)
+                                            tool_point2=l2, radius=.1, deadzone_radius=.2)
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00
