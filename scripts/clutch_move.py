@@ -64,11 +64,11 @@ class ClutchControl:
             self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
         
         self.camera_clutch_pressed = False
-        rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.camera_clutch_cb )
+        rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
         self.mtml_starting_point = None
         rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
 #         self.mtml_orientation.lock_orientation_as_is()
-        self.mtml_orientation.unlock_orientation()
+#         self.mtml_orientation.unlock_orientation()
         
     def __spin__(self):
         rospy.spin()
@@ -76,18 +76,28 @@ class ClutchControl:
     def mtml_cb(self, msg):
 #         msg.pose.position.x
         if self.camera_clutch_pressed:
-            if self.mtml_starting_point == None:
+            if type(self.mtml_starting_point) == NoneType:
                 self.mtml_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
             current_position = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]) 
             movement_vector = current_position-self.mtml_starting_point
-#             self.ecm_pan_tilt(movement_vector[0:2])
+#             print("movement_vector = {}, {}".format(movement_vector[0], movement_vector[1]))
+            
+            self.ecm_pan_tilt(movement_vector[0:2])
+        else:
+            self.center = self.joint_angles
         
     def camera_clutch_cb(self, msg):
+        print(msg)
         if msg.buttons[0] == 1:
             self.camera_clutch_pressed = True
             self.mtml_starting_point = None
+            self.mtml_orientation.lock_orientation_as_is()
+            self.mtmr_orientation.lock_orientation_as_is()
         else:
             self.camera_clutch_pressed = False
+            self.center = self.joint_angles
+            self.mtml_orientation.unlock_orientation()
+            self.mtmr_orientation.unlock_orientation()
                             
     def ecm_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
@@ -100,6 +110,7 @@ class ClutchControl:
                 self.center = msg.position[0:2] + msg.position[-2:]
             elif self.__mode__ == self.MODE.hardware:
                 self.center = msg.position[0:2] + (0,0)
+            self.center_cart = np.array(self.ecm_kin.FK(self.center)[0])
             
     
     
@@ -108,25 +119,26 @@ class ClutchControl:
         q = []
         q = self.joint_angles
         if q:
-#             ee = np.array(self.ecm_kin.FK(q)[0])
-#             ee[0] += movement_vector[0] * .001
-#             ee[1] += movement_vector[1] * .001
-#             
-#             ee_inv = self.ecm_inverse(ee)
-#             
-#             if type(ee_inv) == NoneType:
-#                 return
-#             
-#             new_joint_angles = [float(i) for i in ee_inv]
-#             self.move_ecm(new_joint_angles)
-            
-            q = list(q)
-            q[0] = movement_vector[0] * self.movement_scale
-            q[1] = movement_vector[1] * self.movement_scale
-            q = [round(i,4) for i in q]
-            q = [i+j for i,j in zip(self.center, q)]
-            print(q)
-            self.move_ecm(q)
+            newq = [q[0], q[1], .14, q[3]]
+            ee = np.array(self.ecm_kin.FK(newq)[0])
+            ee[0] = self.center_cart[0] + movement_vector[0] #* .01
+            ee[1] = self.center_cart[1] + movement_vector[1] #* .01
+             
+            ee_inv = self.ecm_inverse(ee)
+             
+            if type(ee_inv) == NoneType:
+                return
+             
+            new_joint_angles = [float(i) for i in ee_inv]
+            self.move_ecm(new_joint_angles)
+             
+#             q = list(q)
+#             q[0] = movement_vector[0] * self.movement_scale
+#             q[1] = movement_vector[1] * self.movement_scale
+#             q = [round(i,4) for i in q]
+#             q = [i+j for i,j in zip(self.center, q)]
+#             print(q)
+#             self.move_ecm(q)
     
     # move ecm based on joint angles either in simulation or hardware
     def move_ecm(self, joint_angles):
@@ -176,7 +188,7 @@ class ClutchControl:
             p = self.ecm_kin.inverse(ecm_pose)
         except Exception as e:
             rospy.logerr('error')
-        if p != None:  
+        if type(p) != NoneType:  
             p[3] = 0
             p[2] -= 0.14
             new_joint_angles = p

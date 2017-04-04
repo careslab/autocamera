@@ -834,10 +834,10 @@ Visualization Manager:
         Z: 0.216891
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.624797
+      Pitch: 0.629797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.41274
+      Yaw: 1.41774
     Saved: ~
 Window Geometry:
   CameraLeft:
