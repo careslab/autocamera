@@ -12,6 +12,8 @@ from mtm import mtm
 import sensor_msgs
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg._PoseStamped import PoseStamped
+import std_msgs
+from std_msgs.msg import Bool
 
 # TODO:
 #     
@@ -50,11 +52,19 @@ class ClutchControl:
         self.ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
         
         self.mtml_orientation = mtm('MTML')
         self.mtmr_orientation = mtm('MTMR')
+        
+        self.mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
+        self.mtml_psm2_translation = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
+        
+        self.mtmr_psm1_orientation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
+        self.mtmr_psm1_translation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
         
         if self.__mode__ == self.MODE.simulation:
             rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
@@ -66,7 +76,10 @@ class ClutchControl:
         self.camera_clutch_pressed = False
         rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
         self.mtml_starting_point = None
+        
         rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
+        rospy.Subscriber('/dvrk/MTMR/position_cartesian_local_current', PoseStamped, self.mtmr_cb)
+        
 #         self.mtml_orientation.lock_orientation_as_is()
 #         self.mtml_orientation.unlock_orientation()
         
@@ -85,19 +98,75 @@ class ClutchControl:
             self.ecm_pan_tilt(movement_vector[0:2])
         else:
             self.center = self.joint_angles
+            self.mtml_pos_before_clutch = msg.pose.position
+    
+    def mtmr_cb(self, msg):
+        if self.camera_clutch_pressed:
+            if type(self.mtml_starting_point) == NoneType:
+                self.mtml_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
+            current_position = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]) 
+            movement_vector = current_position-self.mtml_starting_point
+            
+#             self.ecm_pan_tilt(movement_vector[0:2])
+        else:
+            self.center = self.joint_angles
+            self.mtmr_pos_before_clutch = msg.pose.position
+
+    # To be completed
+    def move_mtm_centerpoints(self, mtml_pos, mtmr_pos):
+        left = np.array([self.mtml_pos_before_clutch.x, self.mtml_pos_before_clutch.y, self.mtml_pos_before_clutch.z])
+        right = np.array([self.mtmr_pos_before_clutch.x, self.mtmr_pos_before_clutch.y, self.mtmr_pos_before_clutch.z])
+        mid = (left+right)/2.0
         
+        if type(mtml_pos) != NoneType:
+            mtml_vect = np.array([mtml_pos.pos.position.x, mtml_pos.pos.position.y, mtml_pos.pos.position.z])
+            
+            ml_vector = mid-left
+            mr_vector = right-mid
+            
+            new_mid = mtml_vect + ml_vector
+            new_mtmr_pos = new_mid + mr_vector
+            
+            mtmr_pose = self.mtmr_kin.forward(q, end_link, base_link)
+            
+             
+#         
+#         # distance between the two mtms before clutching
+#         d = np.sqrt( (left[0]-right[0])**2 + (left[1]-right[1])**2 + (left[2]-right[2])**2)
+#         
+#         # Equation of the line that passes through both mtms
+#         # t is the ratio of distance from the left mtm
+#         x = lambda t: left[0] + right[0] * t
+#         y = lambda t: left[1] + right[1] * t
+#         z = lambda t: left[2] + right[2] * t
+        
+        
+        
+            
     def camera_clutch_cb(self, msg):
-        print(msg)
-        if msg.buttons[0] == 1:
+        if msg.buttons[0] == 1: # Camera clutch pressed
             self.camera_clutch_pressed = True
             self.mtml_starting_point = None
             self.mtml_orientation.lock_orientation_as_is()
             self.mtmr_orientation.lock_orientation_as_is()
-        else:
+            
+            # Prevent the psms from moving when we're moving the camera
+            self.mtml_psm2_orientation.publish(Bool(True))
+            self.mtmr_psm1_orientation.publish(Bool(True))
+            self.mtml_psm2_translation.publish(Bool(True))
+            self.mtmr_psm1_translation.publish(Bool(True))
+            
+        else: # Camera clutch not pressed anymore
             self.camera_clutch_pressed = False
             self.center = self.joint_angles
             self.mtml_orientation.unlock_orientation()
             self.mtmr_orientation.unlock_orientation()
+            
+            # Return to teleop
+            self.mtml_psm2_orientation.publish(Bool(False))
+            self.mtmr_psm1_orientation.publish(Bool(False))
+            self.mtml_psm2_translation.publish(Bool(False))
+            self.mtmr_psm1_translation.publish(Bool(False))
                             
     def ecm_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
