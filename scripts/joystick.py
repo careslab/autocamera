@@ -29,6 +29,7 @@ class Joystick:
         self.center = [0,0,0,0]
         self.joystick_at_zero = True
         self.movement_scale = .2 
+        self.last_z = 0
         
         self.__init_nodes__()
         self.__spin__()
@@ -45,7 +46,7 @@ class Joystick:
             rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
         elif self.__mode__ == self.MODE.hardware:
             rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
-            self.ecm_hw.home()
+#             self.ecm_hw.home()
             self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
         rospy.Subscriber('/joy', msg.Joy, self.on_joystick_change_cb)
@@ -58,10 +59,18 @@ class Joystick:
             self.joint_angles = msg.position[0:2] + msg.position[-2:]
         elif self.__mode__ == self.MODE.hardware:
             self.joint_angles = msg.position[0:2] + (0,0)
+        if self.last_z != 0.0:
+            q = list(self.center)
+            q = self.ecm_zoom(self.last_z, q)
+            self.move_ecm([q[2]], index = [2])
     
     def ecm_joystick_recenter(self):
-        self.center = self.joint_angles
-        self.joystick_at_zero = False        
+        self.center[0] = self.joint_angles[0]
+        self.center[1] = self.joint_angles[1]
+        self.center[3] = self.joint_angles[3]
+        self.last_z = 0
+        self.joystick_at_zero = False     
+           
     def on_joystick_change_cb(self, message):
         j = msg.Joy()
         if sum( np.abs(message.axes[0:2])) != 0 and self.joystick_at_zero == False:
@@ -77,9 +86,30 @@ class Joystick:
             # Allow movement
             movement_vector = np.array(message.axes[0:2]) # left right and up down
                 
-            self.ecm_pan_tilt(movement_vector) 
+            q = self.ecm_pan_tilt(movement_vector)
+#             q = self.ecm_zoom(message.axes[-1], q)
+            self.last_z = message.axes[-1]
+            self.move_ecm([q[0], q[1],q[3]], index = [0,1,3]) 
     
-    def ecm_pan_tilt(self, movement_vector):
+    def ecm_zoom(self, z, q = []):
+        print(z, q, self.joint_angles)
+        if q == []:
+            q = self.joint_angles
+        if z == 0.0 :
+            return q
+        if z > 0 and q[2] < .21: # Zoom in
+            q[2] = self.joint_angles[2] + .0002
+        elif z < 0:
+            q[2] = self.joint_angles[2] - .0002
+#         if q[2] < 0 :
+#             q[2] = .001
+        q = [round(i,4) for i in q]
+        q = [i+j for i,j in zip(self.center, q)]
+#         self.joint_angles = q
+        self.center[2] = q[2]
+        return q
+    
+    def ecm_pan_tilt(self, movement_vector, q = []):
         q = []
         q = self.joint_angles
         if q:
@@ -96,22 +126,24 @@ class Joystick:
 #             self.move_ecm(new_joint_angles)
             
             q = list(q)
-            q[0] = movement_vector[0] * self.movement_scale
-            q[1] = movement_vector[1] * self.movement_scale
+            q[0] += .4 * movement_vector[0] * self.movement_scale
+            q[1] += .08 * movement_vector[1] * self.movement_scale
             q = [round(i,4) for i in q]
             q = [i+j for i,j in zip(self.center, q)]
-            print(q)
-            self.move_ecm(q)
+#             self.move_ecm(q)
+            return q
     
     # move ecm based on joint angles either in simulation or hardware
-    def move_ecm(self, joint_angles):
+    def move_ecm(self, joint_angles, index = []):
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = joint_angles
             msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
             self.ecm_sim.publish(msg)            
         elif self.__mode__ == self.MODE.hardware:
-            self.ecm_hw.move_joint_list(joint_angles, interpolate=False)
+            if index == []:
+                index = range(0,len(joint_angles))
+            self.ecm_hw.move_joint_list(joint_angles, index, interpolate=False)
     
     def ecm_inverse(self, goal_pos):
         key_hole,_ = self.ecm_kin.FK([0,0,0,0])
