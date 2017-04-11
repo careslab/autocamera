@@ -41,6 +41,14 @@ class ClutchControl:
     def __init__(self, mode = MODE.simulation):        
         self.__mode__ = mode
         self.movement_scale = .2 
+        self.joint_angles = [0,0,0,0]
+        
+        self.mtml_pos = [0,0,0]
+        self.mtml_joint_angles = [0,0,0,0,0,0,0]
+        
+        self.mtmr_pos = [0,0,0]
+        self.mtmr_joint_angles = [0,0,0,0,0,0,0]
+        
         
         self.__init_nodes__()
         self.__spin__()
@@ -78,7 +86,10 @@ class ClutchControl:
         self.mtml_starting_point = None
         
         rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
+        rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_joint_angles_cb)
+        
         rospy.Subscriber('/dvrk/MTMR/position_cartesian_local_current', PoseStamped, self.mtmr_cb)
+        rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_joint_angles_cb)
         
 #         self.mtml_orientation.lock_orientation_as_is()
 #         self.mtml_orientation.unlock_orientation()
@@ -86,6 +97,13 @@ class ClutchControl:
     def __spin__(self):
         rospy.spin()
 
+    def mtml_joint_angles_cb(self, msg):
+        self.mtml_joint_angles = msg.position
+    
+    def mtmr_joint_angles_cb(self, msg):
+        self.mtmr_joint_angles = msg.position
+        
+            
     def mtml_cb(self, msg):
 #         msg.pose.position.x
         if self.camera_clutch_pressed:
@@ -93,23 +111,25 @@ class ClutchControl:
                 self.mtml_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
             current_position = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]) 
             movement_vector = current_position-self.mtml_starting_point
+            self.move_mtm_centerpoints(self.mtml_pos, self.mtmr_pos)
 #             print("movement_vector = {}, {}".format(movement_vector[0], movement_vector[1]))
-            
+            self.mtml_pos = current_position
             self.ecm_pan_tilt(movement_vector[0:2])
         else:
             self.center = self.joint_angles
             self.mtml_pos_before_clutch = msg.pose.position
     
     def mtmr_cb(self, msg):
+        pass
         if self.camera_clutch_pressed:
             if type(self.mtml_starting_point) == NoneType:
                 self.mtml_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
             current_position = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]) 
             movement_vector = current_position-self.mtml_starting_point
-            
+            self.mtmr_pos = current_position
 #             self.ecm_pan_tilt(movement_vector[0:2])
         else:
-            self.center = self.joint_angles
+#             self.center = self.joint_angles
             self.mtmr_pos_before_clutch = msg.pose.position
 
     # To be completed
@@ -119,16 +139,27 @@ class ClutchControl:
         mid = (left+right)/2.0
         
         if type(mtml_pos) != NoneType:
-            mtml_vect = np.array([mtml_pos.pos.position.x, mtml_pos.pos.position.y, mtml_pos.pos.position.z])
+#             mtml_vect = np.array([mtml_pos.pos.position.x, mtml_pos.pos.position.y, mtml_pos.pos.position.z])
             
             ml_vector = mid-left
             mr_vector = right-mid
             
-            new_mid = mtml_vect + ml_vector
-            new_mtmr_pos = new_mid + mr_vector
+            new_mid = mtml_pos + ml_vector
+            new_mtmr_position = new_mid + mr_vector
             
-            mtmr_pose = self.mtmr_kin.forward(q, end_link, base_link)
+            mtmr_pose = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])
+            print('ml_vector = ' + ml_vector.__str__())
+            print('mr_vector = ' + mr_vector.__str__())
+            print('new_mid = ' + new_mid.__str__())
+            print('new_mtmr_position = ' + new_mtmr_position.__str__())
             
+            new_mtmr_position = np.array(self.mtml_pos)-left + right
+            print('new_mtmr_position = ' + new_mtmr_position.__str__())
+            
+            mtmr_pose[0:3, 3] = new_mtmr_position.reshape(3,1)
+            mtmr_joint_angles = self.mtmr_kin.inverse(mtmr_pose)
+            print('mtmr_pose = ' + mtmr_pose.__str__())
+            print('mtmr_joint_angles = ' + mtmr_joint_angles.__str__())
              
 #         
 #         # distance between the two mtms before clutching
