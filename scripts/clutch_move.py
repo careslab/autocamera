@@ -57,6 +57,9 @@ class ClutchControl:
         rospy.init_node('ecm_clutch_control')
         
         self.ecm_hw = robot("ECM")
+        self.mtmr_hw = robot("MTMR")
+        self.mtml_hw = robot("MTML")
+        
         self.ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
@@ -111,13 +114,16 @@ class ClutchControl:
                 self.mtml_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
             current_position = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]) 
             movement_vector = current_position-self.mtml_starting_point
-            self.move_mtm_centerpoints(self.mtml_pos, self.mtmr_pos)
+            self.move_mtm_centerpoints()
 #             print("movement_vector = {}, {}".format(movement_vector[0], movement_vector[1]))
             self.mtml_pos = current_position
             self.ecm_pan_tilt(movement_vector[0:2])
         else:
             self.center = self.joint_angles
-            self.mtml_pos_before_clutch = msg.pose.position
+            try:
+                self.mtml_pos_before_clutch = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3]
+            except:
+                pass
     
     def mtmr_cb(self, msg):
         pass
@@ -130,12 +136,19 @@ class ClutchControl:
 #             self.ecm_pan_tilt(movement_vector[0:2])
         else:
 #             self.center = self.joint_angles
-            self.mtmr_pos_before_clutch = msg.pose.position
+            try :
+                self.mtmr_pos_before_clutch = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
+            except:
+                pass
 
     # To be completed
-    def move_mtm_centerpoints(self, mtml_pos, mtmr_pos):
-        left = np.array([self.mtml_pos_before_clutch.x, self.mtml_pos_before_clutch.y, self.mtml_pos_before_clutch.z])
-        right = np.array([self.mtmr_pos_before_clutch.x, self.mtmr_pos_before_clutch.y, self.mtmr_pos_before_clutch.z])
+    def move_mtm_centerpoints(self):
+        left = self.mtml_pos_before_clutch
+        right = self.mtmr_pos_before_clutch
+        
+        mtml_pos = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3]
+        mtmr_pos = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
+        
         mid = (left+right)/2.0
         
         if type(mtml_pos) != NoneType:
@@ -153,13 +166,18 @@ class ClutchControl:
             print('new_mid = ' + new_mid.__str__())
             print('new_mtmr_position = ' + new_mtmr_position.__str__())
             
-            new_mtmr_position = np.array(self.mtml_pos)-left + right
+#             new_mtmr_position = mtml_pos-left + right
             print('new_mtmr_position = ' + new_mtmr_position.__str__())
             
+            print('right = ' + right.__str__())
+            print('mtmr_pose = ' + mtmr_pose.__str__())
             mtmr_pose[0:3, 3] = new_mtmr_position.reshape(3,1)
             mtmr_joint_angles = self.mtmr_kin.inverse(mtmr_pose)
-            print('mtmr_pose = ' + mtmr_pose.__str__())
             print('mtmr_joint_angles = ' + mtmr_joint_angles.__str__())
+            
+            mtmr_joint_angles = [float(i) for i in mtmr_joint_angles]
+            mtmr_joint_angles.append(0.0)
+            self.mtmr_hw.move_joint_list(mtmr_joint_angles, interpolate=False)
              
 #         
 #         # distance between the two mtms before clutching
