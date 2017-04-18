@@ -282,8 +282,12 @@ class Autocamera:
                  
     def find_zoom_level(self, msg, cam_info, clean_joints):
         if cam_info != None:
-            T1W = self.psm1_kin.forward(clean_joints['psm1'].position)
-            T2W = self.psm2_kin.forward(clean_joints['psm2'].position)
+            psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-5].name)
+            T1W = psm1_kin_to_wrist.forward(clean_joints['psm1'].position)
+            
+            psm2_kin_to_wrist = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-5].name)
+            T2W = psm2_kin_to_wrist.forward(clean_joints['psm2'].position)
+            
             TEW = self.ecm_kin.forward(clean_joints['ecm'].position)
             TEW_inv = numpy.linalg.inv(TEW)
             T1W_inv = numpy.linalg.inv(T1W)

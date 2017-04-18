@@ -10,6 +10,7 @@ import numpy as np
 import cv2
 import cv_bridge
 
+# from arm import arm as robot
 from robot import *
 # from dvrk.arm import *
 from sensor_msgs.msg import JointState

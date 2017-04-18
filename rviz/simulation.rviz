@@ -22,7 +22,7 @@ Panels:
         - /new_psm1_base1
         - /new_psm2_base1
       Splitter Ratio: 0.833992
-    Tree Height: 722
+    Tree Height: 466
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -41,7 +41,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: CameraLeft
 Visualization Manager:
   Class: ""
   Displays:
@@ -69,138 +69,138 @@ Visualization Manager:
       Frames:
         All Enabled: false
         ecm_base_link:
-          Value: false
+          Value: true
         ecm_insertion_link:
-          Value: false
+          Value: true
         ecm_pitch_link:
-          Value: false
+          Value: true
         ecm_pitch_link_1:
-          Value: false
+          Value: true
         ecm_pitch_link_2:
-          Value: false
+          Value: true
         ecm_pitch_link_3:
-          Value: false
+          Value: true
         ecm_roll_link:
-          Value: false
+          Value: true
         ecm_setup_base_link:
-          Value: false
+          Value: true
         ecm_setup_link:
-          Value: false
+          Value: true
         ecm_yaw_link:
-          Value: false
+          Value: true
         fake_cam_left_optical_link:
-          Value: false
+          Value: true
         fake_cam_right_optical_link:
-          Value: false
+          Value: true
         fake_camera_link:
-          Value: false
+          Value: true
         left_back_parallel_link:
-          Value: false
+          Value: true
         left_bottom_parallel_link:
-          Value: false
+          Value: true
         left_outer_yaw_link:
-          Value: false
+          Value: true
         left_top_panel:
-          Value: false
+          Value: true
         left_top_parallel_link:
-          Value: false
+          Value: true
         left_wrist_pitch_link:
-          Value: false
+          Value: true
         left_wrist_platform_link:
-          Value: false
+          Value: true
         left_wrist_roll_link:
-          Value: false
+          Value: true
         left_wrist_yaw_link:
-          Value: false
+          Value: true
         one_outer_insertion_link:
-          Value: false
+          Value: true
         one_outer_pitch_back_link:
-          Value: false
+          Value: true
         one_outer_pitch_bottom_link:
-          Value: false
+          Value: true
         one_outer_pitch_front_link:
-          Value: false
+          Value: true
         one_outer_pitch_link:
-          Value: false
+          Value: true
         one_outer_pitch_top_link:
-          Value: false
+          Value: true
         one_outer_yaw_link:
-          Value: false
+          Value: true
         one_psm_base_link:
-          Value: false
+          Value: true
         one_tool_main_link:
-          Value: false
+          Value: true
         one_tool_tip_link:
-          Value: false
+          Value: true
         one_tool_wrist_link:
-          Value: false
+          Value: true
         one_tool_wrist_sca_ee_link_0:
-          Value: false
+          Value: true
         one_tool_wrist_sca_ee_link_1:
-          Value: false
+          Value: true
         one_tool_wrist_sca_ee_link_2:
-          Value: false
+          Value: true
         one_tool_wrist_sca_link:
-          Value: false
+          Value: true
         one_tool_wrist_sca_shaft_link:
-          Value: false
+          Value: true
         one_tool_wrist_shaft_link:
-          Value: false
+          Value: true
         right_back_parallel_link:
-          Value: false
+          Value: true
         right_bottom_parallel_link:
-          Value: false
+          Value: true
         right_outer_yaw_link:
-          Value: false
+          Value: true
         right_top_panel:
-          Value: false
+          Value: true
         right_top_parallel_link:
-          Value: false
+          Value: true
         right_wrist_pitch_link:
-          Value: false
+          Value: true
         right_wrist_platform_link:
-          Value: false
+          Value: true
         right_wrist_roll_link:
-          Value: false
+          Value: true
         right_wrist_yaw_link:
-          Value: false
+          Value: true
         two_outer_insertion_link:
-          Value: false
+          Value: true
         two_outer_pitch_back_link:
-          Value: false
+          Value: true
         two_outer_pitch_bottom_link:
-          Value: false
+          Value: true
         two_outer_pitch_front_link:
-          Value: false
+          Value: true
         two_outer_pitch_link:
-          Value: false
+          Value: true
         two_outer_pitch_top_link:
-          Value: false
+          Value: true
         two_outer_yaw_link:
-          Value: false
+          Value: true
         two_psm_base_link:
-          Value: false
+          Value: true
         two_tool_main_link:
-          Value: false
+          Value: true
         two_tool_tip_link:
-          Value: false
+          Value: true
         two_tool_wrist_link:
-          Value: false
+          Value: true
         two_tool_wrist_sca_ee_link_0:
-          Value: false
+          Value: true
         two_tool_wrist_sca_ee_link_1:
-          Value: false
+          Value: true
         two_tool_wrist_sca_ee_link_2:
-          Value: false
+          Value: true
         two_tool_wrist_sca_link:
-          Value: false
+          Value: true
         two_tool_wrist_sca_shaft_link:
-          Value: false
+          Value: true
         two_tool_wrist_shaft_link:
-          Value: false
+          Value: true
         world:
-          Value: false
-      Marker Scale: 0.5
+          Value: true
+      Marker Scale: 0.05
       Name: TF
       Show Arrows: false
       Show Axes: true
@@ -699,14 +699,14 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz/Camera
-      Enabled: false
+      Enabled: true
       Image Rendering: background and overlay
-      Image Topic: /fakecam_node/fake_image_left
+      Image Topic: /autocamera_image_left
       Name: CameraLeft
       Overlay Alpha: 0.5
       Queue Size: 2
       Transport Hint: raw
-      Value: false
+      Value: true
       Visibility:
         CameraRight: true
         Grid: true
@@ -762,7 +762,7 @@ Visualization Manager:
       Marker Topic: /marker_subscriber
       Name: Marker
       Namespaces:
-        {}
+        my_namespace: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -770,7 +770,7 @@ Visualization Manager:
       Marker Topic: /left_arm
       Name: left_tool
       Namespaces:
-        {}
+        my_namespace: true
       Queue Size: 100
       Value: true
     - Class: rviz/Image
@@ -822,22 +822,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.44734
+      Distance: 0.159199
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.511989
-        Y: 0.0987809
-        Z: 0.216891
+        X: -0.378986
+        Y: -0.000679174
+        Z: 0.425114
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.629797
+      Pitch: 0.674797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.41774
+      Yaw: 1.42774
     Saved: ~
 Window Geometry:
   CameraLeft:
@@ -846,10 +846,10 @@ Window Geometry:
     collapsed: false
   Displays:
     collapsed: false
-  Height: 1000
+  Height: 744
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000010f00000361fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000361000000dd00fffffffb0000001600430061006d00650072006100520069006700680074020000015100000082000002af0000023efb0000001400430061006d006500720061004c0065006600740200000176000000d00000028a00000230fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800630061006d006500720061005f0069006d00610067006502000000fa000000820000028d00000232000000010000010f00000245fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002800000245000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004bf0000003bfc0100000002fb0000000800540069006d00650100000000000004bf000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003aa0000036100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000010f00000261fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000261000000dd00fffffffb0000001600430061006d00650072006100520069006700680074020000015100000082000002af0000023efb0000001400430061006d006500720061004c0065006600740300000710000000d20000028a00000230fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800630061006d006500720061005f0069006d00610067006502000000fa000000820000028d00000232000000010000010f00000245fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002800000245000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005150000003bfc0100000002fb0000000800540069006d0065010000000000000515000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000004000000026100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -858,8 +858,8 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1215
-  X: 65
-  Y: 130
+  Width: 1301
+  X: 2785
+  Y: 156
   camera_image:
     collapsed: false
