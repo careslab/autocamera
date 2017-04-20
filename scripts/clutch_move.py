@@ -85,7 +85,9 @@ class ClutchControl:
             self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
         
         self.camera_clutch_pressed = False
+        self.head_sensor_pressed = False
         rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
+        rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
         self.mtml_starting_point = None
         
         rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
@@ -190,32 +192,45 @@ class ClutchControl:
 #         z = lambda t: left[2] + right[2] * t
         
         
+    def enable_teleop(self):
+        self.mtml_orientation.unlock_orientation()
+        self.mtmr_orientation.unlock_orientation()
         
-            
+        # Return to teleop
+        self.mtml_psm2_orientation.publish(Bool(False))
+        self.mtmr_psm1_orientation.publish(Bool(False))
+        self.mtml_psm2_translation.publish(Bool(False))
+        self.mtmr_psm1_translation.publish(Bool(False))
+    def disable_teleop(self):
+        self.mtml_orientation.lock_orientation_as_is()
+        self.mtmr_orientation.lock_orientation_as_is()
+        
+        # Prevent the psms from moving when we're moving the camera
+        self.mtml_psm2_orientation.publish(Bool(True))
+        self.mtmr_psm1_orientation.publish(Bool(True))
+        self.mtml_psm2_translation.publish(Bool(True))
+        self.mtmr_psm1_translation.publish(Bool(True))
+                
+    def camera_headsensor_cb(self, msg):
+        if msg.buttons[0] == 1:
+            self.head_sensor_pressed = True
+            self.enable_teleop()
+        else:
+            self.head_sensor_pressed = False
+            self.mtml_hw.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+            self.mtmr_hw.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+                        
     def camera_clutch_cb(self, msg):
-        if msg.buttons[0] == 1: # Camera clutch pressed
+        if msg.buttons[0] == 1 and self.head_sensor_pressed: # Camera clutch pressed
             self.camera_clutch_pressed = True
             self.mtml_starting_point = None
-            self.mtml_orientation.lock_orientation_as_is()
-            self.mtmr_orientation.lock_orientation_as_is()
-            
-            # Prevent the psms from moving when we're moving the camera
-            self.mtml_psm2_orientation.publish(Bool(True))
-            self.mtmr_psm1_orientation.publish(Bool(True))
-            self.mtml_psm2_translation.publish(Bool(True))
-            self.mtmr_psm1_translation.publish(Bool(True))
+            self.disable_teleop()
             
         else: # Camera clutch not pressed anymore
             self.camera_clutch_pressed = False
             self.center = self.joint_angles
-            self.mtml_orientation.unlock_orientation()
-            self.mtmr_orientation.unlock_orientation()
-            
-            # Return to teleop
-            self.mtml_psm2_orientation.publish(Bool(False))
-            self.mtmr_psm1_orientation.publish(Bool(False))
-            self.mtml_psm2_translation.publish(Bool(False))
-            self.mtmr_psm1_translation.publish(Bool(False))
+            if self.head_sensor_pressed:
+                self.enable_teleop()
                             
     def ecm_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
@@ -230,8 +245,6 @@ class ClutchControl:
                 self.center = msg.position[0:2] + (0,0)
             self.center_cart = np.array(self.ecm_kin.FK(self.center)[0])
             
-    
-    
     
     def ecm_pan_tilt(self, movement_vector):
         q = []

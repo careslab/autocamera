@@ -223,6 +223,9 @@ class arm:
         :param data: The cartesian position current."""
         self.__position_cartesian_current = posemath.fromMsg(data.pose)
 
+    def dvrk_set_state(self, state, timeout = 5):
+        return self.__dvrk_set_state(state, timeout)
+    
     def __dvrk_set_state(self, state, timeout = 5):
         """Simple set state with block.
 
