@@ -40,6 +40,7 @@ class ClutchControl:
         
     def __init__(self, mode = MODE.simulation):        
         self.__mode__ = mode
+        self.camera_clutch_pressed = False
         self.movement_scale = .2 
         self.joint_angles = [0,0,0,0]
         
@@ -64,9 +65,14 @@ class ClutchControl:
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
         self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
         self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
+        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         
         self.mtml_orientation = mtm('MTML')
         self.mtmr_orientation = mtm('MTMR')
@@ -96,6 +102,9 @@ class ClutchControl:
         rospy.Subscriber('/dvrk/MTMR/position_cartesian_local_current', PoseStamped, self.mtmr_cb)
         rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_joint_angles_cb)
         
+        rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_joint_angles_cb)
+        rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_joint_angles_cb)
+        
 #         self.mtml_orientation.lock_orientation_as_is()
 #         self.mtml_orientation.unlock_orientation()
         
@@ -108,7 +117,12 @@ class ClutchControl:
     def mtmr_joint_angles_cb(self, msg):
         self.mtmr_joint_angles = msg.position
         
-            
+    def psm1_joint_angles_cb(self,msg):
+        self.psm1_joint_angles = msg.position
+    
+    def psm2_joint_angles_cb(self,msg):
+        self.psm2_joint_angles = msg.position
+    
     def mtml_cb(self, msg):
 #         msg.pose.position.x
         if self.camera_clutch_pressed:
@@ -143,6 +157,19 @@ class ClutchControl:
             except:
                 pass
 
+    def realign_mtm(self):
+        print("\n\nRealigning MTM-R\n")
+        mtmr_pose = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])
+        psm1_pose = self.psm1_kin.forward(list(self.psm1_joint_angles)[0:-1])
+        
+        mtmr_pose[0:3, 0:3] = psm1_pose[0:3,0:3]
+        mtmr_joint_angles = self.mtmr_kin.inverse(mtmr_pose)
+        print('Realigned mtmr_joint_angles = ' + mtmr_joint_angles.__str__())
+        
+        mtmr_joint_angles = [float(i) for i in mtmr_joint_angles]
+        mtmr_joint_angles.append(0.0)
+        self.mtmr_hw.move_joint_list(mtmr_joint_angles, interpolate=False)
+        
     # To be completed
     def move_mtm_centerpoints(self):
         left = self.mtml_pos_before_clutch
@@ -196,11 +223,15 @@ class ClutchControl:
         self.mtml_orientation.unlock_orientation()
         self.mtmr_orientation.unlock_orientation()
         
+        self.realign_mtm()
+
         # Return to teleop
         self.mtml_psm2_orientation.publish(Bool(False))
         self.mtmr_psm1_orientation.publish(Bool(False))
         self.mtml_psm2_translation.publish(Bool(False))
         self.mtmr_psm1_translation.publish(Bool(False))
+        
+        
     def disable_teleop(self):
         self.mtml_orientation.lock_orientation_as_is()
         self.mtmr_orientation.lock_orientation_as_is()
@@ -250,22 +281,23 @@ class ClutchControl:
         q = []
         q = self.joint_angles
         if q:
-            newq = [q[0], q[1], .14, q[3]]
+            newq = [q[0], q[1], .2, q[3]]
             ee = np.array(self.ecm_kin.FK(newq)[0])
-            ee[0] = self.center_cart[0] + movement_vector[0] #* .01
-            ee[1] = self.center_cart[1] + movement_vector[1] #* .01
-             
+            ee[0] = self.center_cart[0] + movement_vector[0] #* .8
+            ee[1] = self.center_cart[1] + movement_vector[1] #* .8
+              
             ee_inv = self.ecm_inverse(ee)
-             
+              
             if type(ee_inv) == NoneType:
                 return
-             
+              
             new_joint_angles = [float(i) for i in ee_inv]
+            new_joint_angles[2] = q[2]
             self.move_ecm(new_joint_angles)
              
 #             q = list(q)
-#             q[0] = movement_vector[0] * self.movement_scale
-#             q[1] = movement_vector[1] * self.movement_scale
+#             q[0] = self.center_cart[0] + movement_vector[0] * self.movement_scale
+#             q[1] = self.center_cart[1] + movement_vector[1] * self.movement_scale
 #             q = [round(i,4) for i in q]
 #             q = [i+j for i,j in zip(self.center, q)]
 #             print(q)
@@ -365,6 +397,6 @@ class ClutchControl:
         return R 
         
 if __name__ == "__main__":
-    j = ClutchControl( ClutchControl.MODE.simulation)
+    j = ClutchControl( ClutchControl.MODE.hardware)
     
     
