@@ -184,7 +184,7 @@ class arm:
         """Callback for arm state.
 
         :param data: the current arm state"""
-        rospy.loginfo(rospy.get_caller_id() + " -> current state is %s", data.data)
+        #rospy.loginfo(rospy.get_caller_id() + " -> current state is %s", data.data)
         self.__robot_state = data.data
         self.__robot_state_event.set()
 
@@ -192,7 +192,7 @@ class arm:
         """Callback for the goal reached.
 
         :param data: the goal reached"""
-        rospy.loginfo(rospy.get_caller_id() + " -> goal reached is %s", data.data)
+        #rospy.loginfo(rospy.get_caller_id() + " -> goal reached is %s", data.data)
         self.__goal_reached = data.data
         self.__goal_reached_event.set()
 
@@ -247,7 +247,7 @@ class arm:
     def home(self):
         """This method will provide power to the arm as will as home
         the arm. This method requries the arm name."""
-        rospy.loginfo(rospy.get_caller_id() + ' -> start homing')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> start homing')
         self.__robot_state_event.clear()
         self.set_robot_state_publisher.publish('Home')
         counter = 10 # up to 10 transitions to get ready
@@ -256,16 +256,16 @@ class arm:
             if (self.__robot_state != 'DVRK_READY'):
                 self.__robot_state_event.clear()
                 counter = counter - 1
-                rospy.loginfo(rospy.get_caller_id() + ' -> waiting for state to be DVRK_READY')
+#                 rospy.loginfo(rospy.get_caller_id() + ' -> waiting for state to be DVRK_READY')
             else:
                 counter = -1
         if (self.__robot_state != 'DVRK_READY'):
             rospy.logfatal(rospy.get_caller_id() + ' -> failed to reach state DVRK_READY')
-        rospy.loginfo(rospy.get_caller_id() + ' <- homing complete')
+#         rospy.loginfo(rospy.get_caller_id() + ' <- homing complete')
 
     def shutdown(self):
         """Stops providing power to the arm."""
-        rospy.loginfo(rospy.get_caller_id() + ' -> end homing')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> end homing')
         self.__dvrk_set_state('DVRK_UNINITIALIZED', 20)
 
     def get_robot_state(self):
@@ -402,7 +402,7 @@ class arm:
         :param delta_input: the incremental motion you want to make
         :param interpolate: see  :ref:`interpolate <interpolate>`
         """
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian translation')
         # is this a legal translation input
         if(self.__check_input_type(delta_input, [list, float, Vector, Rotation, Frame])):
                if(self.__check_input_type(delta_input, [list, float, Vector])):
@@ -411,14 +411,14 @@ class arm:
                    self.delta_move_cartesian_rotation(delta_input, interpolate)
                elif(self.__check_input_type(delta_input, [Frame])):
                    self.delta_move_cartesian_frame(delta_input, interpolate)
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian translation')
 
     def delta_move_cartesian_translation(self, delta_translation, interpolate=True):
         """Incremental translation in cartesian space.
 
         :param delta_translation: the incremental translation you want to make based on the current position, this is in terms of a  `PyKDL.Vector <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ or a list of floats of size 3
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian translation')
         # is this a legal translation input
         if(self.__check_input_type(delta_translation, [list, float,Vector])):
             if(type(delta_translation) is list):
@@ -434,14 +434,14 @@ class arm:
             delta_frame = Frame(delta_rotation, delta_vector)
             # move accordingly
             self.delta_move_cartesian_frame(delta_frame, interpolate)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian translation')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian translation')
 
     def delta_move_cartesian_rotation(self, delta_rotation, interpolate=True):
         """Incremental rotation in cartesian plane.
 
         :param delta_rotation: the incremental `PyKDL.Rotation <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ based upon the current position
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian rotation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian rotation')
         # is this a legal rotation input
         if(self.__check_input_type(delta_rotation, [Rotation])):
             # convert into a Frame
@@ -449,21 +449,21 @@ class arm:
             delta_frame = Frame(delta_rotation, delta_vector)
             # move accordingly
             self.delta_move_cartesian_frame(delta_frame, interpolate)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian rotation')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian rotation')
 
     def delta_move_cartesian_frame(self, delta_frame, interpolate=True):
         """Incremental move by Frame in cartesian plane.
 
         :param delta_frame: the incremental `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ based upon the current position
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian frame')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian frame')
         # is this a legal frame input
         if (self.__check_input_type(delta_frame, [Frame])):
             # add the incremental move to the current position, to get the ending frame
             end_frame = delta_frame * self.__position_cartesian_desired
             # move accordingly
             self.move_cartesian_frame(end_frame, interpolate)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian frame')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing delta move cartesian frame')
 
 
     def move_cartesian_translation(self, abs_translation, interpolate=True):
@@ -471,7 +471,7 @@ class arm:
 
         :param abs_translation: the absolute translation you want to make, this is in terms of a  `PyKDL.Vector <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ or a list of floats of size 3
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
         # is this a legal translation input
         if(self.__check_input_type(abs_translation, [list,float,Vector])):
             # if the input is a list convert it into a vector
@@ -488,14 +488,14 @@ class arm:
             abs_frame = Frame(abs_rotation, abs_vector)
             # move accordingly
             self.move_cartesian_frame(abs_frame, interpolate)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian translation')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian translation')
 
     def move_cartesian(self, abs_input, interpolate=True):
         """Absolute translation in cartesian space.
 
         :param abs_input: the absolute translation you want to make
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
         # is this a legal translation input
         if(self.__check_input_type(abs_input, [list, float, Vector, Rotation, Frame])):
                if(self.__check_input_type(abs_input, [list, float, Vector])):
@@ -504,14 +504,14 @@ class arm:
                    self.move_cartesian_rotation(abs_input, interpolate)
                elif(self.__check_input_type(abs_input, [Frame])):
                    self.move_cartesian_frame(abs_input, interpolate)
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian translation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian translation')
 
     def move_cartesian_rotation(self, abs_rotation, interpolate=True):
         """Absolute rotation in cartesian plane.
 
         :param abs_rotation: the absolute `PyKDL.Rotation <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian rotation')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian rotation')
         # is this a legal rotation input
         if(self.__check_input_type(abs_rotation, [Rotation])):
             # convert into a Frame
@@ -519,7 +519,7 @@ class arm:
             abs_frame = Frame(abs_rotation, abs_vector)
             # move accordingly
             self.move_cartesian_frame(abs_frame, interpolate)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian rotation')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian rotation')
 
 
     def move_cartesian_frame(self, abs_frame, interpolate=True):
@@ -527,14 +527,14 @@ class arm:
 
         :param abs_frame: the absolute `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian frame')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian frame')
         if (self.__check_input_type(abs_frame, [Frame])):
             # move based on value of interpolate
             if (interpolate):
                 self.__move_cartesian_goal(abs_frame)
             else:
                 self.__move_cartesian_direct(abs_frame)
-            rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian frame')
+#             rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian frame')
 
     def __move_cartesian_direct(self, end_frame):
         """Move the arm to the end position by passing the trajectory generator.
@@ -542,14 +542,14 @@ class arm:
         :param end_frame: the ending `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :returns: true if you had successfully move
         :rtype: Bool"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian direct')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian direct')
         # set in position cartesian mode
         end_position = posemath.toMsg(end_frame)
         if (not self.__dvrk_set_state('DVRK_POSITION_CARTESIAN')):
             return False
         # go to that position directly
         self.set_position_cartesian_publisher.publish(end_position)
-        rospy.loginfo(rospy.get_caller_id() + ' <- completing move cartesian direct')
+#         rospy.loginfo(rospy.get_caller_id() + ' <- completing move cartesian direct')
         return True
 
     def __move_cartesian_goal(self, end_frame):
@@ -558,7 +558,7 @@ class arm:
         :param end_frame: the ending `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :returns: true if you had succesfully move
         :rtype: Bool"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian goal')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian goal')
         # set in position cartesian mode
         end_position= posemath.toMsg(end_frame)
         if (not self.__dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')):
@@ -580,7 +580,7 @@ class arm:
         self.__goal_reached_event.wait(20) # 1 minute at most
         if not self.__goal_reached:
             return False
-        rospy.loginfo(rospy.get_caller_id() + ' -> compeleting set position goal cartesian publish and wait')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> compeleting set position goal cartesian publish and wait')
         return True
 
     def delta_move_joint_list(self, value, index=[], interpolate=True):
@@ -589,7 +589,7 @@ class arm:
         :param value: the incremental amount in which you want to move index by, this is a list
         :param index: the joint you want to move, this is a list
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move joint index')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move joint index')
         # check if value is a list
         if(self.__check_input_type(value, [list,float])):
             initial_joint_position = self.__position_joint_desired
@@ -621,7 +621,7 @@ class arm:
         :param value: the incremental amount in which you want to move index by, this is a list
         :param index: the incremental joint you want to move, this is a list
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
         # check if value is a list
         if(self.__check_input_type(value, [list,float])):
             initial_joint_position = self.__position_joint_desired
@@ -647,13 +647,13 @@ class arm:
 
         :param abs_joint: the absolute position of the joints in terms of a list
         :param interpolate: if false the trajectory generator will be used; if true you can bypass the trajectory generator"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move joint vector')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move joint vector')
         if(self.__check_input_type(abs_joint, [list,float])):
             if (interpolate):
                 self.__move_joint_goal(abs_joint)
             else:
                 self.__move_joint_direct(abs_joint)
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move joint vector')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move joint vector')
 
     def __move_joint_direct(self, end_joint):
         """Move the arm to the end vector by passing the trajectory generator.
@@ -661,7 +661,7 @@ class arm:
         :param end_joint: the list of joints in which you should conclude movement
         :returns: true if you had succesfully move
         :rtype: Bool"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting move joint direct')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting move joint direct')
         if (self.__check_input_type(end_joint, [list,float])):
             if not self.__dvrk_set_state('DVRK_POSITION_JOINT'):
                 return False
@@ -669,7 +669,7 @@ class arm:
             joint_state = JointState()
             joint_state.position[:] = end_joint
             self.set_position_joint_publisher.publish(joint_state)
-            rospy.loginfo(rospy.get_caller_id() + ' <- completing move joint direct')
+#             rospy.loginfo(rospy.get_caller_id() + ' <- completing move joint direct')
             return True
 
     def __move_joint_goal(self, end_joint):
@@ -678,7 +678,7 @@ class arm:
         :param end_joint: the list of joints in which you should conclude movement
         :returns: true if you had succesfully move
         :rtype: Bool"""
-        rospy.loginfo(rospy.get_caller_id() + ' -> starting move joint goal')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> starting move joint goal')
         if (self.__check_input_type(end_joint, [list,float])):
             if (not self.__dvrk_set_state('DVRK_POSITION_GOAL_JOINT')):
                 return False
@@ -699,7 +699,7 @@ class arm:
         self.__goal_reached_event.wait(20) # 1 minute at most
         if not self.__goal_reached:
             return False
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing set position goal joint publish and wait')
+#         rospy.loginfo(rospy.get_caller_id() + ' -> completing set position goal joint publish and wait')
         return True
 
     def set_wrench_spatial_force(self, force):
