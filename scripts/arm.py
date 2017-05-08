@@ -179,7 +179,9 @@ class arm:
         # rospy.init_node('arm_api', anonymous = True)
 #         rospy.init_node('arm_api',anonymous = True, log_level = rospy.WARN)
 #         rospy.loginfo(rospy.get_caller_id() + ' -> started arm: ' + self.__arm_name)
-
+    def get_robot_state(self):
+        return self.__robot_state
+    
     def __robot_state_callback(self, data):
         """Callback for arm state.
 

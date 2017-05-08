@@ -11,13 +11,10 @@ from sensor_msgs.msg._JointState import JointState
 from mtm import mtm 
 import sensor_msgs
 from sensor_msgs.msg import Joy
-from geometry_msgs.msg._PoseStamped import PoseStamped
+from geometry_msgs.msg import PoseStamped, 
 import std_msgs
 from std_msgs.msg import Bool
 from std_msgs.msg import String
-
-# TODO:
-#     
 
 class ClutchControl:
     # General idea:
@@ -46,6 +43,8 @@ class ClutchControl:
         self.joint_angles = [0,0,0,0]
         self.center = [0,0,0,0]
         
+        self.flag = True
+        
         self.mtml_pos = [0,0,0]
         self.mtml_joint_angles = [0,0,0,0,0,0,0]
         
@@ -55,7 +54,7 @@ class ClutchControl:
         self.mtmr_starting_point =  [0,0,0,0,0,0,0]
         
         self.__init_nodes__()
-        self.__spin__()
+        self.spin()
         
     def __init_nodes__(self):
         rospy.init_node('ecm_clutch_control')
@@ -63,6 +62,9 @@ class ClutchControl:
         self.ecm_hw = robot("ECM")
         self.mtmr_hw = robot("MTMR")
         self.mtml_hw = robot("MTML")
+        
+        self.mtml_hw_pub = rospy.Publisher('/dvrk/MTML/set_position_joint', JointState, queue_size=1)
+        self.mtmr_hw_pub = rospy.Publisher('/dvrk/MTMR/set_position_joint', JointState, queue_size=1)
         
         self.ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
@@ -89,45 +91,70 @@ class ClutchControl:
         self.mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
         self.mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
         
+        self.sub_ecm_cb = None
         if self.__mode__ == self.MODE.simulation:
-            rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+            self.sub_ecm_cb = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
         elif self.__mode__ == self.MODE.hardware:
-            rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
-            self.ecm_hw.home()
+            self.sub_ecm_cb = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+#             self.ecm_hw.home()
             self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
         
         self.camera_clutch_pressed = False
         self.head_sensor_pressed = False
-        rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
-        rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
+        self.sub_camera_clutch_cb = rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
+        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
         self.mtml_starting_point = None
         
-        rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
-        rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_joint_angles_cb)
+        self.sub_mtml_cart_cb = rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
+        self.sub_mtml_joint_cb = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_joint_angles_cb)
         
-        rospy.Subscriber('/dvrk/MTMR/position_cartesian_local_current', PoseStamped, self.mtmr_cb)
-        rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_joint_angles_cb)
+        self.sub_mtmr_cart_cb = rospy.Subscriber('/dvrk/MTMR/position_cartesian_local_current', PoseStamped, self.mtmr_cb)
+        self.sub_mtmr_joint_cb = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_joint_angles_cb)
         
-        rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_joint_angles_cb)
-        rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_joint_angles_cb)
+        self.sub_psm1_joint_cb = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_joint_angles_cb)
+        self.sub_psm2_joint_cb = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_joint_angles_cb)
         
 #         self.mtml_orientation.lock_orientation_as_is()
 #         self.mtml_orientation.unlock_orientation()
+    
+    def shutdown(self):
+        try:
+            self.sub_ecm_cb.unregister()
+            self.sub_camera_clutch_cb.unregister()
+            self.sub_headsensor_cb.unregister()
+            self.sub_mtml_cart_cb.unregister()
+            self.sub_mtml_joint_cb.unregister()
+            self.sub_mtmr_cart_cb.unregister()
+            self.sub_mtmr_joint_cb.unregister()
+            self.sub_psm1_joint_cb.unregister()
+            self.sub_psm2_joint_cb.unregister()
+            
+        except(e):
+            pass
+        rospy.signal_shutdown('shutting down ClutchControl')
         
-    def __spin__(self):
+    def set_mode(self, mode):
+        """ Values:
+            MODE.simulation
+            MODE.hardware
+        """
+        self.__mode__ = mode
+            
+    def spin(self):
         rospy.spin()
 
     def mtml_joint_angles_cb(self, msg):
-        self.mtml_joint_angles = msg.position
+        self.mtml_joint_angles = list(msg.position)
+        self.move_mtm_out_of_the_way()
     
     def mtmr_joint_angles_cb(self, msg):
-        self.mtmr_joint_angles = msg.position
+        self.mtmr_joint_angles = list(msg.position)
         
     def psm1_joint_angles_cb(self,msg):
-        self.psm1_joint_angles = msg.position
+        self.psm1_joint_angles = list(msg.position)
     
     def psm2_joint_angles_cb(self,msg):
-        self.psm2_joint_angles = msg.position
+        self.psm2_joint_angles = list(msg.position)
     
     def mtml_cb(self, msg):
 #         msg.pose.position.x
@@ -167,7 +194,32 @@ class ClutchControl:
                 self.mtmr_pos_before_clutch = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
             except:
                 pass
-
+    
+    def move_mtm_out_of_the_way(self):
+        if self.head_sensor_pressed == True and self.camera_clutch_pressed == False:
+            if self.mtml_hw.get_robot_state() == 'DVRK_POSITION_GOAL_CARTESIAN' and self.flag == True:
+                self.flag == False
+                ml = self.mtml_joint_angles[3]
+                mr = self.mtml_joint_angles[3]
+                delta = .1
+                
+                mtml_joints = JointState()
+                mtml_joints.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll', 'finger_grips']
+                mtml_joints.position = self.mtml_joint_angles
+                mtml_joints.position[3] += (-1.58 -mtml_joints.position[3])/10.0  
+                mtml_joints.effort = [0, 0, 0, delta, 0, 0, 0, 0]
+                print("mtml_joints = " + mtml_joints.__str__())
+                self.mtml_hw_pub.publish(mtml_joints)
+                
+                mtmr_joints = JointState()
+                mtmr_joints.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll', 'finger_grips']
+                mtmr_joints.position = self.mtmr_joint_angles
+                new_p = list(mtmr_joints.position)
+                new_p[3] = 1.58
+                mtmr_joints.position[3] +=  (1.58 - mtmr_joints.position[3])/10.0 
+                mtmr_joints.effort = [0, 0, 0, delta, 0, 0, 0, 0]
+                self.mtmr_hw_pub.publish(mtmr_joints)
+                
     # To be completed
     def move_mtm_centerpoints(self):
         left = self.mtml_pos_before_clutch
@@ -193,6 +245,8 @@ class ClutchControl:
             mtmr_joint_angles = [float(i) for i in mtmr_joint_angles]
             mtmr_joint_angles.append(0.0)
             self.mtmr_hw.move_joint_list(mtmr_joint_angles[0:3], [0,1,2], interpolate=False)
+            
+#             self.move_mtm_out_of_the_way()
              
         
         
@@ -367,6 +421,7 @@ class ClutchControl:
         
         R = np.matrix(R)
         return R 
+        
         
 if __name__ == "__main__":
     j = ClutchControl( ClutchControl.MODE.hardware)
