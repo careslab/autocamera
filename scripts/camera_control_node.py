@@ -30,6 +30,7 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import pyqtSlot
 import threading
 from PyQt4.QtCore import QThread
+from std_msgs.msg._Empty import Empty
 
 class camera_handler:
     """
@@ -903,13 +904,51 @@ class camera_qt_gui:
                 self.node_handler.shutdown()
                 self.quit()
                 
-        
+    class thread_home_arms(QThread):
+        def __init__(self):
+            super(QThread, self).__init__()
+            self.is_running = True
+        def run(self):
+            psm1 = robot('PSM1')
+            psm2 = robot('PSM2')
+            ecm = robot('ECM')
+            mtml = robot('MTML')
+            mtmr = robot('MTMR')
+            
+            psm1.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
+            psm2.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
+            
+            mtml.move_joint_list([0.0,0.0,0.0,-1.57,0.0,0.0,0.0,0.0], interpolate=True)
+            mtmr.move_joint_list([0.0,0.0,0.0,1.57,0.0,0.0,0.0,0.0], interpolate=True)
+            
+            ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
+            
+            self.is_running = False
+        def kill(self):
+            if self.is_running == False:
+                self.quit()        
+    
+    class run_dvrk_console(QThread):
+        def run(self):
+            os.system('qlacloserelays')
+            rospy.sleep(1)
+            #home all the arms
+            rospy.Publisher('/dvrk/console/home', Empty, latch=True, queue_size=1).publish()
+            os.system('rosrun dvrk_robot dvrk_console_json -j /home/dvrk/dev/Working\ Settings\ Files/Oct-2016/console-full-wsu.json')
+        def kill(self):
+            self.quit()
+            
     def __init__(self):
         
         self.thread = None
+        self.homing_thread = None
+        self.console_homing = self.run_dvrk_console()
+        self.console_homing.start()
         
         # We have to initialize the node inside the main thread otherwise it would not work
         rospy.init_node('camera_control_node')
+        
+        widget_x = 20; widget_y = 30;
         
         self.a = QApplication(sys.argv) # Application handle
         self.w = QWidget() # Widget handle
@@ -919,36 +958,53 @@ class camera_qt_gui:
          
         # Set window title
         self.w.setWindowTitle("Camera Options")
+        
+        # Add home button
+        self.btn_exit = QPushButton(self.w)
+        self.btn_exit.setText('Home')
+        self.btn_exit.clicked.connect(self.home)
+        self.btn_exit.move(widget_x,widget_y)
          
         # Add radio button for autocamera
         self.radio_autocamera = QRadioButton('Autocamera', self.w)
         self.radio_autocamera.setToolTip('Activate autocamera')
         self.radio_autocamera.clicked.connect(self.on_autocamera_select)
         self.radio_autocamera.resize(self.radio_autocamera.sizeHint())
-        self.radio_autocamera.move(20,30)
+        self.radio_autocamera.move(widget_x,2*widget_y)
         
         # Add radio button for clutch and Go
         self.radio_clutchNGo = QRadioButton('Clutch and Move', self.w)
         self.radio_clutchNGo.setToolTip('Activate camera clutch mechanism')
         self.radio_clutchNGo.clicked.connect(self.on_clutchNGo_select)
         self.radio_clutchNGo.resize(self.radio_clutchNGo.sizeHint())
-        self.radio_clutchNGo.move(20,60)
+        self.radio_clutchNGo.move(widget_x,3*widget_y)
         
         # Add exit button
         self.btn_exit = QPushButton(self.w)
         self.btn_exit.setText('Exit')
         self.btn_exit.clicked.connect(self.exit_program)
-        self.btn_exit.move(20,90)
+        self.btn_exit.move(widget_x,4*widget_y)
         
         # Show window
         self.w.show()
     
         sys.exit(self.a.exec_())
-       
+    
+    @pyqtSlot()
+    def home(self):
+        self.homing_thread = self.thread_home_arms()
+        self.homing_thread.start()
+        
     @pyqtSlot()
     def exit_program(self):
+        rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish()
+        rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(False))
         if self.thread != None:
             self.thread.kill()
+        if self.homing_thread != None:
+            self.homing_thread.kill()
+        if self.console_homing != None:
+            self.console_homing.kill()
         sys.exit(self.a.exec_())
     
     @pyqtSlot()
@@ -967,7 +1023,9 @@ class camera_qt_gui:
         
         if self.thread != None:
             self.thread.kill()
-        
+
+        rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
+                
         if name == self.node_name.clutchNGo :
             self.thread = self.thread_clutchNGo()
             self.thread.start()
@@ -985,5 +1043,9 @@ def main():
     node_handler.debug_graphics(False)
     node_handler.spin()
     """
+    
+
 if __name__ == "__main__":
     main()
+    print('hello')
+    t1.kill()
