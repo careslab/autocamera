@@ -229,6 +229,6 @@ class Joystick:
         return R 
         
 if __name__ == "__main__":
-    j = Joystick( Joystick.MODE.hardware)
+    j = Joystick( Joystick.MODE.simulation)
     
     
