@@ -898,13 +898,16 @@ class Joystick:
         self.sub_joy = rospy.Subscriber('/joy', msg.Joy, self.on_joystick_change_cb)
         
     def shutdown(self):
+        print('shutting down joystick control')
         try:
             self.sub_ecm.unregister()
             self.sub_joy.unregister()
             self.ecm_sim.unregister()
         except e:
             pass
-        
+    def set_mode(self, mode):
+        self.__mode__ = mode
+                
     def spin(self):
         self.__spin__()
     def __spin__(self):
@@ -969,18 +972,6 @@ class Joystick:
         q = []
         q = self.joint_angles
         if q:
-#             ee = np.array(self.ecm_kin.FK(q)[0])
-#             ee[0] += movement_vector[0] * .001
-#             ee[1] += movement_vector[1] * .001
-#             
-#             ee_inv = self.ecm_inverse(ee)
-#             
-#             if type(ee_inv) == NoneType:
-#                 return
-#             
-#             new_joint_angles = [float(i) for i in ee_inv]
-#             self.move_ecm(new_joint_angles)
-            
             q = list(q)
             q[0] += .4 * movement_vector[0] * self.movement_scale
             q[1] += .08 * movement_vector[1] * self.movement_scale
@@ -1137,7 +1128,6 @@ class camera_qt_gui:
             super(QThread, self).__init__()
             self.node_handler = None
             self.__mode__ = mode
-            os.system('rosrun joy joy_node &')
         def run(self):
             self.node_handler = Joystick()
             self.node_handler.set_mode(self.__mode__)
@@ -1186,9 +1176,10 @@ class camera_qt_gui:
         
         self.thread = None
         self.homing_thread = None
-        self.console_homing = self.run_dvrk_console()
-        self.console_homing.start()
+#         self.console_homing = self.run_dvrk_console()
+#         self.console_homing.start()
         self.__mode__ = self.MODE.simulation 
+        self.__control_mode__ = None
         
         # We have to initialize the node inside the main thread otherwise it would not work
         rospy.init_node('camera_control_node')
@@ -1281,30 +1272,45 @@ class camera_qt_gui:
             self.thread.kill()
         if self.homing_thread != None:
             self.homing_thread.kill()
-        if self.console_homing != None:
-            self.console_homing.kill()
+#         if self.console_homing != None:
+#             self.console_homing.kill()
         sys.exit(self.a.exec_())
     
     @pyqtSlot()
     def on_autocamera_select(self):  
+        self.__control_mode__ = self.node_name.autocamera
         self.start_node_handler(self.node_name.autocamera)
         #threading.Thread(target=self.start_node_handler, args=(self.node_name.autocamera))
         
     @pyqtSlot()
     def on_clutchNGo_select(self):
+        self.__control_mode__ = self.node_name.clutchNGo
         self.start_node_handler(self.node_name.clutchNGo)
     
     @pyqtSlot()
     def on_joystick_select(self):
+        self.__control_mode__ = self.node_name.joystick
+        print(self.node_name.joystick)
         self.start_node_handler(self.node_name.joystick)
         
     @pyqtSlot()
     def on_simulation_select(self):
-        self.__mode__ = self.MODE.simulation
+        if self.__mode__ != self.MODE.simulation :
+            self.__mode__ = self.MODE.simulation
+            if self.__control_mode__ != None:
+                self.thread.kill()
+                self.start_node_handler(self.__control_mode__)
     
     @pyqtSlot()
     def on_hardware_select(self):
-        self.__mode__ = self.MODE.hardware
+        print('1')
+        if self.__mode__ != self.MODE.hardware :
+            self.__mode__ = self.MODE.hardware
+            print(self.__control_mode__)
+            if self.__control_mode__ != None:
+                print('3')
+                self.thread.kill()
+                self.start_node_handler(self.__control_mode__)
     
     def start_node_handler(self, name=node_name.clutchNGo):
         msg = QMessageBox()
