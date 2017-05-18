@@ -31,6 +31,8 @@ from PyQt4.QtCore import pyqtSlot
 import threading
 from PyQt4.QtCore import QThread
 from std_msgs.msg._Empty import Empty
+from geometry_msgs.msg import PoseStamped, Pose
+from hrl_geom import pose_converter
 
 class camera_handler:
     """
@@ -1149,22 +1151,26 @@ class camera_qt_gui:
         def __init__(self):
             super(QThread, self).__init__()
             self.is_running = True
+            
         def run(self):
+            self.counter = 100
             psm1 = robot('PSM1')
             psm2 = robot('PSM2')
             ecm = robot('ECM')
             mtml = robot('MTML')
             mtmr = robot('MTMR')
             
+            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.set_base_frames)
+            
             psm1.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
             psm2.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
             
-            mtml.move_joint_list([0.0,0.0,0.0,-1.57,0.0,0.0,0.0,0.0], interpolate=True)
-            mtmr.move_joint_list([0.0,0.0,0.0,1.57,0.0,0.0,0.0,0.0], interpolate=True)
+            mtml.move_joint_list([-1.57],[3], interpolate=True)
+            mtmr.move_joint_list([1.57],[3], interpolate=True)
             
             ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
-            self.set_base_frames()
+#             self.set_base_frames()
             
             self.is_running = False
             
@@ -1172,46 +1178,53 @@ class camera_qt_gui:
             if self.is_running == False:
                 self.quit()
                         
-        def set_base_frames(self):
-            q = [0.0,0.0,0.0,0.0]
+        def set_base_frames(self, msg):
+            print('set_base_frames', msg.position)
+            if msg.position and self.counter > 0:
+                self.counter -= 1
+                q = msg.position
+                
+                self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+                self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+                self.ecm_base = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[3].name)
+                
+                self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+                self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[1].name)
+                
+                self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+                self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[1].name)
+                
+                self.psm1_pub = rospy.Publisher('/dvrk/PSM1/set_base_frame', Pose, queue_size=10)
+                self.psm2_pub = rospy.Publisher('/dvrk/PSM2/set_base_frame', Pose, queue_size=10)
             
-            self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-            self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
-            self.ecm_base = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[3].name)
+                ecm_ee = self.ecm_kin.forward(q)
+                ecm_base_frame = self.ecm_base.forward([]) 
+                
+                r_180_x = self.rotate('x', np.pi)
+                r_90_z = self.rotate('z', -np.pi/2)
+                
+                ecm_ee[0:3,0:3] = ecm_ee[0:3,0:3] * r_90_z * r_180_x
+                
+                print("joint_angles " + q.__str__())
+                print('ecm_ee' + ecm_ee.__str__())
+                print('ecm_base' + ecm_base_frame.__str__())
+                
+                psm1_base_frame =  (ecm_ee ** -1) * self.psm1_kin.forward([]) 
+                psm1_message = pose_converter.PoseConv.to_pose_msg(psm1_base_frame)
+                psm1_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm1_base_frame)
             
-            self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-            self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[1].name)
-            
-            self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
-            self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[1].name)
-            
-            self.psm1_pub = rospy.Publisher('/dvrk/PSM1/set_base_frame', Pose, latch=True, queue_size=1)
-            self.psm2_pub = rospy.Publisher('/dvrk/PSM2/set_base_frame', Pose, latch=True, queue_size=1)
-        
-            ecm_ee = self.ecm_kin.forward(q)
-            ecm_base_frame = self.ecm_base.forward([]) 
-            
-            r_180_x = self.rotate('x', pi)
-            r_90_z = self.rotate('z', -pi/2)
-            
-            ecm_ee[0:3,0:3] = ecm_ee[0:3,0:3] * r_90_z * r_180_x
-            
-            print("joint_angles " + q.__str__())
-            print('ecm_ee' + ecm_ee.__str__())
-            print('ecm_base' + ecm_base_frame.__str__())
-            
-            psm1_base_frame =  (ecm_ee ** -1) * self.psm1_kin.forward([]) 
-            psm1_message = pose_converter.PoseConv.to_pose_msg(psm1_base_frame)
-            psm1_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm1_base_frame)
-        
-            psm2_base_frame = (ecm_ee ** -1) * self.psm2_kin.forward([])
-            psm2_message = pose_converter.PoseConv.to_pose_msg(psm2_base_frame)
-            psm2_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm2_base_frame)
-            
-            self.psm1_pub.publish(psm1_message)
-            self.psm2_pub.publish(psm2_message)
-            
-#             ecm_message = pose_converter.PoseConv.to_pose_msg(ecm_base_frame)
+                psm2_base_frame = (ecm_ee ** -1) * self.psm2_kin.forward([])
+                psm2_message = pose_converter.PoseConv.to_pose_msg(psm2_base_frame)
+                psm2_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm2_base_frame)
+                
+                for _ in range(1,10):
+                    self.psm1_pub.publish(psm1_message)
+                    self.psm2_pub.publish(psm2_message)
+    #             ecm_message = pose_converter.PoseConv.to_pose_msg(ecm_base_frame)
+            else:
+                self.sub_ecm.unregister()
+                self.psm1_pub.unregister()
+                self.psm2_pub.unregister()
             
         def rotate(self, axis, angle):
             """

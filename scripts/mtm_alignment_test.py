@@ -154,8 +154,8 @@ class mtm_aligner:
         self.mtmr_pub = rospy.Publisher('/dvrk/MTMR/set_base_frame', Pose, latch=True, queue_size=1)
         self.mtml_pub = rospy.Publisher('/dvrk/MTML/set_base_frame',Pose, latch=True, queue_size=1)
         
-        self.mtmr_hw = robot("MTML")
-        self.mtml_hw = robot("MTMR")
+        self.mtmr_hw = robot("MTMR")
+        self.mtml_hw = robot("MTML")
         
         self.psm1_hw = robot("PSM1")
         self.psm2_hw = robot("PSM2")
@@ -190,8 +190,8 @@ class mtm_aligner:
         self.psm1_hw.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
         self.psm2_hw.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
         
-        self.mtml_hw.move_joint_list([1.57], [3], interpolate=True)
-        self.mtmr_hw.move_joint_list([-1.58], [3], interpolate=True)
+        self.mtml_hw.move_joint_list([-1.58], [3], interpolate=True)
+        self.mtmr_hw.move_joint_list([1.57], [3], interpolate=True)
         
 #         while True:
 #             rospy.sleep(10)
