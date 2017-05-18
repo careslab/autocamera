@@ -1123,6 +1123,7 @@ class camera_qt_gui:
             if self.node_handler != None:
                 self.node_handler.shutdown()
                 self.quit()
+                
     class thread_joystick(QThread):
         def __init__(self, mode):
             super(QThread, self).__init__()
@@ -1138,6 +1139,12 @@ class camera_qt_gui:
                 self.node_handler.shutdown()
                 self.quit()
                 
+    """
+        thread_home_arms:
+                This thread sets the PSM base frames so the MTM's and PSM's align correctly.
+                It also moves the MTM's wrists to an appropriate location
+                
+    """
     class thread_home_arms(QThread):
         def __init__(self):
             super(QThread, self).__init__()
@@ -1157,10 +1164,74 @@ class camera_qt_gui:
             
             ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
+            self.set_base_frames()
+            
             self.is_running = False
+            
         def kill(self):
             if self.is_running == False:
-                self.quit()        
+                self.quit()
+                        
+        def set_base_frames(self):
+            q = [0.0,0.0,0.0,0.0]
+            
+            self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+            self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+            self.ecm_base = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[3].name)
+            
+            self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+            self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[1].name)
+            
+            self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+            self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[1].name)
+            
+            self.psm1_pub = rospy.Publisher('/dvrk/PSM1/set_base_frame', Pose, latch=True, queue_size=1)
+            self.psm2_pub = rospy.Publisher('/dvrk/PSM2/set_base_frame', Pose, latch=True, queue_size=1)
+        
+            ecm_ee = self.ecm_kin.forward(q)
+            ecm_base_frame = self.ecm_base.forward([]) 
+            
+            r_180_x = self.rotate('x', pi)
+            r_90_z = self.rotate('z', -pi/2)
+            
+            ecm_ee[0:3,0:3] = ecm_ee[0:3,0:3] * r_90_z * r_180_x
+            
+            print("joint_angles " + q.__str__())
+            print('ecm_ee' + ecm_ee.__str__())
+            print('ecm_base' + ecm_base_frame.__str__())
+            
+            psm1_base_frame =  (ecm_ee ** -1) * self.psm1_kin.forward([]) 
+            psm1_message = pose_converter.PoseConv.to_pose_msg(psm1_base_frame)
+            psm1_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm1_base_frame)
+        
+            psm2_base_frame = (ecm_ee ** -1) * self.psm2_kin.forward([])
+            psm2_message = pose_converter.PoseConv.to_pose_msg(psm2_base_frame)
+            psm2_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm2_base_frame)
+            
+            self.psm1_pub.publish(psm1_message)
+            self.psm2_pub.publish(psm2_message)
+            
+#             ecm_message = pose_converter.PoseConv.to_pose_msg(ecm_base_frame)
+            
+        def rotate(self, axis, angle):
+            """
+            Returns a rotation matrix
+                axis : 'x','y' or 'z'
+                angle : In radians
+            """
+            c = np.cos(angle)
+            s = np.sin(angle)
+            
+            m = np.eye(3)
+            
+            if axis.lower() == 'x':
+                m[1:,1:] = np.matrix( [ [c,-s], [s,c]])
+            elif axis.lower() == 'z':
+                m[:2,:2] = np.matrix( [ [c,-s], [s,c]])
+            elif axis.lower() == 'y':
+                m[0,0] = c; m[0,2] = s; m[2,0] = -s; m[2,2] = c;
+                
+            return m
     
     class run_dvrk_console(QThread):
         def run(self):

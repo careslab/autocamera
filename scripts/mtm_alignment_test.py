@@ -95,6 +95,7 @@ class mtm_aligner:
             
             
             
+            # Show it in RViz
             ecm_ee_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(ecm_ee)
             ecm_ee_message_stamped.header.frame_id = "/world"
             
