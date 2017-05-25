@@ -1159,14 +1159,14 @@ class camera_qt_gui:
             ecm = robot('ECM')
             mtml = robot('MTML')
             mtmr = robot('MTMR')
-            
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.set_base_frames)
-            
             psm1.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
             psm2.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
             
-            mtml.move_joint_list([-1.57],[3], interpolate=True)
-            mtmr.move_joint_list([1.57],[3], interpolate=True)
+            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.set_base_frames)
+            
+            
+#             mtml.move_joint_list([-1.57],[3], interpolate=True)
+#             mtmr.move_joint_list([1.57],[3], interpolate=True)
             
             ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
