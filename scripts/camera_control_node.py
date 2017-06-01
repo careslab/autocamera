@@ -172,20 +172,24 @@ class Autocamera_node_handler:
 
     def shutdown(self):
         try:
-            self.sub_psm1_sim.unregister()
-            self.sub_psm2_sim.unregister()
-            self.sub_psm1_hw.unregister()
-            self.sub_psm2_hw.unregister()
             if self.__DEBUG_GRAPHICS__ == True:
                 self.sub_fake_image_left.unregister()
                 self.sub_fake_image_right.unregister()
-                self.image_left_pub.unregister()
-                self.image_right_pub.unregister()
-            self.sub_ecm_sim.unregister()
-            self.sub_caminfo.unregister()
+                
+            if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
+                self.sub_psm1_sim.unregister()
+                self.sub_psm2_sim.unregister()
+                self.sub_ecm_sim.unregister()
+            self.image_left_pub.unregister()
+            self.image_right_pub.unregister()
+            self.sub_psm1_hw.unregister()
+            self.sub_psm2_hw.unregister()
             self.ecm_pub.unregister()
+            self.sub_caminfo.unregister()
             self.psm1_pub.unregister()
             self.psm2_pub.unregister()
+            
+            print( "Shutting down " + self.__class__.__name__)
             
         except Exception:
             print("couldn't unregister all the topics")
@@ -506,7 +510,6 @@ class ClutchControl:
         self.mtmr_starting_point =  [0,0,0,0,0,0,0]
         
         self.__init_nodes__()
-        self.spin()
         
     def __init_nodes__(self):
 #         rospy.init_node('ecm_clutch_control')
@@ -581,7 +584,10 @@ class ClutchControl:
             self.sub_psm1_joint_cb.unregister()
             self.sub_psm2_joint_cb.unregister()
             
+            print( "Shutting down " + self.__class__.__name__)
+            
         except(e):
+            print("couldn't unregister all the topics")
             pass
 #         rospy.signal_shutdown('shutting down ClutchControl')
         
@@ -881,7 +887,6 @@ class Joystick:
         self.last_z = 0
         
         self.__init_nodes__()
-        self.__spin__()
         
     def __init_nodes__(self):
         self.ecm_hw = robot("ECM")
@@ -905,8 +910,11 @@ class Joystick:
             self.sub_ecm.unregister()
             self.sub_joy.unregister()
             self.ecm_sim.unregister()
+            
+            print( "Shutting down " + self.__class__.__name__)
         except e:
-            pass
+            print("couldn't unregister all the topics")
+
     def set_mode(self, mode):
         self.__mode__ = mode
                 
@@ -1102,6 +1110,7 @@ class camera_qt_gui:
             self.__mode__ = mode
         def run(self):
             self.node_handler = Autocamera_node_handler()
+            print('\nRunning {} in {}\n'.format("Autocamera",self.__mode__))
             self.node_handler.set_mode(self.__mode__)
             self.node_handler.debug_graphics(True)
             self.node_handler.spin()
@@ -1117,7 +1126,8 @@ class camera_qt_gui:
             self.node_handler = None
             self.__mode__ = mode
         def run(self):
-            self.node_handler = Joystick()
+            self.node_handler = ClutchControl()
+            print('\nRunning {} in {}\n'.format("Clutch and Move",self.__mode__))
             self.node_handler.set_mode(self.__mode__)
             self.node_handler.spin()
         
@@ -1133,6 +1143,7 @@ class camera_qt_gui:
             self.__mode__ = mode
         def run(self):
             self.node_handler = Joystick()
+            print('\nRunning {} in {}\n'.format("Joystick Control",self.__mode__))
             self.node_handler.set_mode(self.__mode__)
             self.node_handler.spin()
         
@@ -1374,7 +1385,6 @@ class camera_qt_gui:
     @pyqtSlot()
     def on_joystick_select(self):
         self.__control_mode__ = self.node_name.joystick
-        print(self.node_name.joystick)
         self.start_node_handler(self.node_name.joystick)
         
     @pyqtSlot()
@@ -1387,12 +1397,10 @@ class camera_qt_gui:
     
     @pyqtSlot()
     def on_hardware_select(self):
-        print('1')
         if self.__mode__ != self.MODE.hardware :
             self.__mode__ = self.MODE.hardware
             print(self.__control_mode__)
             if self.__control_mode__ != None:
-                print('3')
                 self.thread.kill()
                 self.start_node_handler(self.__control_mode__)
     
