@@ -43,6 +43,9 @@ class Autocamera:
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         
+        self.zoom_deadzone_radius = .2
+        self.zoom_innerzone_radius = .1
+        
         self.zoom_level_positions = {'l1':None, 'r1':None, 'l2':None, 'r2':None, 'lm':None, 'rm':None}
         self.logerror("autocamera_initialized")
         
@@ -338,7 +341,7 @@ class Autocamera:
              
             mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
-                                            tool_point2=l2, radius=.1, deadzone_radius=.2)
+                                            tool_point2=l2, radius=self.zoom_innerzone_radius, deadzone_radius=self.zoom_deadzone_radius)
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00

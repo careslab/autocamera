@@ -30,6 +30,7 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import pyqtSlot
 import threading
 from PyQt4.QtCore import QThread
+from PyQt4.QtCore import Qt
 from std_msgs.msg._Empty import Empty
 from geometry_msgs.msg import PoseStamped, Pose
 from hrl_geom import pose_converter
@@ -1292,10 +1293,11 @@ class camera_qt_gui:
         
         widget_number = 1
         # Add home button
-        self.btn_exit = QPushButton(self.w)
-        self.btn_exit.setText('Home')
-        self.btn_exit.clicked.connect(self.home)
-        self.btn_exit.move(widget_x,widget_number * widget_y)
+        self.btn_home = QPushButton(self.w)
+        self.btn_home.setText('Home')
+        self.btn_home.clicked.connect(self.home)
+        self.btn_home.move(widget_x,widget_number * widget_y)
+        
         # Add radio button for autocamera
         widget_number += 1
         self.radio_autocamera = QRadioButton('Autocamera', self.w)
@@ -1346,6 +1348,37 @@ class camera_qt_gui:
         camera_control_group.addButton(self.radio_autocamera)
         camera_control_group.addButton(self.radio_clutchNGo)
         camera_control_group.addButton(self.radio_joystick)
+        
+        self.main_layout = QHBoxLayout()
+        self.options_box = QHBoxLayout()
+        self.mode_box = QVBoxLayout()
+        self.control_method = QVBoxLayout()
+        
+        self.control_method.addStretch(1)
+        self.control_method.addWidget(self.radio_autocamera)
+        self.control_method.addWidget(self.radio_clutchNGo)
+        self.control_method.addWidget(self.radio_joystick)
+        self.control_method.setContentsMargins(2, 2, 2, 2)
+        
+        self.mode_box.addStretch(1)
+        self.mode_box.addWidget(self.radio_simulation)
+        self.mode_box.addWidget(self.radio_hardware)
+        
+#         self.options_box.addWidget(self.btn_home)
+#         self.options_box.addWidget(self.btn_exit)
+        self.options_box.addLayout(self.mode_box)
+        self.options_box.addLayout(self.control_method)
+
+        self.left_bar = QVBoxLayout()
+        self.left_bar.addWidget(self.btn_home)
+        self.left_bar.addLayout(self.options_box)
+        self.left_bar.addWidget(self.btn_exit)
+        self.left_bar.addStretch(1)
+        
+#         self.main_layout.setSizeConstraint(self.main_layout.SetFixedSize)
+        self.main_layout.addLayout(self.left_bar)
+        self.main_layout.addStretch(1)
+        self.w.setLayout(self.main_layout)
         
         mode_group.addButton(self.radio_simulation)
         mode_group.addButton(self.radio_hardware)
