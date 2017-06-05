@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Mon Jun  5 15:26:03 2017
+# Created: Mon Jun  5 15:54:55 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,10 @@ except AttributeError:
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName(_fromUtf8("Dialog"))
-        Dialog.resize(724, 667)
+        Dialog.resize(672, 613)
+        Dialog.setMinimumSize(QtCore.QSize(672, 613))
+        Dialog.setMaximumSize(QtCore.QSize(1000, 1000))
+        Dialog.setMouseTracking(True)
         self.groupBoxOperationMode = QtGui.QGroupBox(Dialog)
         self.groupBoxOperationMode.setGeometry(QtCore.QRect(10, 170, 161, 71))
         self.groupBoxOperationMode.setObjectName(_fromUtf8("groupBoxOperationMode"))
@@ -37,7 +40,7 @@ class Ui_Dialog(object):
         self.radioButtonHardware.setGeometry(QtCore.QRect(10, 40, 116, 22))
         self.radioButtonHardware.setObjectName(_fromUtf8("radioButtonHardware"))
         self.groupBoxCameraControlMethod = QtGui.QGroupBox(Dialog)
-        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 260, 171, 111))
+        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 240, 171, 111))
         self.groupBoxCameraControlMethod.setAutoFillBackground(False)
         self.groupBoxCameraControlMethod.setObjectName(_fromUtf8("groupBoxCameraControlMethod"))
         self.radioButtonAutocamera = QtGui.QRadioButton(self.groupBoxCameraControlMethod)

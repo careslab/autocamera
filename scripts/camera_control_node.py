@@ -1301,11 +1301,17 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.radioButtonSimulation.clicked.connect(self.on_simulation_select)
         self.radioButtonHardware.clicked.connect(self.on_hardware_select)
         
+        self.groupBoxAutocameraParams.setVisible(False)
+        
         self.pushButtonHome.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(False)
+        self.groupBoxOperationMode.setEnabled(False)
+        self.groupBoxCameraControlMethod.setEnabled(False)
     
     @pyqtSlot()
     def home(self):
+        self.groupBoxOperationMode.setEnabled(True)
+        self.groupBoxCameraControlMethod.setEnabled(True)
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
 
@@ -1315,7 +1321,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonExit.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(True)
         self.pushButtonPowerOn.setEnabled(False)
-        
+
         rospy.Publisher('/dvrk/console/home', Empty, latch=True, queue_size=1).publish()
     
     @pyqtSlot()
@@ -1324,6 +1330,8 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonExit.setEnabled(True)
         self.pushButtonPowerOff.setEnabled(False)
         self.pushButtonPowerOn.setEnabled(True)
+        self.groupBoxOperationMode.setEnabled(False)
+        self.groupBoxCameraControlMethod.setEnabled(False)
         
         rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish(Empty())
                 
@@ -1387,7 +1395,11 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
 
         rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
-                
+
+        if name == self.node_name.autocamera:
+            self.groupBoxAutocameraParams.setVisible(True)
+        else:
+            self.groupBoxAutocameraParams.setVisible(False)                                
         if name == self.node_name.clutchNGo :
             self.thread = self.thread_clutchNGo(self.__mode__)
             self.thread.start()
@@ -1398,6 +1410,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         elif name == self.node_name.joystick:
             self.thread = self.thread_joystick(self.__mode__)
             self.thread.start()
+            
             
         
 def main():
