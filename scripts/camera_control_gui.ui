@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>724</width>
+    <height>667</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <widget class="QGroupBox" name="groupBoxOperationMode">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>170</y>
+     <width>161</width>
+     <height>71</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Operation Mode</string>
+   </property>
+   <widget class="QRadioButton" name="radioButtonSimulation">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>116</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Simulation</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButtonHardware">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>40</y>
+      <width>116</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Hardware</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupBoxCameraControlMethod">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>240</y>
+     <width>171</width>
+     <height>111</height>
+    </rect>
+   </property>
+   <property name="autoFillBackground">
+    <bool>false</bool>
+   </property>
+   <property name="title">
+    <string>Camera Control Method</string>
+   </property>
+   <widget class="QRadioButton" name="radioButtonAutocamera">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>40</y>
+      <width>116</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Autocamera</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButtonClutchAndMove">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>60</y>
+      <width>151</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Clutch and Move</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButtonJoystick">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>80</y>
+      <width>141</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Joystick Control</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButtonTeleop">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>116</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Teleop</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupBoxPower">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>20</y>
+     <width>120</width>
+     <height>151</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Power</string>
+   </property>
+   <widget class="QPushButton" name="pushButtonHome">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>98</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Home</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButtonPowerOff">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>80</y>
+      <width>98</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Power Off</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButtonExit">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>110</y>
+      <width>98</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Exit</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButtonPowerOn">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>50</y>
+      <width>98</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Power On</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupBoxAutocameraParams">
+   <property name="geometry">
+    <rect>
+     <x>220</x>
+     <y>20</y>
+     <width>461</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Autocamera Zoom Parameters</string>
+   </property>
+   <widget class="QSlider" name="horizontalSliderInnerzone">
+    <property name="geometry">
+     <rect>
+      <x>138</x>
+      <y>23</y>
+      <width>231</width>
+      <height>29</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+   </widget>
+   <widget class="QSlider" name="horizontalSliderDeadzone">
+    <property name="geometry">
+     <rect>
+      <x>138</x>
+      <y>53</y>
+      <width>231</width>
+      <height>29</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelInnerzoneValue">
+    <property name="geometry">
+     <rect>
+      <x>378</x>
+      <y>26</y>
+      <width>41</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>0</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelDeadzoneValue">
+    <property name="geometry">
+     <rect>
+      <x>378</x>
+      <y>55</y>
+      <width>41</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>0</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>29</y>
+      <width>121</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Inner Zone Radius</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>56</y>
+      <width>131</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Dead Zone Radius</string>
+    </property>
+   </widget>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

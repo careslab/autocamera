@@ -35,6 +35,10 @@ from std_msgs.msg._Empty import Empty
 from geometry_msgs.msg import PoseStamped, Pose
 from hrl_geom import pose_converter
 
+import camera_control_gui
+from PyQt4 import QtGui
+from std_msgs.msg._Float32 import Float32
+
 class camera_handler:
     """
         This is a base class for all classes that will manipulate the camera movements
@@ -1087,12 +1091,14 @@ class Joystick:
         return R 
             
 
-class camera_qt_gui:
+class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     
     class node_name:
         clutchNGo = 'clutch_control'
         autocamera = 'Autocamera'
         joystick = 'joystick'
+        teleop = 'teleop'
+        
     class MODE:
         """
             simulation mode: Use the hardware for the master side, 
@@ -1268,130 +1274,59 @@ class camera_qt_gui:
         def kill(self):
             self.quit()
             
-    def __init__(self):
-        
+    def __init__(self, parent=None):
+        super(camera_qt_gui, self).__init__(parent)
+        self.setupUi(self)
+#         
         self.thread = None
         self.homing_thread = None
-#         self.console_homing = self.run_dvrk_console()
-#         self.console_homing.start()
+
         self.__mode__ = self.MODE.simulation 
         self.__control_mode__ = None
-        
+         
         # We have to initialize the node inside the main thread otherwise it would not work
         rospy.init_node('camera_control_node')
         
-        widget_x = 20; widget_y = 30;
+        self.pushButtonHome.clicked.connect(self.home)
+        self.pushButtonPowerOn.clicked.connect(self.power_on)
+        self.pushButtonPowerOff.clicked.connect(self.power_off)
+        self.pushButtonExit.clicked.connect(self.exit_program)
         
-        self.a = QApplication(sys.argv) # Application handle
-        self.w = QWidget() # Widget handle
+        self.radioButtonTeleop.clicked.connect(self.on_teleop_select)
+        self.radioButtonAutocamera.clicked.connect(self.on_autocamera_select)
+        self.radioButtonClutchAndMove.clicked.connect(self.on_clutchNGo_select)
+        self.radioButtonJoystick.clicked.connect(self.on_joystick_select)
         
-        # Set window size.
-        self.w.resize(320, 240)
-         
-        # Set window title
-        self.w.setWindowTitle("Camera Options")
+        self.radioButtonSimulation.setChecked(True)
+        self.radioButtonSimulation.clicked.connect(self.on_simulation_select)
+        self.radioButtonHardware.clicked.connect(self.on_hardware_select)
         
-        widget_number = 1
-        # Add home button
-        self.btn_home = QPushButton(self.w)
-        self.btn_home.setText('Home')
-        self.btn_home.clicked.connect(self.home)
-        self.btn_home.move(widget_x,widget_number * widget_y)
-        
-        # Add radio button for autocamera
-        widget_number += 1
-        self.radio_autocamera = QRadioButton('Autocamera', self.w)
-        self.radio_autocamera.setToolTip('Activate Autocamera')
-        self.radio_autocamera.clicked.connect(self.on_autocamera_select)
-        self.radio_autocamera.resize(self.radio_autocamera.sizeHint())
-        self.radio_autocamera.move(widget_x,widget_number*widget_y)
-        
-        # Add radio button for clutch and Go
-        widget_number += 1
-        self.radio_clutchNGo = QRadioButton('Clutch and Move', self.w)
-        self.radio_clutchNGo.setToolTip('Activate camera clutch mechanism')
-        self.radio_clutchNGo.clicked.connect(self.on_clutchNGo_select)
-        self.radio_clutchNGo.resize(self.radio_clutchNGo.sizeHint())
-        self.radio_clutchNGo.move(widget_x,widget_number*widget_y)
-        
-        # Add radio button for clutch and Go
-        widget_number += 1
-        self.radio_joystick = QRadioButton('Joystick Control', self.w)
-        self.radio_joystick.setToolTip('Activate camera joystick mechanism')
-        self.radio_joystick.clicked.connect(self.on_joystick_select)
-        self.radio_joystick.resize(self.radio_joystick.sizeHint())
-        self.radio_joystick.move(widget_x,widget_number*widget_y)
-        
-        # Add exit button
-        widget_number += 1
-        self.btn_exit = QPushButton(self.w)
-        self.btn_exit.setText('Exit')
-        self.btn_exit.clicked.connect(self.exit_program)
-        self.btn_exit.move(widget_x,widget_number*widget_y)
-
-        self.radio_simulation = QRadioButton('Simulation', self.w)
-        self.radio_simulation.setToolTip('Simulation mode')
-        self.radio_simulation.clicked.connect(self.on_simulation_select)
-        self.radio_simulation.resize(self.radio_joystick.sizeHint())
-        self.radio_simulation.move(6*widget_x,widget_y)
-        self.radio_simulation.click()
-        
-        self.radio_hardware = QRadioButton('Hardware', self.w)
-        self.radio_hardware.setToolTip('Hardware mode')
-        self.radio_hardware.clicked.connect(self.on_hardware_select)
-        self.radio_hardware.resize(self.radio_joystick.sizeHint())
-        self.radio_hardware.move(11*widget_x,widget_y)
-        
-        camera_control_group = QButtonGroup(self.w)
-        mode_group = QButtonGroup(self.w)
-        
-        camera_control_group.addButton(self.radio_autocamera)
-        camera_control_group.addButton(self.radio_clutchNGo)
-        camera_control_group.addButton(self.radio_joystick)
-        
-        self.main_layout = QHBoxLayout()
-        self.options_box = QHBoxLayout()
-        self.mode_box = QVBoxLayout()
-        self.control_method = QVBoxLayout()
-        
-        self.control_method.addStretch(1)
-        self.control_method.addWidget(self.radio_autocamera)
-        self.control_method.addWidget(self.radio_clutchNGo)
-        self.control_method.addWidget(self.radio_joystick)
-        self.control_method.setContentsMargins(2, 2, 2, 2)
-        
-        self.mode_box.addStretch(1)
-        self.mode_box.addWidget(self.radio_simulation)
-        self.mode_box.addWidget(self.radio_hardware)
-        
-#         self.options_box.addWidget(self.btn_home)
-#         self.options_box.addWidget(self.btn_exit)
-        self.options_box.addLayout(self.mode_box)
-        self.options_box.addLayout(self.control_method)
-
-        self.left_bar = QVBoxLayout()
-        self.left_bar.addWidget(self.btn_home)
-        self.left_bar.addLayout(self.options_box)
-        self.left_bar.addWidget(self.btn_exit)
-        self.left_bar.addStretch(1)
-        
-#         self.main_layout.setSizeConstraint(self.main_layout.SetFixedSize)
-        self.main_layout.addLayout(self.left_bar)
-        self.main_layout.addStretch(1)
-        self.w.setLayout(self.main_layout)
-        
-        mode_group.addButton(self.radio_simulation)
-        mode_group.addButton(self.radio_hardware)
-        # Show window
-        self.w.show()
-    
-        sys.exit(self.a.exec_())
+        self.pushButtonHome.setEnabled(False)
+        self.pushButtonPowerOff.setEnabled(False)
     
     @pyqtSlot()
     def home(self):
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
+
+    @pyqtSlot()
+    def power_on(self):
+        self.pushButtonHome.setEnabled(True)
+        self.pushButtonExit.setEnabled(False)
+        self.pushButtonPowerOff.setEnabled(True)
+        self.pushButtonPowerOn.setEnabled(False)
         
+        rospy.Publisher('/dvrk/console/home', Empty, latch=True, queue_size=1).publish()
+    
+    @pyqtSlot()
+    def power_off(self):
+        self.pushButtonHome.setEnabled(False)
+        self.pushButtonExit.setEnabled(True)
+        self.pushButtonPowerOff.setEnabled(False)
+        self.pushButtonPowerOn.setEnabled(True)
+        
+        rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish(Empty())
+                
     @pyqtSlot()
     def exit_program(self):
         rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish()
@@ -1402,8 +1337,13 @@ class camera_qt_gui:
             self.homing_thread.kill()
 #         if self.console_homing != None:
 #             self.console_homing.kill()
-        sys.exit(self.a.exec_())
+        sys.exit(0)
     
+    @pyqtSlot()
+    def on_teleop_select(self):
+        self.__control_mode__ = self.node_name.teleop
+        self.start_node_handler(self.node_name.teleop)
+        
     @pyqtSlot()
     def on_autocamera_select(self):  
         self.__control_mode__ = self.node_name.autocamera
@@ -1445,6 +1385,7 @@ class camera_qt_gui:
         if self.thread != None:
             self.thread.kill()
 
+        rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
                 
         if name == self.node_name.clutchNGo :
@@ -1460,7 +1401,10 @@ class camera_qt_gui:
             
         
 def main():
-    camera_qt_gui()
+    app = QtGui.QApplication(sys.argv)
+    form = camera_qt_gui()
+    form.show()
+    app.exec_()
     """
     node_handler = Autocamera_node_handler()
     node_handler.set_mode(node_handler.MODE.hardware)
