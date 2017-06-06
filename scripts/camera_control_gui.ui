@@ -26,7 +26,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>da Vinci Camera Controller</string>
   </property>
   <widget class="QGroupBox" name="groupBoxOperationMode">
    <property name="geometry">

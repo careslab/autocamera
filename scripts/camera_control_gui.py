@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Mon Jun  5 15:54:55 2017
+# Created: Tue Jun  6 15:58:56 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -98,7 +98,7 @@ class Ui_Dialog(object):
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(_translate("Dialog", "Dialog", None))
+        Dialog.setWindowTitle(_translate("Dialog", "da Vinci Camera Controller", None))
         self.groupBoxOperationMode.setTitle(_translate("Dialog", "Operation Mode", None))
         self.radioButtonSimulation.setText(_translate("Dialog", "Simulation", None))
         self.radioButtonHardware.setText(_translate("Dialog", "Hardware", None))

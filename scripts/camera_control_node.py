@@ -27,7 +27,7 @@ from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 import sensor_msgs
 import time
 from PyQt4.QtGui import *
-from PyQt4.QtCore import pyqtSlot
+from PyQt4.QtCore import pyqtSlot, SIGNAL
 import threading
 from PyQt4.QtCore import QThread
 from PyQt4.QtCore import Qt
@@ -38,6 +38,7 @@ from hrl_geom import pose_converter
 import camera_control_gui
 from PyQt4 import QtGui
 from std_msgs.msg._Float32 import Float32
+from PyQt4.Qt import QObject
 
 class camera_handler:
     """
@@ -204,9 +205,54 @@ class Autocamera_node_handler:
     def spin(self):
         self.__init_nodes__() # initialize all the nodes, subscribers and publishers
         rospy.spin()
+     
+    def set_autocamera_params(self, inner_zone, dead_zone):
+        self.autocamera.zoom_deadzone_radius = dead_zone
+        self.autocamera.zoom_innerzone_radius = inner_zone
          
     def debug_graphics(self, has_graphics):
         self.__DEBUG_GRAPHICS__ = has_graphics
+
+    def image_cb(self, image_msg, camera_name):
+        image_pub = {'left':self.image_left_pub, 'right':self.image_right_pub}[camera_name]
+        
+        bridge = cv_bridge.CvBridge()
+        
+        im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
+        
+        tool1_name = {'left':'l1', 'right':'r1'}
+        tool2_name = {'left':'l2', 'right':'r2'}
+        toolm_name = {'left':'lm', 'right':'rm'}
+        
+        if not None in self.autocamera.zoom_level_positions:
+            tool1 = self.autocamera.zoom_level_positions[tool1_name[camera_name]]; tool1 = tuple(int(i) for i in tool1)
+            tool2 = self.autocamera.zoom_level_positions[tool2_name[camera_name]]; tool2 = tuple(int(i) for i in tool2)
+            toolm = self.autocamera.zoom_level_positions[toolm_name[camera_name]]; toolm = tuple(int(i) for i in toolm)
+            
+            rotate_180 = lambda  p : (640-p[0], 480-p[2])
+            w = 640 ; h = 480;
+            
+            inner_radius = self.autocamera.zoom_innerzone_radius 
+            deadzone_radius = self.autocamera.zoom_deadzone_radius + self.autocamera.zoom_innerzone_radius
+            
+            mid_point = ( int(tool1[0]+tool2[0])/2, int(tool1[1] + tool2[1])/2)  
+
+            cv2.circle(im, mid_point, int(deadzone_radius * w), (128,128,128))
+            cv2.circle(im, mid_point, int(inner_radius * w), (255,255,255))    
+            cv2.circle(im, tool1, 10, (0,255,0), -1)
+            cv2.circle(im, tool2, 10, (0,255,255), -1)
+            cv2.circle(im, toolm, 10, (0,0,255), -1)
+            
+            cv2.circle(im, (0,0), 20, (255,0,0), -1)
+            cv2.circle(im, (640,480), 20, (255,0,255), -1)
+            
+            new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
+        
+            new_image.header.seq = image_msg.header.seq
+            new_image.header.stamp = image_msg.header.stamp
+            new_image.header.frame_id = image_msg.header.frame_id
+            
+            image_pub.publish(new_image)
             
     def logerror(self, msg, debug = False):
         if self.DEBUG or debug:
@@ -388,67 +434,8 @@ class Autocamera_node_handler:
         elif msg.header.frame_id == '/fake_cam_right_optical_link':
             self.cam_info['right'] = msg
         
-    
-    def image_cb(self, image_msg, camera_name):
-        image_pub = {'left':self.image_left_pub, 'right':self.image_right_pub}[camera_name]
-        
-        bridge = cv_bridge.CvBridge()
-        
-        im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
-        
-        tool1_name = {'left':'l1', 'right':'r1'}
-        tool2_name = {'left':'l2', 'right':'r2'}
-        toolm_name = {'left':'lm', 'right':'rm'}
-        
-        if not None in self.autocamera.zoom_level_positions:
-            tool1 = self.autocamera.zoom_level_positions[tool1_name[camera_name]]; tool1 = tuple(int(i) for i in tool1)
-            tool2 = self.autocamera.zoom_level_positions[tool2_name[camera_name]]; tool2 = tuple(int(i) for i in tool2)
-            toolm = self.autocamera.zoom_level_positions[toolm_name[camera_name]]; toolm = tuple(int(i) for i in toolm)
-            
-            rotate_180 = lambda  p : (640-p[0], 480-p[2])
-            w = 640 ; h = 480;
-#             outer_margin = .7; inner_margin = .2;
-#             ozone = [[int(outer_margin * w), int(outer_margin * h)],
-#                      [int( (1-outer_margin) * w), int(outer_margin * h)],
-#                      [int((1-outer_margin) * w), int((1-outer_margin) * h)],
-#                      [int(outer_margin * w), int((1-outer_margin) * h)]]
-#             # Draw the outer margin
-#             for i in range(-1, len(ozone)-1):
-#                 first = i
-#                 second = i+1
-#                 if i == -1: first = len(ozone) - 1
-#                 cv2.line(im, tuple(ozone[first]),tuple(ozone[second]), (255,0,0))
-#                 
-#             izone = [[int(inner_margin * w), int(inner_margin * h)],
-#                      [int( (1-inner_margin) * w), int(inner_margin * h)],
-#                      [int((1-inner_margin) * w), int((1-inner_margin) * h)],
-#                      [int(inner_margin * w), int((1-inner_margin) * h)]]
-#             # Draw the outer margin
-#             for i in range(-1, len(izone)-1):
-#                 first = i
-#                 second = i+1
-#                 if i == -1: first = len(izone) - 1
-#                 cv2.line(im, tuple(izone[first]),tuple(izone[second]), (0,0,255))
-            
-            inner_radius = 0.1 ; deadzone_radius = 0.2 + inner_radius;
-            mid_point = ( int(tool1[0]+tool2[0])/2, int(tool1[1] + tool2[1])/2)  
 
-            cv2.circle(im, mid_point, int(deadzone_radius * w), (128,128,128))
-            cv2.circle(im, mid_point, int(inner_radius * w), (255,255,255))    
-            cv2.circle(im, tool1, 10, (0,255,0), -1)
-            cv2.circle(im, tool2, 10, (0,255,255), -1)
-            cv2.circle(im, toolm, 10, (0,0,255), -1)
-            
-            cv2.circle(im, (0,0), 20, (255,0,0), -1)
-            cv2.circle(im, (640,480), 20, (255,0,255), -1)
-            
-            new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
-        
-            new_image.header.seq = image_msg.header.seq
-            new_image.header.stamp = image_msg.header.stamp
-            new_image.header.frame_id = image_msg.header.frame_id
-            
-            image_pub.publish(new_image)
+    
         
     def left_image_cb(self, image_msg):
         self.image_cb(image_msg, 'left')    
@@ -500,7 +487,7 @@ class ClutchControl:
     def __init__(self, mode = MODE.simulation):        
         self.__mode__ = mode
         self.camera_clutch_pressed = False
-        self.movement_scale = 1 
+        self.movement_scale = 1.5 
         self.joint_angles = [0,0,0,0]
         self.center = [0,0,0,0]
         
@@ -513,8 +500,6 @@ class ClutchControl:
         self.mtmr_joint_angles = [0,0,0,0,0,0,0]
         
         self.mtmr_starting_point =  [0,0,0,0,0,0,0]
-        
-        self.__init_nodes__()
         
     def __init_nodes__(self):
 #         rospy.init_node('ecm_clutch_control')
@@ -550,6 +535,8 @@ class ClutchControl:
         
         self.mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
         self.mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
+        
+        print("mode is " + self.__mode__)
         
         self.sub_ecm_cb = None
         if self.__mode__ == self.MODE.simulation:
@@ -596,19 +583,24 @@ class ClutchControl:
             pass
 #         rospy.signal_shutdown('shutting down ClutchControl')
         
+    def set_scale(self, scale):
+        self.movement_scale = scale
+            
     def set_mode(self, mode):
         """ Values:
             MODE.simulation
             MODE.hardware
         """
         self.__mode__ = mode
+        
             
     def spin(self):
+        self.__init_nodes__()
         rospy.spin()
 
     def mtml_joint_angles_cb(self, msg):
         self.mtml_joint_angles = list(msg.position)
-        self.move_mtm_out_of_the_way()
+#         self.move_mtm_out_of_the_way()
     
     def mtmr_joint_angles_cb(self, msg):
         self.mtmr_joint_angles = list(msg.position)
@@ -631,7 +623,7 @@ class ClutchControl:
             current_position = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3] 
             movement_vector = current_position-self.mtml_pos_before_clutch
             self.move_mtm_centerpoints()
-            print("movement_vector = {}, {}, {}".format(movement_vector[0], movement_vector[1], movement_vector[2]))
+#             print("movement_vector = {}, {}, {}".format(movement_vector[0], movement_vector[1], movement_vector[2]))
             self.mtml_pos = current_position
             self.ecm_pan_tilt(movement_vector)
         else:
@@ -658,31 +650,6 @@ class ClutchControl:
             except:
                 pass
     
-    def move_mtm_out_of_the_way(self):
-        if self.head_sensor_pressed == True and self.camera_clutch_pressed == False:
-            if self.mtml_hw.get_robot_state() == 'DVRK_POSITION_GOAL_CARTESIAN' and self.flag == True:
-                self.flag == False
-                ml = self.mtml_joint_angles[3]
-                mr = self.mtml_joint_angles[3]
-                delta = .1
-                
-                mtml_joints = JointState()
-                mtml_joints.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll', 'finger_grips']
-                mtml_joints.position = self.mtml_joint_angles
-                mtml_joints.position[3] += (-1.58 -mtml_joints.position[3])/10.0  
-                mtml_joints.effort = [0, 0, 0, delta, 0, 0, 0, 0]
-                print("mtml_joints = " + mtml_joints.__str__())
-                self.mtml_hw_pub.publish(mtml_joints)
-                
-                mtmr_joints = JointState()
-                mtmr_joints.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll', 'finger_grips']
-                mtmr_joints.position = self.mtmr_joint_angles
-                new_p = list(mtmr_joints.position)
-                new_p[3] = 1.58
-                mtmr_joints.position[3] +=  (1.58 - mtmr_joints.position[3])/10.0 
-                mtmr_joints.effort = [0, 0, 0, delta, 0, 0, 0, 0]
-                self.mtmr_hw_pub.publish(mtmr_joints)
-                
     # To be completed
     def move_mtm_centerpoints(self):
         left = self.mtml_pos_before_clutch
@@ -758,12 +725,13 @@ class ClutchControl:
             elif self.__mode__ == self.MODE.hardware:
                 self.center = msg.position[0:3] + tuple([0])
             self.center_cart = np.array(self.ecm_kin.FK(self.center)[0])
-            
+#         print("self.center is : " + self.center.__str__())  
+#         print("ecm joint angles are : " + msg.position.__str__())
+#         print("self.joint_angles is : " + self.joint_angles.__str__())
     
     def ecm_pan_tilt(self, movement_vector):
         q = []
         q = self.joint_angles
-        print("ecm joint angles are : " + q.__str__())
         movement_vector = [float(i) for i in movement_vector]
         if q:
             q = list(q)
@@ -1297,6 +1265,9 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.radioButtonClutchAndMove.clicked.connect(self.on_clutchNGo_select)
         self.radioButtonJoystick.clicked.connect(self.on_joystick_select)
         
+        self.horizontalSliderInnerzone.valueChanged[int].connect(self.horizontalSliderInnerzoneCb)
+        self.horizontalSliderDeadzone.valueChanged[int].connect(self.horizontalSliderDeadzoneCb)
+        
         self.radioButtonSimulation.setChecked(True)
         self.radioButtonSimulation.clicked.connect(self.on_simulation_select)
         self.radioButtonHardware.clicked.connect(self.on_hardware_select)
@@ -1307,6 +1278,23 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonPowerOff.setEnabled(False)
         self.groupBoxOperationMode.setEnabled(False)
         self.groupBoxCameraControlMethod.setEnabled(False)
+    
+    @pyqtSlot()
+    def horizontalSliderInnerzoneCb(self):
+        self.set_autocamera_params()
+        
+    @pyqtSlot()
+    def horizontalSliderDeadzoneCb(self):
+        self.set_autocamera_params()
+    
+    def set_autocamera_params(self):
+        inner_zone = self.horizontalSliderInnerzone.value()/100.0
+        dead_zone = self.horizontalSliderDeadzone.value()/100.0
+        print(inner_zone, dead_zone)
+        self.labelInnerzoneValue.setText(inner_zone.__str__())
+        self.labelDeadzoneValue.setText(dead_zone.__str__())
+
+        self.thread.node_handler.set_autocamera_params(inner_zone, dead_zone)
     
     @pyqtSlot()
     def home(self):
@@ -1429,4 +1417,3 @@ def main():
 if __name__ == "__main__":
     main()
     print('hello')
-    t1.kill()
