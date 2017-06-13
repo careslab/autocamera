@@ -43,6 +43,9 @@ class Autocamera:
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         
+        self.last_midpoint = None
+        self.pan_tilt_deadzone_radius = .001
+        
         self.zoom_deadzone_radius = .2
         self.zoom_innerzone_radius = .1
         
@@ -175,6 +178,13 @@ class Autocamera:
     
     def point_towards_midpoint(self, clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose):
         mid_point = (psm1_pos + psm2_pos)/2
+        if self.last_midpoint == None:
+            self.last_midpoint = mid_point
+
+        
+        if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
+            mid_point = self.last_midpoint
+#         self.logerror("Distance is " + numpy.linalg.norm(mid_point-self.last_midpoint).__str__(), debug=True)
     #     mid_point = ecm_pose[0:3,3] - numpy.array([0,0,.01]).reshape(3,1)
         self.add_marker(PoseConv.to_homo_mat([mid_point, [0,0,0]]), '/marker_subscriber',color=[1,0,0], scale=[0.047/5,0.047/5,0.047/5])
         self.add_marker(PoseConv.to_homo_mat([key_hole,[0,0,0]]), '/keyhole_subscriber',[0,0,1])
@@ -216,6 +226,8 @@ class Autocamera:
         if p != None:  
             p[3] = 0
             output_msg.position = p
+        
+        self.last_midpoint = mid_point
         return output_msg
     
     def zoom_fitness(self, cam_info, mid_point, inner_margin, deadzone_margin, tool_point):
@@ -250,10 +262,10 @@ class Autocamera:
         
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point > r
             # return positive value
-            return 0.0003 # in meters 
+            return 0.0005 # in meters 
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
-            return -0.0003
+            return -0.0005
 #         elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
 #             return -0.001
         else:
@@ -345,8 +357,8 @@ class Autocamera:
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00
-            elif msg.position[2] > .21: # maximum .23
-                msg.position[2] = .21
+            elif msg.position[2] > .15: # maximum .23
+                msg.position[2] = .15
         return msg   
     
     def compute_viewangle(self, joint, cam_info):
@@ -365,7 +377,7 @@ class Autocamera:
         
         
         except Exception as e:
-    #         rospy.logerr(e.message)
+            rospy.logerr(e.message)
             output_msg = joint['ecm']
     #         output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
     #         output_msg.position = [joint['ecm'].position[x] for x in [0,1,5,6]]
@@ -377,7 +389,8 @@ class Autocamera:
     #     rospy.logerr('psm1 gripper = ' + joint['psm1'].position[-1].__str__() + 'gripper = ' + gripper.__str__())
         
         if gripper == gripper or gripper != gripper: # luke was here
-            output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
+            goal_joints = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
+            output_msg.position =list( numpy.array(output_msg.position) + ( -numpy.array(output_msg.position)+ numpy.array(goal_joints.position)) *.0001)
             output_msg = self.find_zoom_level(output_msg, cam_info, clean_joints)
             pass
         

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Tue Jun  6 15:58:56 2017
+# Created: Tue Jun 13 15:34:56 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -40,7 +40,7 @@ class Ui_Dialog(object):
         self.radioButtonHardware.setGeometry(QtCore.QRect(10, 40, 116, 22))
         self.radioButtonHardware.setObjectName(_fromUtf8("radioButtonHardware"))
         self.groupBoxCameraControlMethod = QtGui.QGroupBox(Dialog)
-        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 240, 171, 111))
+        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 240, 171, 131))
         self.groupBoxCameraControlMethod.setAutoFillBackground(False)
         self.groupBoxCameraControlMethod.setObjectName(_fromUtf8("groupBoxCameraControlMethod"))
         self.radioButtonAutocamera = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
@@ -55,6 +55,9 @@ class Ui_Dialog(object):
         self.radioButtonTeleop = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
         self.radioButtonTeleop.setGeometry(QtCore.QRect(10, 20, 116, 22))
         self.radioButtonTeleop.setObjectName(_fromUtf8("radioButtonTeleop"))
+        self.radioButtonOculus = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
+        self.radioButtonOculus.setGeometry(QtCore.QRect(10, 100, 141, 22))
+        self.radioButtonOculus.setObjectName(_fromUtf8("radioButtonOculus"))
         self.groupBoxPower = QtGui.QGroupBox(Dialog)
         self.groupBoxPower.setGeometry(QtCore.QRect(10, 20, 120, 151))
         self.groupBoxPower.setObjectName(_fromUtf8("groupBoxPower"))
@@ -107,6 +110,7 @@ class Ui_Dialog(object):
         self.radioButtonClutchAndMove.setText(_translate("Dialog", "Clutch and Move", None))
         self.radioButtonJoystick.setText(_translate("Dialog", "Joystick Control", None))
         self.radioButtonTeleop.setText(_translate("Dialog", "Teleop", None))
+        self.radioButtonOculus.setText(_translate("Dialog", "Oculus", None))
         self.groupBoxPower.setTitle(_translate("Dialog", "Power", None))
         self.pushButtonHome.setText(_translate("Dialog", "Home", None))
         self.pushButtonPowerOff.setText(_translate("Dialog", "Power Off", None))

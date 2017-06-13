@@ -335,22 +335,23 @@ class Autocamera_node_handler:
         msg.name = msg.name + ['jaw']
         msg.position = msg.position + [jaw]
         
-        self.psm1_hw.move_joint_list(msg.position, interpolate=True)
+        self.psm1_hw.move_joint_list(msg.position, interpolate=False)
     
     def move_psm2(self, msg):
-        time.sleep(.5)
         jaw = msg.position[-3]
         msg = self.autocamera.extract_positions(msg, 'psm2')
         
         msg.name = msg.name + ['jaw']
         msg.position = msg.position + [jaw]
         
-        self.psm2_hw.move_joint_list(msg.position, interpolate=first_run)
+        self.psm2_hw.move_joint_list(msg.position, interpolate=False)
     
     # ecm callback    
     def add_ecm_jnt(self, msg):
         if self.camera_clutch_pressed == False and msg != None:
             if self.__MOVE_ECM_WITH_SLIDERS__ == False:
+#                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
+#                     msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
                 self.add_jnt('ecm', msg)
             else:
                 temp = list(msg.position[:2]+msg.position[-2:])
@@ -411,11 +412,16 @@ class Autocamera_node_handler:
                 #return # stop here until we co-register the arms
                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
                     pos = jnt_msg.position
+#                     if self.first_run:
+#                         result = self.ecm_hw.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
+#                     else:
+#                     pos = jnt_msg.position[0:2] + [jnt_msg.position[3]]
                     result = self.ecm_hw.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
+#                     pos = [jnt_msg.position[2]]
+#                     result= self.ecm_hw.move_joint_list(pos, index=[2], interpolate=self.first_run)
                     # Interpolate the insertion joint individually and the rest without interpolation
- #                   pos = [jnt_msg.position[2]]
-#                    result = self.ecm_hw.move_joint_list(pos, index=[2], interpolate=True)
-                    if result:
+#                     result = self.ecm_hw.move_joint_list(pos, index=[2], interpolate=self.first_run)
+                    if result == True:
                         self.first_run = False
     #              
                 
@@ -535,8 +541,6 @@ class ClutchControl:
         
         self.mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
         self.mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
-        
-        print("mode is " + self.__mode__)
         
         self.sub_ecm_cb = None
         if self.__mode__ == self.MODE.simulation:
@@ -741,7 +745,6 @@ class ClutchControl:
             
             q = [round(i,4) for i in q]
 #             q = [i+j for i,j in zip(self.center, q)]
-            print(q)
             self.move_ecm(q)
     
     # move ecm based on joint angles either in simulation or hardware
@@ -859,8 +862,6 @@ class Joystick:
         self.movement_scale = .2 
         self.last_z = 0
         
-        self.__init_nodes__()
-        
     def __init_nodes__(self):
         self.ecm_hw = robot("ECM")
         self.ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
@@ -892,6 +893,7 @@ class Joystick:
         self.__mode__ = mode
                 
     def spin(self):
+        self.__init_nodes__()
         self.__spin__()
     def __spin__(self):
         rospy.spin()
@@ -918,7 +920,10 @@ class Joystick:
         if sum( np.abs(message.axes[0:2])) != 0 and self.joystick_at_zero == False:
             return
         self.joystick_at_zero = True
-        
+        if len(message.buttons) == 0:
+            message.buttons = [0]
+        if len(message.axes) < 4:
+            message.axes = tuple( [a for a in message.axes] + [1])
         if message.buttons[0] == 1:
                 self.ecm_joystick_recenter()
                 print('self.center = {}, self.joint_angles = {}'.format(self.center, self.joint_angles))
@@ -934,7 +939,6 @@ class Joystick:
             self.move_ecm([q[0], q[1],q[3]], index = [0,1,3]) 
     
     def ecm_zoom(self, z, q = []):
-        print(z, q, self.joint_angles)
         if q == []:
             q = self.joint_angles
         if z == 0.0 :
@@ -1058,7 +1062,70 @@ class Joystick:
         R = np.matrix(R)
         return R 
             
+class Oculus:
+    class MODE:
+        """
+            simulation mode: Use the hardware for the master side, 
+                            and simulation for the ECM
+            hardware mode: Use hardware for both the master side,
+                            and the ECM
+        """
+        simulation = "SIMULATION"
+        hardware = "HARDWARE"
+        
+    def __init__(self, mode = MODE.simulation):        
+        self.__mode__ = mode
+        self.joint_angles = []
+        self.center = [0,0,0,0]
+        self.joystick_at_zero = True
+        self.movement_scale = .2 
+        self.last_z = 0
+        
+    def __init_nodes__(self):
+        self.ecm_hw = robot("ECM")
+        self.ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
+        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        
+        self.sub_ecm = None
+        if self.__mode__ == self.MODE.simulation:
+            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+        elif self.__mode__ == self.MODE.hardware:
+            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+#             self.ecm_hw.home()
+            self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
+            
+        self.sub_oculus = rospy.Subscriber('/oculus', msg.JointState, self.on_oculus_cb)
+        
+    def shutdown(self):
+        print('shutting down oculus control')
+        try:
+            self.sub_ecm.unregister()
+            self.sub_oculus.unregister()
+            self.ecm_sim.unregister()
+            
+            print( "Shutting down " + self.__class__.__name__)
+        except e:
+            print("couldn't unregister all the topics")
 
+    def set_mode(self, mode):
+        self.__mode__ = mode
+                
+    def spin(self):
+        self.__init_nodes__()
+        self.__spin__()
+    def __spin__(self):
+        rospy.spin()
+        
+    def on_oculus_cb(self, message):
+        if self.__mode__ == self.MODE.simulation:
+            message.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+            self.ecm_sim.publish(message)
+        elif self.__mode__ == self.MODE.hardware:
+            self.ecm_hw.move_joint_list(message.position)
+            
+    def ecm_cb(self, message):
+        pass
 class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     
     class node_name:
@@ -1066,6 +1133,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         autocamera = 'Autocamera'
         joystick = 'joystick'
         teleop = 'teleop'
+        oculus = 'oculus'
         
     class MODE:
         """
@@ -1119,6 +1187,22 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         def run(self):
             self.node_handler = Joystick()
             print('\nRunning {} in {}\n'.format("Joystick Control",self.__mode__))
+            self.node_handler.set_mode(self.__mode__)
+            self.node_handler.spin()
+        
+        def kill(self):
+            if self.node_handler != None:
+                self.node_handler.shutdown()
+                self.quit()
+    
+    class thread_oculus(QThread):
+        def __init__(self, mode):
+            super(QThread, self).__init__()
+            self.node_handler = None
+            self.__mode__ = mode
+        def run(self):
+            self.node_handler = Oculus()
+            print('\nRunning {} in {}\n'.format("Oculus Control",self.__mode__))
             self.node_handler.set_mode(self.__mode__)
             self.node_handler.spin()
         
@@ -1264,6 +1348,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.radioButtonAutocamera.clicked.connect(self.on_autocamera_select)
         self.radioButtonClutchAndMove.clicked.connect(self.on_clutchNGo_select)
         self.radioButtonJoystick.clicked.connect(self.on_joystick_select)
+        self.radioButtonOculus.clicked.connect(self.on_oculus_select)
         
         self.horizontalSliderInnerzone.valueChanged[int].connect(self.horizontalSliderInnerzoneCb)
         self.horizontalSliderDeadzone.valueChanged[int].connect(self.horizontalSliderDeadzoneCb)
@@ -1357,6 +1442,11 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.start_node_handler(self.node_name.joystick)
         
     @pyqtSlot()
+    def on_oculus_select(self):
+        self.__control_mode__ = self.node_name.oculus
+        self.start_node_handler(self.node_name.oculus)
+            
+    @pyqtSlot()
     def on_simulation_select(self):
         if self.__mode__ != self.MODE.simulation :
             self.__mode__ = self.MODE.simulation
@@ -1397,6 +1487,9 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.thread.start()
         elif name == self.node_name.joystick:
             self.thread = self.thread_joystick(self.__mode__)
+            self.thread.start()
+        elif name == self.node_name.oculus:
+            self.thread = self.thread_oculus(self.__mode__)
             self.thread.start()
             
             

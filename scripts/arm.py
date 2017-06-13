@@ -642,7 +642,8 @@ class arm:
                             for i in range (len(initial_joint_position)):
                                 if i == index[j]:
                                     abs_joint[i] = value[j]
-                    self.__move_joint(abs_joint, interpolate)
+                    return self.__move_joint(abs_joint, interpolate)
+        return False
 
     def __move_joint(self, abs_joint, interpolate = True):
         """Absolute move by vector in joint plane.
@@ -652,9 +653,9 @@ class arm:
 #         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move joint vector')
         if(self.__check_input_type(abs_joint, [list,float])):
             if (interpolate):
-                self.__move_joint_goal(abs_joint)
+                return self.__move_joint_goal(abs_joint)
             else:
-                self.__move_joint_direct(abs_joint)
+                return self.__move_joint_direct(abs_joint)
 #         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move joint vector')
 
     def __move_joint_direct(self, end_joint):
