@@ -190,25 +190,29 @@
 
     <transmission name="tran1" >
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="outer_yaw"/>
+      <joint name="outer_yaw">
+	<hardwareInterface>EffortJointInterface</hardwareInterface>
+      </joint>
       <actuator name="motor1">
-        <hardwareInterface>EffortJointInterface</hardwareInterface>
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran2">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="shoulder_pitch"/>
+      <joint name="shoulder_pitch">
+	<hardwareInterface>EffortJointInterface</hardwareInterface>
+      </joint>
       <actuator name="motor2">
-        <hardwareInterface>EffortJointInterface</hardwareInterface>
+
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran3">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="elbow_pitch"/>
-      <actuator name="motor3">
+      <joint name="elbow_pitch">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor3">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
@@ -360,33 +364,37 @@
 
     <transmission name="tran4" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_platform"/>
+      <joint name="wrist_platform">         
+	<hardwareInterface>EffortJointInterface</hardwareInterface> 
+	</joint>
       <actuator name="motor4">
-        <hardwareInterface>EffortJointInterface</hardwareInterface>
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran5" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_pitch"/>
-      <actuator name="motor5">
+      <joint name="wrist_pitch"> 
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor5">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran6" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_yaw"/>
-      <actuator name="motor6">
+      <joint name="wrist_yaw">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor6">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran7" type="transmission_interface/SimpleTransmission">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_roll"/>
-      <actuator name="motor7">
+      <joint name="wrist_roll">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor7">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
@@ -528,33 +536,37 @@
 
     <transmission name="tran4">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_platform"/>
-      <actuator name="motor4">
+      <joint name="wrist_platform">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor4">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran5">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_pitch"/>
-      <actuator name="motor5">
+      <joint name="wrist_pitch">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor5">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran6">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_yaw"/>
-      <actuator name="motor6">
+      <joint name="wrist_yaw">
         <hardwareInterface>EffortJointInterface</hardwareInterface>
+	</joint>
+      <actuator name="motor6">
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
     <transmission name="tran7">
       <type>transmission_interface/SimpleTransmission</type>
-      <joint name="wrist_roll"/>
+      <joint name="wrist_roll">
+	<hardwareInterface>EffortJointInterface</hardwareInterface>
+      </joint>
       <actuator name="motor7">
-        <hardwareInterface>EffortJointInterface</hardwareInterface>
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
