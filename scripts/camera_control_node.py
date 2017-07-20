@@ -35,10 +35,80 @@ from std_msgs.msg._Empty import Empty
 from geometry_msgs.msg import PoseStamped, Pose
 from hrl_geom import pose_converter
 
+import configparser
 import camera_control_gui
 from PyQt4 import QtGui
 from std_msgs.msg._Float32 import Float32
 from PyQt4.Qt import QObject
+import rosbag
+
+class bag_writer:
+    class MODE:
+        """
+            simulation mode: Use the hardware for the master side, 
+                            and simulation for the ECM
+            hardware mode: Use hardware for both the master side,
+                            and the ECM
+        """
+        simulation = "SIMULATION"
+        hardware = "HARDWARE"
+        
+    def __init__(self, arm_names, bag_name='test.bag', mode = bag_writer.MODE.simulation):
+        if type(arm_names) == type(""):
+            arm_names = [arm_names]
+            
+        self.__mode__ = mode
+        
+        # initialize a bag 
+        self.bag = rosbag.Bag(bag_name, 'w')
+        self.arm_names = arm_names
+        # The topics we want to record
+#         self.topics = '/dvrk/{}/state_joint_current'.format(ARM_NAME)
+        self.topics = { arm_name:'/dvrk/{}/state_joint_current'.format(arm_name) for arm_name in self.arm_names}
+        self.out_topics_hw = {arm_name : '/dvrk/{}/set_position_joint'.format(arm_name) for arm_name in self.arm_names}
+        self.out_topics_sim = {arm_name : '/dvrk_{}/joint_states_robot'.format(arm_name.lower()) for arm_name in self.arm_names}
+        
+#         self.out_topics = self.out_topics_sim
+        self.out_topics = self.topics
+        # We have to initialize a ros node if we want to subsribe or publish messages
+#         rospy.init_node('rosbag_test_node')
+        
+        for arm_name in self.arm_names:
+            eval("self.sub_{} = rospy.Subscriber('{}', JointState, self.cb_{})".format(arm_name, self.topics[arm_name], arm_name))
+            rospy.timer.sleep(.1)
+    def set_mode(self, mode):
+        self.__mode__ = mode
+    
+    def shutdown(self):
+        self.bag.close()
+        
+        # unregister all subscribers
+        eval("self.sub_{}.unregister()".format(self.arm_names))
+        
+    def spin(self):
+        rospy.spin()
+        
+    def cb_MTML(self, msg):
+        self.cb(self.out_topics['MTML'], msg)
+    def cb_MTMR(self, msg):
+        self.cb(self.out_topics['MTMR'], msg)
+    def cb_PSM1(self, msg):
+        self.cb(self.out_topics['PSM1'], msg)
+    def cb_PSM2(self, msg):
+        self.cb(self.out_topics['PSM2'], msg)
+    def cb_ECM(self, msg):
+        self.cb(self.out_topics['ECM'], msg)
+                    
+    def cb(self,topic, msg):
+        try:
+            self.bag.write(topic, msg) # record the msg
+        except Exception:
+            pass
+    
+    # This is the destructor for this python class    
+    def __del__(self):
+        self.bag.close()
+    
 
 class camera_handler:
     """
@@ -110,6 +180,16 @@ class Autocamera_node_handler:
         self.ecm_manual_control_lock_ecm_msg = None
         self.mtml_start_position = None
         self.mtml_end_position = None
+        
+        # Get zoom parameters from config file
+        self.config = configparser.ConfigParser()
+        self.config_file = '../config/autocamera.conf'
+        self.config.read(self.config_file)
+        
+        inner = self.config.getfloat('ZOOM', 'inner_zone')
+        outer = self.config.getfloat('ZOOM', 'dead_zone')
+        
+        self.set_autocamera_params(inner, outer)
         
         self.initialize_psms_initialized = 30
         self.__DEBUG_GRAPHICS__ = False
@@ -209,6 +289,15 @@ class Autocamera_node_handler:
     def set_autocamera_params(self, inner_zone, dead_zone):
         self.autocamera.zoom_deadzone_radius = dead_zone
         self.autocamera.zoom_innerzone_radius = inner_zone
+        
+        self.config.set('ZOOM', 'inner_zone', inner_zone.__str__())
+        self.config.set('ZOOM', 'dead_zone', dead_zone.__str__())
+        
+        with open(self.config_file,'w') as cfile:
+            self.config.write(cfile)
+        
+    def get_autocamera_params(self):
+        return self.autocamera.zoom_deadzone_radius, self.autocamera.zoom_innerzone_radius
          
     def debug_graphics(self, has_graphics):
         self.__DEBUG_GRAPHICS__ = has_graphics
@@ -1122,7 +1211,8 @@ class Oculus:
             message.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
             self.ecm_sim.publish(message)
         elif self.__mode__ == self.MODE.hardware:
-            self.ecm_hw.move_joint_list(message.position)
+            print(message.__str__())
+            self.ecm_hw.move_joint_list( list(message.position), interpolate=False)
             
     def ecm_cb(self, message):
         pass
@@ -1380,7 +1470,14 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.labelDeadzoneValue.setText(dead_zone.__str__())
 
         self.thread.node_handler.set_autocamera_params(inner_zone, dead_zone)
-    
+    def get_autocamera_params(self):
+        while self.thread.node_handler == None:
+                pass
+            
+        dead_zone, inner_zone = self.thread.node_handler.get_autocamera_params()
+        self.horizontalSliderDeadzone.setValue(dead_zone*100)
+        self.horizontalSliderInnerzone.setValue(inner_zone*100)
+        
     @pyqtSlot()
     def home(self):
         self.groupBoxOperationMode.setEnabled(True)
@@ -1483,8 +1580,10 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.thread.start()
             
         elif name == self.node_name.autocamera:
+            self.thread = None
             self.thread = self.thread_autocamera(self.__mode__)
             self.thread.start()
+            self.get_autocamera_params()
         elif name == self.node_name.joystick:
             self.thread = self.thread_joystick(self.__mode__)
             self.thread.start()

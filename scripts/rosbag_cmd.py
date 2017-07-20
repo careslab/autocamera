@@ -36,7 +36,7 @@ class bag_writer:
         for arm_name in self.arm_names:
             eval("rospy.Subscriber('{}', JointState, self.cb_{})".format(self.topics[arm_name], arm_name))
             sleep(.1)
-    
+        
         rospy.spin()
         
     def cb_MTML(self, msg):
