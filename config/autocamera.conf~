@@ -1,4 +1,6 @@
 [ZOOM]
-inner = .3
-dead = .2
+inner_zone = 0.23
+dead_zone = 0.33
 
+[RECORDING]
+directory=study_recordings

@@ -53,14 +53,19 @@ class bag_writer:
         simulation = "SIMULATION"
         hardware = "HARDWARE"
         
-    def __init__(self, arm_names, bag_name='test.bag', mode = bag_writer.MODE.simulation):
+    def __init__(self, arm_names, bag_name='test', mode = MODE.simulation, recording_dir='recordings'):
         if type(arm_names) == type(""):
             arm_names = [arm_names]
             
         self.__mode__ = mode
         
-        # initialize a bag 
-        self.bag = rosbag.Bag(bag_name, 'w')
+        # initialize bags 
+        dir = '../{}/'.format(recording_dir)+bag_name +'/'
+        if not os.path.exists(dir):
+            os.system( ('mkdir -p '+ dir ).__str__())
+        
+        self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
+        self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
         self.arm_names = arm_names
         # The topics we want to record
 #         self.topics = '/dvrk/{}/state_joint_current'.format(ARM_NAME)
@@ -69,21 +74,23 @@ class bag_writer:
         self.out_topics_sim = {arm_name : '/dvrk_{}/joint_states_robot'.format(arm_name.lower()) for arm_name in self.arm_names}
         
 #         self.out_topics = self.out_topics_sim
-        self.out_topics = self.topics
+        self.out_topics = self.out_topics_hw
         # We have to initialize a ros node if we want to subsribe or publish messages
 #         rospy.init_node('rosbag_test_node')
         
         for arm_name in self.arm_names:
-            eval("self.sub_{} = rospy.Subscriber('{}', JointState, self.cb_{})".format(arm_name, self.topics[arm_name], arm_name))
+            exec("self.sub_{} = rospy.Subscriber('{}', JointState, self.cb_{})".format(arm_name, self.topics[arm_name], arm_name))
             rospy.timer.sleep(.1)
     def set_mode(self, mode):
         self.__mode__ = mode
     
     def shutdown(self):
-        self.bag.close()
+        self.bag_sim.close()
+        self.bag_hw.close()
         
         # unregister all subscribers
-        eval("self.sub_{}.unregister()".format(self.arm_names))
+        for arm_name in self.arm_names:
+            eval("self.sub_{}.unregister()".format(arm_name))
         
     def spin(self):
         rospy.spin()
@@ -99,9 +106,10 @@ class bag_writer:
     def cb_ECM(self, msg):
         self.cb(self.out_topics['ECM'], msg)
                     
-    def cb(self,topic, msg):
+    def cb(self,arm_name, msg):
         try:
-            self.bag.write(topic, msg) # record the msg
+            self.bag_sim.write(self.out_topics_sim[arm_name], msg) # record the msg
+            self.bag_hw.write(self.out_topics_hw[arm_name], msg) # record the msg
         except Exception:
             pass
     
@@ -1453,6 +1461,35 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonPowerOff.setEnabled(False)
         self.groupBoxOperationMode.setEnabled(False)
         self.groupBoxCameraControlMethod.setEnabled(False)
+        
+        self.recording = False
+        self.pushButtonRecord.clicked.connect(self.on_record)
+        
+        # Get recording parameters from config file
+        self.config = configparser.ConfigParser()
+        self.config_file = '../config/autocamera.conf'
+        self.config.read(self.config_file)
+        self.recording_dir = self.config.get('RECORDING', 'directory')
+    
+    @pyqtSlot()
+    def on_record(self):
+        if self.recording == False:
+            file_name = self.textEditFilename.toPlainText()
+            if os.path.exists('../{}/'.format(self.recording_dir)+file_name):
+                self.labelFilename.setText('File already exists')
+                self.labelFilename.setStyleSheet("color: red")
+                return
+            else:
+                self.labelFilename.setText('')
+            self.recording = True
+            self.pushButtonRecord.setStyleSheet("background-color: red")
+            arm_names = ['MTML', 'MTMR', 'PSM1', 'PSM2', 'ECM']
+            self.bag_writer = bag_writer(arm_names, file_name, recording_dir=self.recording_dir)
+        else:
+            self.recording = False
+            self.pushButtonRecord.setStyleSheet("background-color: ")
+            self.bag_writer.shutdown()
+        
     
     @pyqtSlot()
     def horizontalSliderInnerzoneCb(self):

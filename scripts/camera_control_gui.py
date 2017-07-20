@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Tue Jun 13 15:34:56 2017
+# Created: Thu Jul 20 14:35:06 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -96,6 +96,16 @@ class Ui_Dialog(object):
         self.label_4 = QtGui.QLabel(self.groupBoxAutocameraParams)
         self.label_4.setGeometry(QtCore.QRect(10, 56, 131, 20))
         self.label_4.setObjectName(_fromUtf8("label_4"))
+        self.pushButtonRecord = QtGui.QPushButton(Dialog)
+        self.pushButtonRecord.setGeometry(QtCore.QRect(20, 430, 98, 27))
+        self.pushButtonRecord.setObjectName(_fromUtf8("pushButtonRecord"))
+        self.textEditFilename = QtGui.QTextEdit(Dialog)
+        self.textEditFilename.setGeometry(QtCore.QRect(20, 470, 191, 31))
+        self.textEditFilename.setObjectName(_fromUtf8("textEditFilename"))
+        self.labelFilename = QtGui.QLabel(Dialog)
+        self.labelFilename.setGeometry(QtCore.QRect(20, 510, 191, 17))
+        self.labelFilename.setText(_fromUtf8(""))
+        self.labelFilename.setObjectName(_fromUtf8("labelFilename"))
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -121,4 +131,10 @@ class Ui_Dialog(object):
         self.labelDeadzoneValue.setText(_translate("Dialog", "0", None))
         self.label_3.setText(_translate("Dialog", "Inner Zone Radius", None))
         self.label_4.setText(_translate("Dialog", "Dead Zone Radius", None))
+        self.pushButtonRecord.setText(_translate("Dialog", "Record", None))
+        self.textEditFilename.setHtml(_translate("Dialog", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+"p, li { white-space: pre-wrap; }\n"
+"</style></head><body style=\" font-family:\'Ubuntu\'; font-size:11pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">test_run</p></body></html>", None))
 
