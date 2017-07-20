@@ -96,15 +96,15 @@ class bag_writer:
         rospy.spin()
         
     def cb_MTML(self, msg):
-        self.cb(self.out_topics['MTML'], msg)
+        self.cb('MTML', msg)
     def cb_MTMR(self, msg):
-        self.cb(self.out_topics['MTMR'], msg)
+        self.cb('MTMR', msg)
     def cb_PSM1(self, msg):
-        self.cb(self.out_topics['PSM1'], msg)
+        self.cb('PSM1', msg)
     def cb_PSM2(self, msg):
-        self.cb(self.out_topics['PSM2'], msg)
+        self.cb('PSM2', msg)
     def cb_ECM(self, msg):
-        self.cb(self.out_topics['ECM'], msg)
+        self.cb('ECM', msg)
                     
     def cb(self,arm_name, msg):
         try:
@@ -1459,6 +1459,8 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         
         self.pushButtonHome.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(False)
+        self.pushButtonRecord.setEnabled(False)
+        self.textEditFilename.setEnabled(False)
         self.groupBoxOperationMode.setEnabled(False)
         self.groupBoxCameraControlMethod.setEnabled(False)
         
@@ -1482,13 +1484,17 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             else:
                 self.labelFilename.setText('')
             self.recording = True
+            self.textEditFilename.setEnabled(False)
             self.pushButtonRecord.setStyleSheet("background-color: red")
+            self.pushButtonRecord.setText('Stop Recording')
             arm_names = ['MTML', 'MTMR', 'PSM1', 'PSM2', 'ECM']
             self.bag_writer = bag_writer(arm_names, file_name, recording_dir=self.recording_dir)
         else:
             self.recording = False
             self.pushButtonRecord.setStyleSheet("background-color: ")
+            self.pushButtonRecord.setText('Record')
             self.bag_writer.shutdown()
+            self.textEditFilename.setEnabled(True)
         
     
     @pyqtSlot()
@@ -1519,6 +1525,9 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     def home(self):
         self.groupBoxOperationMode.setEnabled(True)
         self.groupBoxCameraControlMethod.setEnabled(True)
+        self.pushButtonRecord.setEnabled(True)
+        self.textEditFilename.setEnabled(True)
+        
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
 

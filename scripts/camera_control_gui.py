@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Thu Jul 20 14:35:06 2017
+# Created: Thu Jul 20 15:24:34 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -97,7 +97,7 @@ class Ui_Dialog(object):
         self.label_4.setGeometry(QtCore.QRect(10, 56, 131, 20))
         self.label_4.setObjectName(_fromUtf8("label_4"))
         self.pushButtonRecord = QtGui.QPushButton(Dialog)
-        self.pushButtonRecord.setGeometry(QtCore.QRect(20, 430, 98, 27))
+        self.pushButtonRecord.setGeometry(QtCore.QRect(20, 430, 131, 27))
         self.pushButtonRecord.setObjectName(_fromUtf8("pushButtonRecord"))
         self.textEditFilename = QtGui.QTextEdit(Dialog)
         self.textEditFilename.setGeometry(QtCore.QRect(20, 470, 191, 31))
