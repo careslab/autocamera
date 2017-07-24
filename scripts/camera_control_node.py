@@ -85,12 +85,14 @@ class bag_writer:
         self.__mode__ = mode
     
     def shutdown(self):
-        self.bag_sim.close()
-        self.bag_hw.close()
-        
         # unregister all subscribers
         for arm_name in self.arm_names:
             eval("self.sub_{}.unregister()".format(arm_name))
+            rospy.timer.sleep(.1)
+            
+        self.bag_hw.close()
+        self.bag_sim.close()
+        
         
     def spin(self):
         rospy.spin()
@@ -105,17 +107,29 @@ class bag_writer:
         self.cb('PSM2', msg)
     def cb_ECM(self, msg):
         self.cb('ECM', msg)
-                    
+
+    def run_once(f):
+        def wrapper(*args, **kwargs):
+            if not wrapper.has_run:
+                wrapper.has_run = True
+                return_value = f(*args, **kwargs)
+                wrapper.has_run = False
+                return return_value
+        wrapper.has_run = False
+        return wrapper
+    
+    @run_once                    
     def cb(self,arm_name, msg):
         try:
             self.bag_sim.write(self.out_topics_sim[arm_name], msg) # record the msg
             self.bag_hw.write(self.out_topics_hw[arm_name], msg) # record the msg
         except Exception:
-            pass
+            print("there was an error") 
     
     # This is the destructor for this python class    
-    def __del__(self):
-        self.bag.close()
+#     def __del__(self):
+#         self.bag_sim.close()
+#         self.bag_hw.close()
     
 
 class camera_handler:
@@ -1244,6 +1258,25 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         hardware = "HARDWARE"
         
     # The following classes help create threads so the GUI would not freeze
+    
+    class thread_bag_writer(QThread):
+        def __init__(self, arm_names, file_name, recording_dir, mode):
+            super(QThread, self).__init__()
+            self.node_handler = None
+            self.__mode__ = mode
+            self.arm_names = arm_names
+            self.file_name = file_name
+            self.recording_dir = recording_dir
+            
+        def run(self):
+            self.node_handler = bag_writer(self.arm_names, self.file_name, recording_dir=self.recording_dir)
+            self.node_handler.spin()
+        
+        def kill(self):
+            if self.node_handler != None:
+                self.node_handler.shutdown()
+                self.quit()
+                
     class thread_autocamera(QThread):
         def __init__(self, mode):
             super(QThread, self).__init__()
@@ -1488,12 +1521,13 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.pushButtonRecord.setStyleSheet("background-color: red")
             self.pushButtonRecord.setText('Stop Recording')
             arm_names = ['MTML', 'MTMR', 'PSM1', 'PSM2', 'ECM']
-            self.bag_writer = bag_writer(arm_names, file_name, recording_dir=self.recording_dir)
+            self.bag_writer = self.thread_bag_writer(arm_names, file_name, recording_dir=self.recording_dir, mode=self.MODE.hardware)
+            self.bag_writer.start()
         else:
             self.recording = False
             self.pushButtonRecord.setStyleSheet("background-color: ")
             self.pushButtonRecord.setText('Record')
-            self.bag_writer.shutdown()
+            self.bag_writer.kill()
             self.textEditFilename.setEnabled(True)
         
     
