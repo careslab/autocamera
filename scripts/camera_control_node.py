@@ -42,6 +42,86 @@ from std_msgs.msg._Float32 import Float32
 from PyQt4.Qt import QObject
 import rosbag
 
+
+class Teleop_class:
+    class MODE:
+        """
+            simulation mode: Use the hardware for the master side, 
+                            and simulation for the ECM
+            hardware mode: Use hardware for both the master side,
+                            and the ECM
+        """
+        simulation = "SIMULATION"
+        hardware = "HARDWARE"
+        
+    def __init__(self, mode = self.MODE.simulation):
+        self.__mode__ = mode
+        self.scale = 0.3
+        self.__enabled__ = False
+        
+        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[1].name, self.mtml_robot.links[-1])
+        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[1].name, self.mtmr_robot.links[-1])
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[1].name, self.psm1_robot.links[-1])
+        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[1].name, self.psm2_robot.links[-1])
+        
+        self.last_mtml_pos = None
+        self.last_mtmr_pos = None
+    
+        # Subscribe to MTMs hardware
+        self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
+        self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb)
+        
+        # Subscribe to PSMs
+        self.sub_psm1 = None; self.sub_psm2 = None
+        if self.__mode__ == self.MODE.simulation:
+            self.sub_psm1 = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb)
+            self.sub_psm2 = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb)
+        else:
+            self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb)
+            self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb)
+            
+            
+        # Publish to PSMs simulation
+        self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
+        self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        
+        # Access psm hardware
+        self.hw_psm1 = robot('PSM1')
+        self.hw_psm2 = robot('PSM2')
+        
+    def shut_down(self):
+        self.sub_mtml.unregister()
+        self.sub_mtmr.unregister()
+        self.sub_psm1.unregister()
+        self.sub_psm2.unregister()
+        
+        self.pub_psm1.unregister()
+        self.pub_psm2.unregister()
+    
+    def spin(self):
+        rospy.spin()
+            
+    def enable_teleop(self):
+        self.__enabled__ = True
+    def disable_teleop(self):
+        self.__enabled__ = False
+    
+    def mtml_cb(self, msg):
+        pass
+    def mtmr_cb(self, msg):
+        pass
+    
+    def translate(self, arm_name, translation): # translate a psm arm
+        pass
+    
+    def align_orientation(self, arm_name, orientation): # align a psm arm to mtm
+        pass
+    
 class bag_writer:
     class MODE:
         """
@@ -60,7 +140,7 @@ class bag_writer:
         self.__mode__ = mode
         
         # initialize bags 
-        dir = '../{}/'.format(recording_dir)+bag_name +'/'
+        dir = '{}/'.format(recording_dir)+bag_name +'/'; dir = dir.__str__()
         if not os.path.exists(dir):
             os.system( ('mkdir -p '+ dir ).__str__())
         
@@ -1259,6 +1339,23 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         
     # The following classes help create threads so the GUI would not freeze
     
+    
+    class thread_teleop(QThread):
+        def __init__(self, mode):
+            super(QThread, self).__init__()
+            self.node_handler = None
+            self.__mode__ = mode
+        def run(self):
+            self.node_handler = Teleop_class()
+            print('\nRunning {} in {}\n'.format("Teleop",self.__mode__))
+            self.node_handler.set_mode(self.__mode__)
+            self.node_handler.spin()
+        
+        def kill(self):
+            if self.node_handler != None:
+                self.node_handler.shutdown()
+                self.quit()
+                
     class thread_bag_writer(QThread):
         def __init__(self, arm_names, file_name, recording_dir, mode):
             super(QThread, self).__init__()
@@ -1500,17 +1597,20 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.recording = False
         self.pushButtonRecord.clicked.connect(self.on_record)
         
-        # Get recording parameters from config file
-        self.config = configparser.ConfigParser()
-        self.config_file = '../config/autocamera.conf'
-        self.config.read(self.config_file)
-        self.recording_dir = self.config.get('RECORDING', 'directory')
+        try:
+            # Get recording parameters from config file
+            self.config = configparser.ConfigParser()
+            self.config_file = '../config/autocamera.conf'
+            self.config.read(self.config_file)
+            self.recording_dir = self.config.get('RECORDING', 'directory')
+        except Exception:
+            pass
     
     @pyqtSlot()
     def on_record(self):
         if self.recording == False:
             file_name = self.textEditFilename.toPlainText()
-            if os.path.exists('../{}/'.format(self.recording_dir)+file_name):
+            if os.path.exists('{}/'.format(self.recording_dir)+file_name):
                 self.labelFilename.setText('File already exists')
                 self.labelFilename.setStyleSheet("color: red")
                 return
@@ -1648,17 +1748,21 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         if self.thread != None:
             self.thread.kill()
 
-        rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
-        rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
+#         rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
+#         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
 
+        # start teleop
+        self.thread_tel = self.thread_teleop(self.__mode__)
+        self.thread_tel.start()
+        
         if name == self.node_name.autocamera:
             self.groupBoxAutocameraParams.setVisible(True)
         else:
-            self.groupBoxAutocameraParams.setVisible(False)                                
+            self.groupBoxAutocameraParams.setVisible(False)
+            
         if name == self.node_name.clutchNGo :
             self.thread = self.thread_clutchNGo(self.__mode__)
             self.thread.start()
-            
         elif name == self.node_name.autocamera:
             self.thread = None
             self.thread = self.thread_autocamera(self.__mode__)

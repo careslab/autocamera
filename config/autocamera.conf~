@@ -1,6 +1,7 @@
 [ZOOM]
-inner_zone = 0.23
-dead_zone = 0.33
+inner_zone = 0.21
+dead_zone = 0.13
 
 [RECORDING]
-directory=study_recordings
+directory = ~/camera_control_recordings
+
