@@ -54,7 +54,7 @@ class Teleop_class:
         simulation = "SIMULATION"
         hardware = "HARDWARE"
         
-    def __init__(self, mode = self.MODE.simulation):
+    def __init__(self, mode = MODE.simulation):
         self.__mode__ = mode
         self.scale = 0.3
         self.__enabled__ = False
@@ -64,13 +64,18 @@ class Teleop_class:
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
         
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[1].name, self.mtml_robot.links[-1])
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[1].name, self.mtmr_robot.links[-1])
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[1].name, self.psm1_robot.links[-1])
-        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[1].name, self.psm2_robot.links[-1])
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1])
+        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1])
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1])
+        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1])
         
         self.last_mtml_pos = None
+        self.last_mtml_rot = None
         self.last_mtmr_pos = None
+        self.last_mtmr_rot = None
+    
+        self.last_psm1_pos = None
+        self.last_psm2_pos = None
     
         # Subscribe to MTMs hardware
         self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
@@ -103,6 +108,9 @@ class Teleop_class:
         self.pub_psm1.unregister()
         self.pub_psm2.unregister()
     
+    def set_mode(self, mode):
+        self.__mode__ = mode
+        
     def spin(self):
         rospy.spin()
             
@@ -111,13 +119,44 @@ class Teleop_class:
     def disable_teleop(self):
         self.__enabled__ = False
     
+    def psm1_cb(self, msg):
+        self.last_psm1_pos = msg.position
+        
+    def psm2_cb(self, msg):
+        self.last_psm2_pos = msg.position
+    
     def mtml_cb(self, msg):
-        pass
+        # Find mtm end effector position and orientation
+        pos, rot = self.mtml_kin.FK(msg.position)
+        if self.last_mtml_pos == None:
+            self.last_mtml_pos = pos
+            self.last_mtml_rot = rot
+            return
+        
+        if self.__enabled__ == False:
+            return
+        
+        translation = pos - self.last_mtml_pos
+        orientation = rot
+        
+        self.translate('mtml', translation)
+        self.align_orientation('mtml', orientation)
+        
+        self.last_mtml_pos = pos
+        self.last_mtml_rot = rot
+    
     def mtmr_cb(self, msg):
         pass
     
     def translate(self, arm_name, translation): # translate a psm arm
-        pass
+        if arm_name == 'mtml' or arm_name == 'psm2':
+            psm2_pos, _ = self.psm2_kin.FK(self.last_psm2_pos)
+            T = self.psm2_kin.forward(self.last_psm2_pos)
+            new_psm2_pos = psm2_pos + translation
+            T[1:3, 3] = new_psm2_pos
+            new_psm2_angles = self.psm2_kin.inverse(T)
+            
+            self.hw_psm2.move_joint_list( new_psm2_angles, interpolate=False)
     
     def align_orientation(self, arm_name, orientation): # align a psm arm to mtm
         pass
