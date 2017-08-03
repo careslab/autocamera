@@ -41,6 +41,7 @@ from PyQt4 import QtGui
 from std_msgs.msg._Float32 import Float32
 from PyQt4.Qt import QObject
 import rosbag
+from geometry_msgs.msg._Wrench import Wrench
 
 
 class Teleop_class:
@@ -56,19 +57,8 @@ class Teleop_class:
         
     def __init__(self, mode = MODE.simulation):
         self.__mode__ = mode
-        self.scale = 0.3
+        self.scale = 0.7
         self.__enabled__ = False
-        
-        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
-        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
-        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
-        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-        
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1])
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1])
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1])
-        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1])
-        
         self.last_mtml_pos = None
         self.last_mtml_rot = None
         self.last_mtmr_pos = None
@@ -76,34 +66,70 @@ class Teleop_class:
     
         self.last_psm1_pos = None
         self.last_psm2_pos = None
+        
+        self.last_ecm_jnt = None
+        
+    def __init__nodes(self):
+        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
+        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
+        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
+        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        
     
         # Subscribe to MTMs hardware
         self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
         self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb)
+        
+        # subscribe to head sensor
+        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
         
         # Subscribe to PSMs
         self.sub_psm1 = None; self.sub_psm2 = None
         if self.__mode__ == self.MODE.simulation:
             self.sub_psm1 = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb)
             self.sub_psm2 = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb)
+            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
         else:
             self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb)
             self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb)
+            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
             
             
         # Publish to PSMs simulation
         self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
         self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
         
+        # Translation and orientation lock
+        self.lock_mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
+        self.lock_mtml_psm2_translation = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
+        
+        self.lock_mtmr_psm1_orientation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
+        self.lock_mtmr_psm1_translation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
+
+        self.mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
+        self.mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
+
         # Access psm hardware
         self.hw_psm1 = robot('PSM1')
         self.hw_psm2 = robot('PSM2')
+        
+        # Access mtm hardware
+        self.hw_mtml = robot('MTML')
+        self.hw_mtmr = robot('MTMR')
         
     def shut_down(self):
         self.sub_mtml.unregister()
         self.sub_mtmr.unregister()
         self.sub_psm1.unregister()
         self.sub_psm2.unregister()
+        self.sub_ecm.unregister()
         
         self.pub_psm1.unregister()
         self.pub_psm2.unregister()
@@ -112,29 +138,92 @@ class Teleop_class:
         self.__mode__ = mode
         
     def spin(self):
+        self.__init__nodes()
         rospy.spin()
             
     def enable_teleop(self):
         self.__enabled__ = True
+        
+        self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.hw_mtml.set_wrench_body_force([0,0,0])
+        self.hw_mtml.set_gravity_compensation(True)
+        
+#         self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+#         self.lock_mtml_psm2_translation.publish(Bool(False))
+#         self.lock_mtml_psm2_orientation.publish(Bool(False))
+#         self.lock_mtmr_psm1_translation.publish(Bool(False))
+#         self.lock_mtmr_psm1_orientation.publish(Bool(False))
+        
     def disable_teleop(self):
         self.__enabled__ = False
+        self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.hw_mtml.set_gravity_compensation(False)
+#         self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        
+#         self.lock_mtml_psm2_translation.publish(Bool(True))
+#         self.lock_mtml_psm2_orientation.publish(Bool(True))
+#         self.lock_mtmr_psm1_translation.publish(Bool(True))
+#         self.lock_mtmr_psm1_orientation.publish(Bool(True))
     
+    def rotate(self, axis, angle):
+        """
+        Returns a rotation matrix
+            axis : 'x','y' or 'z'
+            angle : In radians
+        """
+        c = np.cos(angle)
+        s = np.sin(angle)
+        
+        m = np.eye(3)
+        
+        if axis.lower() == 'x':
+            m[1:,1:] = np.matrix( [ [c,-s], [s,c]])
+        elif axis.lower() == 'z':
+            m[:2,:2] = np.matrix( [ [c,-s], [s,c]])
+        elif axis.lower() == 'y':
+            m[0,0] = c; m[0,2] = s; m[2,0] = -s; m[2,2] = c;
+            
+        return m
+
+    def camera_headsensor_cb(self, msg):
+        if msg.buttons[0] == 1:
+            self.enable_teleop()            
+        else:
+            self.disable_teleop()
+            
+    def ecm_cb(self, msg):
+        if self.__mode__ == self.MODE.simulation:
+            self.last_ecm_jnt = msg.position[0:2] + msg.position[-2:]
+        elif self.__mode__ == self.MODE.hardware:
+            self.last_ecm_jnt = msg.position[0:3] + tuple([0])
+          
     def psm1_cb(self, msg):
-        self.last_psm1_pos = msg.position
+        self.last_psm1_pos = msg.position[0:-1]
         
     def psm2_cb(self, msg):
-        self.last_psm2_pos = msg.position
+        self.last_psm2_pos = msg.position[0:-1]
     
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
-        pos, rot = self.mtml_kin.FK(msg.position)
+        if self.last_ecm_jnt == None: return
+        
+        r_180_x = self.rotate('x', np.pi)
+        r_90_z = self.rotate('z', -np.pi/2)
+
+        T_mtm = self.mtml_kin.forward(msg.position[0:-1])
+        T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
+        T_ecm[0:3,0:3] = T_ecm[0:3, 0:3] * r_90_z * r_180_x
+        
+        T = (T_ecm ** -1) * T_mtm
+        pos = T[0:3,3]
+        rot = T[0:3,0:3]
+        
         if self.last_mtml_pos == None:
             self.last_mtml_pos = pos
             self.last_mtml_rot = rot
             return
         
-        if self.__enabled__ == False:
-            return
+        if self.__enabled__ == False: return
         
         translation = pos - self.last_mtml_pos
         orientation = rot
@@ -149,16 +238,21 @@ class Teleop_class:
         pass
     
     def translate(self, arm_name, translation): # translate a psm arm
+        if self.__enabled__ == False: return
+        
+        translation = translation * self.scale
         if arm_name == 'mtml' or arm_name == 'psm2':
             psm2_pos, _ = self.psm2_kin.FK(self.last_psm2_pos)
             T = self.psm2_kin.forward(self.last_psm2_pos)
             new_psm2_pos = psm2_pos + translation
-            T[1:3, 3] = new_psm2_pos
+            T[0:3, 3] = new_psm2_pos
             new_psm2_angles = self.psm2_kin.inverse(T)
-            
-            self.hw_psm2.move_joint_list( new_psm2_angles, interpolate=False)
+            print('new_psm2_angles = ' + new_psm2_angles.__str__())
+            self.hw_psm2.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
     
     def align_orientation(self, arm_name, orientation): # align a psm arm to mtm
+        if self.__enabled__ == False: return
+        
         pass
     
 class bag_writer:
