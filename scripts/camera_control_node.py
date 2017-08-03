@@ -57,7 +57,7 @@ class Teleop_class:
         
     def __init__(self, mode = MODE.simulation):
         self.__mode__ = mode
-        self.scale = 0.7
+        self.scale = 0.5
         self.__enabled__ = False
         self.last_mtml_pos = None
         self.last_mtml_rot = None
@@ -76,8 +76,8 @@ class Teleop_class:
         self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
+        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[1].name, self.mtml_robot.links[-1].name)
+        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[1].name, self.mtmr_robot.links[-1].name)
         self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
@@ -167,7 +167,7 @@ class Teleop_class:
     
     def rotate(self, axis, angle):
         """
-        Returns a rotation matrix
+        Returns a rotation matrix and a transformation matrix
             axis : 'x','y' or 'z'
             angle : In radians
         """
@@ -182,8 +182,9 @@ class Teleop_class:
             m[:2,:2] = np.matrix( [ [c,-s], [s,c]])
         elif axis.lower() == 'y':
             m[0,0] = c; m[0,2] = s; m[2,0] = -s; m[2,2] = c;
-            
-        return m
+        t = np.eye(4,4)
+        t[0:3, 0:3] = m    
+        return m, t
 
     def camera_headsensor_cb(self, msg):
         if msg.buttons[0] == 1:
@@ -207,14 +208,15 @@ class Teleop_class:
         # Find mtm end effector position and orientation
         if self.last_ecm_jnt == None: return
         
-        r_180_x = self.rotate('x', np.pi)
-        r_90_z = self.rotate('z', -np.pi/2)
-
+        _, r_270_y = self.rotate('y', 3*np.pi/2)
+        _, r_90_z = self.rotate('z', np.pi/2)
+        _, r_180_x = self.rotate('x', np.pi)
+        
         T_mtm = self.mtml_kin.forward(msg.position[0:-1])
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
-        T_ecm[0:3,0:3] = T_ecm[0:3, 0:3] * r_90_z * r_180_x
         
-        T = (T_ecm ** -1) * T_mtm
+#         T_mtm = T_mtm * r_270_y * r_90_z
+        T = T_mtm * r_180_x#* T_ecm
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
