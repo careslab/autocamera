@@ -59,6 +59,7 @@ class Teleop_class:
         self.__mode__ = mode
         self.scale = 0.5
         self.__enabled__ = False
+        
         self.last_mtml_pos = None
         self.last_mtml_rot = None
         self.last_mtmr_pos = None
@@ -68,6 +69,11 @@ class Teleop_class:
         self.last_psm2_jnt = None
         
         self.last_ecm_jnt = None
+        
+        self.first_mtml_pos = None
+        self.first_mtmr_pos = None
+        self.first_psm1_pos = None
+        self.first_psm2_pos = None
         
     def __init__nodes(self):
         self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
@@ -152,7 +158,7 @@ class Teleop_class:
         self.hw_mtmr.set_wrench_body_force([0,0,0])
         self.hw_mtmr.set_gravity_compensation(True)
         
-        self.align_mtms_to_psms()
+#         self.align_mtms_to_psms()
         
 #         self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
 #         self.lock_mtml_psm2_translation.publish(Bool(False))
@@ -208,14 +214,30 @@ class Teleop_class:
             self.last_ecm_jnt = msg.position[0:3] + tuple([0])
           
     def psm1_cb(self, msg):
+        if self.__mode__ == self.MODE.simulation:
+            p = msg.position
+            msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
+            
         self.last_psm1_jnt = msg.position[0:-1]
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        self.pub_psm2.publish(msg)
+        if self.__mode__ == self.MODE.hardware:
+            self.pub_psm1.publish(msg)
+            
+        if self.first_psm1_pos == None:
+            self.first_psm1_pos, _ = self.psm1_kin.FK( self.last_psm1_jnt)
         
     def psm2_cb(self, msg):
-        self.last_psm2_jnt = msg.position[0:-1]
+        if self.__mode__ == self.MODE.simulation:
+            p = msg.position
+            msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
+            
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        self.pub_psm1.publish(msg)
+        self.last_psm2_jnt = msg.position[0:-1]
+        if self.__mode__ == self.MODE.hardware:
+            self.pub_psm2.publish(msg)
+            
+        if self.first_psm2_pos == None:
+            self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
     
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
@@ -234,18 +256,33 @@ class Teleop_class:
         rot = T[0:3,0:3]
         
         if self.last_mtml_pos == None:
+            self.first_mtml_pos = pos
             self.last_mtml_pos = pos
             self.last_mtml_rot = rot
             return
         
         if self.__enabled__ == False: return
         
-        translation = pos - self.last_mtml_pos
+        translation = pos - self.first_mtml_pos
         orientation = rot
         
-#         self.translate('mtml', translation)
-        self.set_orientation_mtml( orientation)
+        T = self.translate_mtml(translation)
+        T = self.set_orientation_mtml( orientation, T)
         
+        new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
+        
+        if type(new_psm2_angles) == NoneType:
+            return
+            
+        if self.__mode__ == self.MODE.hardware:
+            self.hw_psm2.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
+        
+        if self.__mode__ == self.MODE.simulation:
+            msg = JointState()
+            msg.position = new_psm2_angles.tolist()
+            msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            self.pub_psm2.publish(msg)
+            
         self.last_mtml_pos = pos
         self.last_mtml_rot = rot
         
@@ -268,18 +305,33 @@ class Teleop_class:
         rot = T[0:3,0:3]
         
         if self.last_mtmr_pos == None:
+            self.first_mtmr_pos = pos
             self.last_mtmr_pos = pos
             self.last_mtmr_rot = rot
             return
         
         if self.__enabled__ == False: return
         
-        translation = pos - self.last_mtmr_pos
+        translation = pos - self.first_mtmr_pos
         orientation = rot
         
-#         self.translate('mtml', translation)
-        self.set_orientation_mtmr(orientation)
+        T = self.translate_mtmr(translation)
+        T = self.set_orientation_mtmr(orientation, T)
         
+        new_psm1_angles = self.psm1_kin.inverse(T, self.last_psm1_jnt)
+            
+        if type(new_psm1_angles) == NoneType:
+            return
+            
+        if self.__mode__ == self.MODE.hardware:
+            self.hw_psm1.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
+        
+        if self.__mode__ == self.MODE.simulation:
+            msg = JointState()
+            msg.position = new_psm1_angles.tolist()
+            msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            self.pub_psm1.publish(msg)
+            
         self.last_mtmr_pos = pos
         self.last_mtmr_rot = rot
         
@@ -298,38 +350,54 @@ class Teleop_class:
         jnt_mtml = self.mtml_kin.inverse(T_mtml)
         jnt_mtmr = self.mtmr_kin.inverse(T_mtmr)
         
-        self.hw_mtml.move_joint_list( jnt_mtml.tolist(), range(0, len(jnt_mtml)), interpolation=True)
-        self.hw_mtmr.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolation=True)
+        if self.__mode__ == self.MODE.hardware:
+            self.hw_mtml.move_joint_list( jnt_mtml.tolist(), range(0, len(jnt_mtml)), interpolate=True)
+            self.hw_mtmr.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolate=True)
+            
         
-    def translate(self, arm_name, translation): # translate a psm arm
+        
+    def translate_mtml(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
         translation = translation * self.scale
-        if arm_name == 'mtml' or arm_name == 'psm2':
-            psm2_pos, _ = self.psm2_kin.FK(self.last_psm2_pos)
-            T = self.psm2_kin.forward(self.last_psm2_pos)
-            new_psm2_pos = psm2_pos + translation
-            T[0:3, 3] = new_psm2_pos
-            new_psm2_angles = self.psm2_kin.inverse(T)
-            self.hw_psm2.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
+        psm2_pos = self.first_psm2_pos#self.psm2_kin.FK(self.last_psm2_jnt)
+        if T==None:
+            T = self.psm2_kin.forward(self.last_psm2_jnt)
+        new_psm2_pos = psm2_pos + translation
+        T[0:3, 3] = new_psm2_pos
+        return T
     
-    def set_orientation_mtml(self,orientation): # align a psm arm to mtm
+    def translate_mtmr(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
-        T_psm2 = self.psm2_kin.forward(self.last_psm2_jnt)
-        T_psm2[0:3,0:3] = orientation
-        new_psm2_angles = self.psm2_kin.inverse(T_psm2)
-        print('new_psm2_angles = ' + new_psm2_angles.__str__())
-        self.hw_psm2.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
+        translation = translation * self.scale
+        psm1_pos = self.first_psm1_pos #self.psm1_kin.FK(self.last_psm1_jnt)
         
-    def set_orientation_mtmr(self,orientation): # align a psm arm to mtm
+        if T==None:
+            T = self.psm1_kin.forward(self.last_psm1_jnt)
+            
+        new_psm1_pos = psm1_pos + translation
+        T[0:3, 3] = new_psm1_pos
+        
+        return T
+        
+    
+    def set_orientation_mtml(self,orientation, T=None): # align a psm arm to mtm
         if self.__enabled__ == False: return
         
-        T_psm1 = self.psm1_kin.forward(self.last_psm1_jnt)
-        T_psm1[0:3,0:3] = orientation
-        new_psm1_angles = self.psm1_kin.inverse(T_psm1)
-        print('new_psm1_angles = ' + new_psm1_angles.__str__())
-        self.hw_psm1.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
+        if T==None:
+            T = self.psm2_kin.forward(self.last_psm2_jnt)
+        T[0:3,0:3] = orientation
+        new_psm2_angles = self.psm2_kin.inverse(T)
+        return T
+        
+    def set_orientation_mtmr(self,orientation, T = None): # align a psm arm to mtm
+        if self.__enabled__ == False: return
+        if T == None:
+            T = self.psm1_kin.forward(self.last_psm1_jnt)
+            
+        T[0:3,0:3] = orientation
+        return T
             
         
 class bag_writer:
