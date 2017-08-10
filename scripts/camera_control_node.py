@@ -84,14 +84,19 @@ class Teleop_class:
         
         self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[1].name, self.mtml_robot.links[-1].name)
         self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[1].name, self.mtmr_robot.links[-1].name)
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[1].name, self.psm1_robot.links[-1].name)
-        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[1].name, self.psm2_robot.links[-1].name)
+        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
+        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
     
-        # Subscribe to MTMs hardware
-        self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
-        self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb)
+        # Subscribe to MTMs
+        self.sub_mtml = None; self.sub_mtmr = None
+        if self.__mode__ == self.MODE.simulation:
+            self.sub_mtml = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.mtml_cb)
+            self.sub_mtmr = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.mtmr_cb)
+        elif self.__mode__ == self.MODE.hardware:
+            self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
+            self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb)
         
         # subscribe to head sensor
         self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
@@ -130,12 +135,17 @@ class Teleop_class:
         self.hw_mtml = robot('MTML')
         self.hw_mtmr = robot('MTMR')
         
+        if self.__mode__ == self.MODE.simulation:
+            self.enable_teleop()
+        
     def shut_down(self):
         self.sub_mtml.unregister()
         self.sub_mtmr.unregister()
         self.sub_psm1.unregister()
         self.sub_psm2.unregister()
         self.sub_ecm.unregister()
+        self.sub_mtml.unregister()
+        self.sub_mtmr.unregister()
         
         self.pub_psm1.unregister()
         self.pub_psm2.unregister()
@@ -242,16 +252,29 @@ class Teleop_class:
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
         if self.last_ecm_jnt == None: return
-        
+
+        if self.__mode__ == self.MODE.simulation:
+            msg.position = msg.position[0:2] + msg.position[3:] 
+            msg.name = msg.name[0:2] + msg.name[3:]
+        else:
+            msg.position = msg.position[0:-1]
+            msg.name = msg.name[0:-1]
+            
         _, r_270_y = self.rotate('y', 3*np.pi/2)
         _, r_90_z = self.rotate('z', np.pi/2)
         _, r_180_x = self.rotate('x', np.pi)
-        
-        T_mtm = self.mtml_kin.forward(msg.position[0:-1])
+        T_mtm = self.mtml_kin.forward(msg.position)
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         
 #         T_mtm = T_mtm * r_270_y * r_90_z
-        T = T_mtm# * r_180_x#* T_ecm
+        rr = np.matrix ([[ 1.0,  0.0,          0.0,          0.0],
+                     [  0.0, 1.0,          0.0,         -0.00],
+                     [  0.0, 0.0,          1.0,          -0.0],
+                     [  0.0,  0.0,          0.0,          1.0]] )
+        
+        rr[0:3,0:3] = T_ecm[0:3,0:3]
+        
+        T = T_mtm 
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
@@ -267,10 +290,10 @@ class Teleop_class:
         orientation = rot
         
         T = self.translate_mtml(translation)
-        T = self.set_orientation_mtml( orientation, T)
+#         T = self.set_orientation_mtml( orientation, T)
         
         new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
-        
+        print(new_psm2_angles)
         if type(new_psm2_angles) == NoneType:
             return
             
@@ -292,15 +315,36 @@ class Teleop_class:
         # Find mtm end effector position and orientation
         if self.last_ecm_jnt == None: return
         
+        if self.__mode__ == self.MODE.simulation:
+            msg.position = msg.position[0:2] + msg.position[3:] 
+            msg.name = msg.name[0:2] + msg.name[3:]
+        else:
+            msg.position = msg.position[0:-1]
+            msg.name = msg.name[0:-1]
+            
         _, r_270_y = self.rotate('y', 3*np.pi/2)
         _, r_90_z = self.rotate('z', np.pi/2)
         _, r_180_x = self.rotate('x', np.pi)
+        _, r_180_z = self.rotate('z', np.pi)
+        _, r_270_x = self.rotate('x', 3*np.pi/2)
+        _, r_90_x = self.rotate('x', np.pi/2.0)
+        _, r_90_y = self.rotate('y', np.pi/2.0)
+        _, r_60_y = self.rotate('y', np.pi/3.0)
         
-        T_mtm = self.mtmr_kin.forward(msg.position[0:-1])
+        _, r_225_x = self.rotate('x', 5*np.pi/4.0) 
+        _, r_270_z = self.rotate('z', 3*np.pi/2.0)
+        
+        T_mtm = self.mtmr_kin.forward(msg.position)
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         
 #         T_mtm = T_mtm * r_270_y * r_90_z
-        T = T_mtm #* r_180_x * r_90_z #* T_ecm
+        rr = np.matrix ([[ 1.0,  0.0,          0.0,          0.0],
+                     [  0.0, 1.0,          0.0,         -0.00],
+                     [  0.0, 0.0,          1.0,          -0.0],
+                     [  0.0,  0.0,          0.0,          1.0]] )
+        
+        rr[0:3,0:3] = T_ecm[0:3,0:3]
+        T = T_mtm * rr
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
@@ -315,11 +359,11 @@ class Teleop_class:
         translation = pos - self.first_mtmr_pos
         orientation = rot
         
+        
         T = self.translate_mtmr(translation)
-        T = self.set_orientation_mtmr(orientation, T)
+#         T = self.set_orientation_mtmr(orientation, T)
         
         new_psm1_angles = self.psm1_kin.inverse(T, self.last_psm1_jnt)
-            
         if type(new_psm1_angles) == NoneType:
             return
             
