@@ -34,6 +34,7 @@ from PyQt4.QtCore import Qt
 from std_msgs.msg._Empty import Empty
 from geometry_msgs.msg import PoseStamped, Pose
 from hrl_geom import pose_converter
+from visualization_msgs.msg import Marker
 
 import configparser
 import camera_control_gui
@@ -74,6 +75,13 @@ class Teleop_class:
         self.first_mtmr_pos = None
         self.first_psm1_pos = None
         self.first_psm2_pos = None
+        
+        self.Tw_mtml = None 
+        self.Tw_mtmr = None
+        from autocamera_algorithm import Autocamera
+        from visualization_msgs.msg import Marker
+        self.autocamera = Autocamera()
+        
         
     def __init__nodes(self):
         self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
@@ -249,6 +257,8 @@ class Teleop_class:
         if self.first_psm2_pos == None:
             self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
     
+    
+        
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
         if self.last_ecm_jnt == None: return
@@ -260,21 +270,24 @@ class Teleop_class:
             msg.position = msg.position[0:-1]
             msg.name = msg.name[0:-1]
             
-        _, r_270_y = self.rotate('y', 3*np.pi/2)
-        _, r_90_z = self.rotate('z', np.pi/2)
-        _, r_180_x = self.rotate('x', np.pi)
+        if self.Tw_mtml == None:
+            T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
+            T_mtm_000 = self.mtml_kin.forward(msg.position)
+            self.Tw_mtml =  (T_mtm_000**-1) * T_ecm
+
+        _, r_90_z = self.rotate('z', np.pi/2.0)
+                    
         T_mtm = self.mtml_kin.forward(msg.position)
-        T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
+        T = r_90_z * T_mtm * self.Tw_mtml
         
-#         T_mtm = T_mtm * r_270_y * r_90_z
-        rr = np.matrix ([[ 1.0,  0.0,          0.0,          0.0],
-                     [  0.0, 1.0,          0.0,         -0.00],
-                     [  0.0, 0.0,          1.0,          -0.0],
-                     [  0.0,  0.0,          0.0,          1.0]] )
+#         br = tf.TransformBroadcaster()
+#         br.sendTransform(T[0:3,3],
+#                         tf.transformations.quaternion_from_matrix(T),
+#                         rospy.Time.now(),
+#                         '/mtml_transform',
+#                         "world")
         
-        rr[0:3,0:3] = T_ecm[0:3,0:3]
-        
-        T = T_mtm 
+  
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
@@ -289,7 +302,10 @@ class Teleop_class:
         translation = pos - self.first_mtml_pos
         orientation = rot
         
+        
+        
         T = self.translate_mtml(translation)
+#         self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,.02,.02])
 #         T = self.set_orientation_mtml( orientation, T)
         
         new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
@@ -344,7 +360,7 @@ class Teleop_class:
                      [  0.0,  0.0,          0.0,          1.0]] )
         
         rr[0:3,0:3] = T_ecm[0:3,0:3]
-        T = T_mtm * rr
+        T = T_mtm
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
@@ -358,7 +374,7 @@ class Teleop_class:
         
         translation = pos - self.first_mtmr_pos
         orientation = rot
-        
+       
         
         T = self.translate_mtmr(translation)
 #         T = self.set_orientation_mtmr(orientation, T)

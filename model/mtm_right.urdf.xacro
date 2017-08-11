@@ -8,6 +8,6 @@
   <xacro:mtm_right 
       prefix="right_"
       parent_link="world"
-      xyz="-1.25 -0.2 0.8" rpy="0.0 0.0 3.1415926"/>
+      xyz=".5 0 0" rpy="0 0 0"/>
   
 </robot>

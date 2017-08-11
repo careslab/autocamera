@@ -6,8 +6,8 @@
 
   <link name="world"/>
   <xacro:mtm_right 
-      prefix="_right"
+      prefix="right_"
       parent_link="world"
-      xyz="-1.25 -0.2 0.8" rpy="0.0 0.0 3.1415926"/>
+      xyz="2 0 0" rpy="1.45428823693 -0.636398129841 0.868166634353"/>
   
 </robot>
