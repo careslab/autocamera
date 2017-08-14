@@ -130,10 +130,10 @@ class Autocamera:
         new_joint.position = pos
         return new_joint
                 
-    def add_marker(self, pose, name, color=[1,0,1], type=Marker.SPHERE, scale = [.02,.02,.02], points=None):
+    def add_marker(self, pose, name, color=[1,0,1], type=Marker.SPHERE, scale = [.02,.02,.02], points=None, frame = "world"):
         vis_pub = rospy.Publisher(name, Marker, queue_size=10)
         marker = Marker()
-        marker.header.frame_id = "world"
+        marker.header.frame_id = frame
         marker.header.stamp = rospy.Time() 
         marker.ns = "my_namespace"
         marker.id = 0
