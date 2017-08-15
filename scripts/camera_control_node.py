@@ -66,6 +66,9 @@ class Teleop_class:
         self.last_mtmr_pos = None
         self.last_mtmr_rot = None
     
+        self.mtml_gripper = None
+        self.mtmr_gripper = None
+        
         self.last_psm1_jnt = None
         self.last_psm2_jnt = None
         
@@ -122,6 +125,8 @@ class Teleop_class:
             self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb)
             self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb)
             self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+            self.sub_mtml_gripper = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.mtml_gripper_cb)
+            self.sub_mtmr_gripper = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.mtmr_gripper_cb)
             
             
         # Publish to PSMs simulation
@@ -265,11 +270,14 @@ class Teleop_class:
             self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
     
     
-        
+    def mtml_gripper_cb(self, msg):
+        self.mtml_gripper = msg.data
+    def mtmr_gripper_cb(self, msg):
+        self.mtmr_gripper = msg.data
+                
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
         if self.last_ecm_jnt == None: return
-
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
@@ -281,15 +289,8 @@ class Teleop_class:
             T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
             self.T_mtm_000 = self.mtml_kin.forward(msg.position)
             T_mtm_000 = self.mtml_kin.forward(msg.position)
-            self.Tw_mtml =  (T_mtm_000**-1) * T_ecm
             self.T_star_mtml = (T_ecm**-1) * T_mtm_000
 
-        r_90_z, r_90_z_t  = self.rotate('z', np.pi/2)
-        r_90_x, r_90_x_t = self.rotate('x', np.pi/2.0)
-        r_180_y, r_180_y_t = self.rotate('y', np.pi)
-        r_180_x, r_180_x_t = self.rotate('x', np.pi)
-        r_90_y, r_90_y_t = self.rotate('y', np.pi/2.0)
-        
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         T_mtm = self.mtml_kin.forward(msg.position)
         T = ( self.T_mtm_000**-1) * T_mtm 
@@ -298,8 +299,6 @@ class Teleop_class:
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
         T = transform * T
-#         T =  r_90_z_t * T
-#         T = T_mtm * self.Tw_mtml
         
 
         
@@ -315,7 +314,7 @@ class Teleop_class:
         
         if self.__enabled__ == False: return
         
-        self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
+#         self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
         
         delta = pos - self.first_mtml_pos
         delta = np.insert(delta, 3,1).transpose()
@@ -327,21 +326,16 @@ class Teleop_class:
         p0 = T_ecm[0:3,3]
         p1 = p0 + translation
         
-    
-#         br = tf.TransformBroadcaster()
-#         br.sendTransform(T[0:3,3],
-#                         tf.transformations.quaternion_from_matrix(T),
-#                         rospy.Time.now(),
-#                         '/mtml_transform',
-#                         "world")
-        
-        orientation = rot
+        orientation = T_ecm[0:3,0:3] * rot
 
         T = self.translate_mtml(translation)
-#         T = self.set_orientation_mtml( orientation, T)
+        T = self.set_orientation_mtml( orientation, T)
         
         new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
-        new_psm2_angles[-3:] = [0,0,0]
+        if self.__mode__ == self.MODE.hardware:
+            gripper = (self.mtml_gripper-.4) * 1.4/.6
+            new_psm2_angles = np.append(new_psm2_angles, gripper)
+            
         print(new_psm2_angles)
         if type(new_psm2_angles) == NoneType:
             return
@@ -371,18 +365,6 @@ class Teleop_class:
             msg.position = msg.position[0:-1]
             msg.name = msg.name[0:-1]
             
-        _, r_270_y = self.rotate('y', 3*np.pi/2)
-        _, r_90_z = self.rotate('z', np.pi/2)
-        _, r_180_x = self.rotate('x', np.pi)
-        _, r_180_z = self.rotate('z', np.pi)
-        _, r_270_x = self.rotate('x', 3*np.pi/2)
-        _, r_90_x = self.rotate('x', np.pi/2.0)
-        _, r_90_y = self.rotate('y', np.pi/2.0)
-        _, r_60_y = self.rotate('y', np.pi/3.0)
-        
-        _, r_225_x = self.rotate('x', 5*np.pi/4.0) 
-        _, r_270_z = self.rotate('z', 3*np.pi/2.0)
-        
         T_mtm = self.mtmr_kin.forward(msg.position)
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         
@@ -391,9 +373,9 @@ class Teleop_class:
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
-        rot = T[0:3,0:3]
         T = transform * T
         
+        rot = T[0:3,0:3]
         pos = T[0:3,3]
         
         if self.last_mtmr_pos == None:
@@ -414,16 +396,20 @@ class Teleop_class:
         p0 = T_ecm[0:3,3]
         p1 = p0 + translation
         
-        orientation = rot
+        orientation = T_ecm[0:3,0:3] * rot
        
         
         T = self.translate_mtmr(translation)
-#         T = self.set_orientation_mtmr(orientation, T)
+        T = self.set_orientation_mtmr(orientation, T)
         
         new_psm1_angles = self.psm1_kin.inverse(T, self.last_psm1_jnt)
         if type(new_psm1_angles) == NoneType:
             return
-            
+        
+        if self.__mode__ == self.MODE.hardware:
+            gripper = (self.mtmr_gripper-.4) * 1.4/.6
+            new_psm1_angles = np.append(new_psm1_angles, gripper)
+                
         if self.__mode__ == self.MODE.hardware:
             self.hw_psm1.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
         
@@ -466,7 +452,7 @@ class Teleop_class:
             T = self.psm2_kin.forward(self.last_psm2_jnt)
         new_psm2_pos = psm2_pos + translation
         T[0:3, 3] = new_psm2_pos
-        self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
+#         self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
         return T
     
     def translate_mtmr(self, translation, T=None): # translate a psm arm
@@ -1857,8 +1843,8 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.quit()
                         
         def set_base_frames(self, msg):
-            print('set_base_frames', msg.position)
             return
+            print('set_base_frames', msg.position)
             if msg.position and self.counter > 0:
                 self.counter -= 1
                 q = msg.position
