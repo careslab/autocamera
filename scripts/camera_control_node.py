@@ -128,6 +128,10 @@ class Teleop_class:
         self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
         self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
         
+        # Publish to MTMs simulation
+        self.pub_mtml = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
+        self.pub_mtmr = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=10)
+        
         # Translation and orientation lock
         self.lock_mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
         self.lock_mtml_psm2_translation = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
@@ -280,10 +284,21 @@ class Teleop_class:
             self.Tw_mtml =  (T_mtm_000**-1) * T_ecm
             self.T_star_mtml = (T_ecm**-1) * T_mtm_000
 
-        r_90_z, r_90_z_t  = self.rotate('z', -np.pi/2)
+        r_90_z, r_90_z_t  = self.rotate('z', np.pi/2)
+        r_90_x, r_90_x_t = self.rotate('x', np.pi/2.0)
+        r_180_y, r_180_y_t = self.rotate('y', np.pi)
+        r_180_x, r_180_x_t = self.rotate('x', np.pi)
+        r_90_y, r_90_y_t = self.rotate('y', np.pi/2.0)
+        
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         T_mtm = self.mtml_kin.forward(msg.position)
-        T = (self.T_mtm_000**-1) * T_mtm 
+        T = ( self.T_mtm_000**-1) * T_mtm 
+        transform = np.matrix( [ [0,-1,0,0], 
+                                [0,0,1,0], 
+                                [-1,0,0,0], 
+                                [0,0,0,1]])
+        T = transform * T
+#         T =  r_90_z_t * T
 #         T = T_mtm * self.Tw_mtml
         
 
@@ -300,7 +315,7 @@ class Teleop_class:
         
         if self.__enabled__ == False: return
         
-#         self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
+        self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
         
         delta = pos - self.first_mtml_pos
         delta = np.insert(delta, 3,1).transpose()
@@ -308,11 +323,11 @@ class Teleop_class:
         p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         translation = (p1-p0)
-        translation = (T_ecm * translation)[0:3]
+        translation = ( T_ecm * translation)[0:3]
         p0 = T_ecm[0:3,3]
         p1 = p0 + translation
         
-#         self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[p0,p1], frame="world")
+    
 #         br = tf.TransformBroadcaster()
 #         br.sendTransform(T[0:3,3],
 #                         tf.transformations.quaternion_from_matrix(T),
@@ -326,6 +341,7 @@ class Teleop_class:
 #         T = self.set_orientation_mtml( orientation, T)
         
         new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
+        new_psm2_angles[-3:] = [0,0,0]
         print(new_psm2_angles)
         if type(new_psm2_angles) == NoneType:
             return
@@ -370,16 +386,15 @@ class Teleop_class:
         T_mtm = self.mtmr_kin.forward(msg.position)
         T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
         
-#         T_mtm = T_mtm * r_270_y * r_90_z
-        rr = np.matrix ([[ 1.0,  0.0,          0.0,          0.0],
-                     [  0.0, 1.0,          0.0,         -0.00],
-                     [  0.0, 0.0,          1.0,          -0.0],
-                     [  0.0,  0.0,          0.0,          1.0]] )
-        
-        rr[0:3,0:3] = T_ecm[0:3,0:3]
-        T = T_mtm
-        pos = T[0:3,3]
+        T = ( self.T_mtm_000**-1) * T_mtm 
+        transform = np.matrix( [ [0,-1,0,0], 
+                                [0,0,1,0], 
+                                [-1,0,0,0], 
+                                [0,0,0,1]])
         rot = T[0:3,0:3]
+        T = transform * T
+        
+        pos = T[0:3,3]
         
         if self.last_mtmr_pos == None:
             self.first_mtmr_pos = pos
@@ -389,7 +404,16 @@ class Teleop_class:
         
         if self.__enabled__ == False: return
         
-        translation = pos - self.first_mtmr_pos
+        delta = pos - self.first_mtmr_pos
+        delta = np.insert(delta, 3,1).transpose()
+        p0 = np.insert(self.first_mtmr_pos, 3,1).reshape(4,1)
+        p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
+        
+        translation = (p1-p0)
+        translation = ( T_ecm * translation)[0:3]
+        p0 = T_ecm[0:3,3]
+        p1 = p0 + translation
+        
         orientation = rot
        
         
@@ -442,6 +466,7 @@ class Teleop_class:
             T = self.psm2_kin.forward(self.last_psm2_jnt)
         new_psm2_pos = psm2_pos + translation
         T[0:3, 3] = new_psm2_pos
+        self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
         return T
     
     def translate_mtmr(self, translation, T=None): # translate a psm arm
@@ -1833,6 +1858,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                         
         def set_base_frames(self, msg):
             print('set_base_frames', msg.position)
+            return
             if msg.position and self.counter > 0:
                 self.counter -= 1
                 q = msg.position

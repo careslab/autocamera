@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /TF1
         - /TF1/Frames1
         - /ModelMTML1
         - /ModelMTML1/Links1
@@ -20,6 +21,7 @@ Panels:
         - /camera_image1
         - /new_psm1_base1
         - /new_psm2_base1
+        - /Marker2
       Splitter Ratio: 0.831395
     Tree Height: 722
   - Class: rviz/Selection
@@ -63,19 +65,237 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 1500
       Frames:
         All Enabled: false
+        ecm_base_link:
+          Value: false
+        ecm_insertion_link:
+          Value: false
+        ecm_pitch_link:
+          Value: false
+        ecm_pitch_link_1:
+          Value: false
+        ecm_pitch_link_2:
+          Value: false
+        ecm_pitch_link_3:
+          Value: false
+        ecm_roll_link:
+          Value: true
+        ecm_setup_base_link:
+          Value: false
+        ecm_setup_link:
+          Value: false
+        ecm_yaw_link:
+          Value: false
+        fake_cam_left_optical_link:
+          Value: false
+        fake_cam_right_optical_link:
+          Value: false
+        fake_camera_link:
+          Value: false
+        left_back_parallel_link:
+          Value: false
+        left_bottom_parallel_link:
+          Value: false
+        left_outer_yaw_link:
+          Value: false
+        left_top_panel:
+          Value: false
+        left_top_parallel_link:
+          Value: false
+        left_wrist_pitch_link:
+          Value: false
+        left_wrist_platform_link:
+          Value: false
+        left_wrist_roll_link:
+          Value: true
+        left_wrist_yaw_link:
+          Value: false
+        one_outer_insertion_link:
+          Value: false
+        one_outer_pitch_back_link:
+          Value: false
+        one_outer_pitch_bottom_link:
+          Value: false
+        one_outer_pitch_front_link:
+          Value: false
+        one_outer_pitch_link:
+          Value: false
+        one_outer_pitch_top_link:
+          Value: false
+        one_outer_yaw_link:
+          Value: false
+        one_psm_base_link:
+          Value: false
+        one_tool_main_link:
+          Value: false
+        one_tool_tip_link:
+          Value: false
+        one_tool_wrist_link:
+          Value: false
+        one_tool_wrist_sca_ee_link_0:
+          Value: false
+        one_tool_wrist_sca_ee_link_1:
+          Value: false
+        one_tool_wrist_sca_ee_link_2:
+          Value: false
+        one_tool_wrist_sca_link:
+          Value: false
+        one_tool_wrist_sca_shaft_link:
+          Value: false
+        one_tool_wrist_shaft_link:
+          Value: false
+        right_back_parallel_link:
+          Value: false
+        right_bottom_parallel_link:
+          Value: false
+        right_outer_yaw_link:
+          Value: false
+        right_top_panel:
+          Value: false
+        right_top_parallel_link:
+          Value: false
+        right_wrist_pitch_link:
+          Value: false
+        right_wrist_platform_link:
+          Value: false
+        right_wrist_roll_link:
+          Value: false
+        right_wrist_yaw_link:
+          Value: false
+        two_outer_insertion_link:
+          Value: false
+        two_outer_pitch_back_link:
+          Value: false
+        two_outer_pitch_bottom_link:
+          Value: false
+        two_outer_pitch_front_link:
+          Value: false
+        two_outer_pitch_link:
+          Value: false
+        two_outer_pitch_top_link:
+          Value: false
+        two_outer_yaw_link:
+          Value: false
+        two_psm_base_link:
+          Value: false
+        two_tool_main_link:
+          Value: false
+        two_tool_tip_link:
+          Value: false
+        two_tool_wrist_link:
+          Value: false
+        two_tool_wrist_sca_ee_link_0:
+          Value: true
+        two_tool_wrist_sca_ee_link_1:
+          Value: false
+        two_tool_wrist_sca_ee_link_2:
+          Value: false
+        two_tool_wrist_sca_link:
+          Value: false
+        two_tool_wrist_sca_shaft_link:
+          Value: false
+        two_tool_wrist_shaft_link:
+          Value: false
+        world:
+          Value: false
       Marker Scale: 0.5
       Name: TF
       Show Arrows: false
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        world:
+          ecm_setup_base_link:
+            ecm_setup_link:
+              ecm_base_link:
+                ecm_yaw_link:
+                  ecm_pitch_link:
+                    ecm_insertion_link:
+                      ecm_roll_link:
+                        fake_camera_link:
+                          fake_cam_left_optical_link:
+                            {}
+                          fake_cam_right_optical_link:
+                            {}
+                  ecm_pitch_link_1:
+                    ecm_pitch_link_2:
+                      ecm_pitch_link_3:
+                        {}
+          left_top_panel:
+            left_outer_yaw_link:
+              left_back_parallel_link:
+                left_bottom_parallel_link:
+                  left_wrist_platform_link:
+                    left_wrist_pitch_link:
+                      left_wrist_yaw_link:
+                        left_wrist_roll_link:
+                          {}
+              left_top_parallel_link:
+                {}
+          one_psm_base_link:
+            one_outer_yaw_link:
+              one_outer_pitch_back_link:
+                one_outer_pitch_bottom_link:
+                  one_outer_insertion_link:
+                    {}
+                one_outer_pitch_top_link:
+                  {}
+              one_outer_pitch_front_link:
+                {}
+              one_outer_pitch_link:
+                one_tool_main_link:
+                  one_tool_wrist_link:
+                    one_tool_wrist_shaft_link:
+                      one_tool_wrist_sca_link:
+                        one_tool_wrist_sca_shaft_link:
+                          one_tool_tip_link:
+                            {}
+                          one_tool_wrist_sca_ee_link_0:
+                            {}
+                          one_tool_wrist_sca_ee_link_1:
+                            {}
+                          one_tool_wrist_sca_ee_link_2:
+                            {}
+          right_top_panel:
+            right_outer_yaw_link:
+              right_back_parallel_link:
+                right_bottom_parallel_link:
+                  right_wrist_platform_link:
+                    right_wrist_pitch_link:
+                      right_wrist_yaw_link:
+                        right_wrist_roll_link:
+                          {}
+              right_top_parallel_link:
+                {}
+          two_psm_base_link:
+            two_outer_yaw_link:
+              two_outer_pitch_back_link:
+                two_outer_pitch_bottom_link:
+                  two_outer_insertion_link:
+                    {}
+                two_outer_pitch_top_link:
+                  {}
+              two_outer_pitch_front_link:
+                {}
+              two_outer_pitch_link:
+                two_tool_main_link:
+                  two_tool_wrist_link:
+                    two_tool_wrist_shaft_link:
+                      two_tool_wrist_sca_link:
+                        two_tool_wrist_sca_shaft_link:
+                          two_tool_tip_link:
+                            {}
+                          two_tool_wrist_sca_ee_link_0:
+                            {}
+                          two_tool_wrist_sca_ee_link_1:
+                            {}
+                          two_tool_wrist_sca_ee_link_2:
+                            {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -480,7 +700,7 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz/Camera
-      Enabled: false
+      Enabled: true
       Image Rendering: background and overlay
       Image Topic: /fakecam_node/fake_image_left
       Name: CameraLeft
@@ -488,7 +708,7 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: false
+      Value: true
       Visibility:
         CameraRight: true
         Grid: true
@@ -517,6 +737,7 @@ Visualization Manager:
       Unreliable: false
       Value: false
       Visibility:
+        "": true
         CameraLeft: true
         Grid: true
         Marker: true
@@ -546,7 +767,7 @@ Visualization Manager:
       Marker Topic: /marker_subscriber
       Name: Marker
       Namespaces:
-        {}
+        my_namespace: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -554,7 +775,7 @@ Visualization Manager:
       Marker Topic: /left_arm
       Name: left_tool
       Namespaces:
-        {}
+        my_namespace: true
       Queue Size: 100
       Value: true
     - Class: rviz/Image
@@ -584,13 +805,21 @@ Visualization Manager:
       Reference Frame: mtml_transform
       Value: true
     - Class: rviz/Marker
-      Enabled: false
+      Enabled: true
       Marker Topic: /mtml_delta
       Name: Marker
       Namespaces:
-        {}
+        my_namespace: true
       Queue Size: 100
-      Value: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /psm2_delta
+      Name: Marker
+      Namespaces:
+        my_namespace: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 67; 67; 67
@@ -615,22 +844,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.940672
+      Distance: 1.8543
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.268152
-        Y: -0.0616072
-        Z: 0.452595
+        X: -0.620095
+        Y: -0.258095
+        Z: 0.38609
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.859796
+      Pitch: 0.254798
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.99778
+      Yaw: 1.16961
     Saved: ~
 Window Geometry:
   CameraLeft:
@@ -642,7 +871,7 @@ Window Geometry:
   Height: 1000
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001e000000361fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000000fb000001a700000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000361000000dd00fffffffb0000001600430061006d006500720061005200690067006800740200001210000000ad0000032c00000280fb0000001400430061006d006500720061004c0065006600740200001257000000d20000033500000287fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800630061006d006500720061005f0069006d00610067006502000000000000006a00000280000001e0000000010000010f00000245fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002800000245000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004bf0000003bfc0100000002fb0000000800540069006d00650100000000000004bf000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000002d90000036100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000001e000000361fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000000fb000001a700000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000361000000dd00fffffffb0000001600430061006d006500720061005200690067006800740200001210000000ad0000032c00000280fb0000001400430061006d006500720061004c0065006600740300001161000000be0000033500000287fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001800630061006d006500720061005f0069006d00610067006502000000000000006a00000280000001e0000000010000010f00000245fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002800000245000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004bf0000003bfc0100000002fb0000000800540069006d00650100000000000004bf000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000002d90000036100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
