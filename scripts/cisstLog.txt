@@ -1,0 +1,58 @@
+M- cisst 1.0.8 (git: 1.0.8)
+M- CISST_ROOT: undefined
+M- cisst share: undefined
+M- cmn_m: 1, cmn_kg: 1, CISST_USE_SI_UNITS is set to 1
+-M Class cmnClassRegister: FindClassServices: couldn't find class info for "mtsIntuitiveResearchKit"
+W- Class cmnClassRegister: SetLogMask: class "mtsIntuitiveResearchKit" is not registered (yet?) 
+M- osaThread::CreateInternal: create thread named: Unnamed
+M- osaThread::CreateInternal: create thread named: Unnamed
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionComponentProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsStdStringVecProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsStdStringVecProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionComponentProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsStdStringVecProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsStdStringVecProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionComponentProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsComponentStatusControlProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsDescriptionConnectionProxy"
+D- Class mtsCommandQueuedWriteGeneric: Allocate: resizing argument queue to 64 with "mtsBool"
+FirewirePort: number of ports = 1
+FirewirePort: successfully initialized port 0
+FirewirePort: successfully disabled cycle start packet
+ScanNodes: base node id = ffc0
+ScanNodes: building node map for b nodes:
+  Node 0, BoardId = 5, Firmware Version = 4
+  Node 1, BoardId = 4, Firmware Version = 4
+  Node 2, BoardId = 6, Firmware Version = 4
+  Node 3, BoardId = 7, Firmware Version = 4
+  Node 4, BoardId = 8, Firmware Version = 4
+  Node 5, BoardId = 9, Firmware Version = 4
+  Node 6, BoardId = 2, Firmware Version = 4
+  Node 7, BoardId = 3, Firmware Version = 4
+  Node 8, BoardId = 0, Firmware Version = 4
+  Node 9, BoardId = 1, Firmware Version = 4
+ScanNodes: all nodes broadcast capable
+FirewirePort::NumberOfUsers: found 2 users
+Full lsof result:
+COMMAND     PID  PPID USER   FD   TYPE DEVICE SIZE/OFF  NODE NAME
+dvrk_cons  4028  4027 dvrk   35u   CHR  251,0      0t0 30724 /dev/fw0
+dvrk_cons  4028  4027 dvrk   46u   CHR  251,0      0t0 30724 /dev/fw0
+dvrk_cons 13637 13636 dvrk   35u   CHR  251,0      0t0 30724 /dev/fw0
+dvrk_cons 13637 13636 dvrk   46u   CHR  251,0      0t0 30724 /dev/fw0
+sh        13650 13637 dvrk   35u   CHR  251,0      0t0 30724 /dev/fw0
+sh        13650 13637 dvrk   46u   CHR  251,0      0t0 30724 /dev/fw0
+
+E- cmnThrow with std::exception (osaIO1394Port: Found more than one user on firewire port: 0)

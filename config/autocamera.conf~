@@ -1,0 +1,7 @@
+[ZOOM]
+inner_zone = 0.21
+dead_zone = 0.13
+
+[RECORDING]
+directory = ~/camera_control_recordings
+

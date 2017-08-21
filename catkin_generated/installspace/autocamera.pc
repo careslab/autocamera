@@ -1,0 +1,8 @@
+prefix=/home/careslab/dev/catkin_ws/install
+
+Name: autocamera
+Description: Description of autocamera
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/careslab/dev/catkin_ws/install/lib 
+Requires: 
