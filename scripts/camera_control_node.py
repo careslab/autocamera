@@ -156,9 +156,16 @@ class Teleop_class:
         self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
         self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
         
+        self.pub_unlock_mtml_orientation = rospy.Publisher('/dvrk/MTML/unlock_orientation', Empty, latch=True, queue_size = 1)
+        self.pub_unlock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/unlock_orientation', Empty, latch=True, queue_size = 1)
+        
         self.mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
         self.mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
-
+        
+        # Wrist Adjustments
+        self.mtml_wrist_adjustment = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True)
+        self.mtmr_wrist_adjustment = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True)
+        
         # Access psm hardware
         self.hw_psm1 = robot('PSM1')
         self.hw_psm2 = robot('PSM2')
@@ -347,7 +354,7 @@ class Teleop_class:
         else:
             msg.position = msg.position[0:-1]
             msg.name = msg.name[0:-1]
-        msg.position = [.8 * i for i in msg.position]
+#         msg.position = [.8 * i for i in msg.position]
         
         self.last_mtml_jnt = msg.position
         
@@ -379,6 +386,7 @@ class Teleop_class:
         self.last_mtml_rot = rot
         
         if self.__enabled__ == False: return
+        self.mtml_wrist_adjustment.publish()
         
 #         self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
         
@@ -395,15 +403,27 @@ class Teleop_class:
         T = self.translate_mtml(translation)
         T = self.set_orientation_mtml( orientation, T)
         
-        new_psm2_angles = self.psm2_kin.inverse(T, self.last_psm2_jnt)
+        q = list(self.last_psm2_jnt)
+        q[4] = 0
+#         q[3] = 0
+        new_psm2_angles = self.psm2_kin.inverse(T, q)
             
         
         if type(new_psm2_angles) == NoneType:
+            print("Frozen, Translation = " + translation.__str__())
+#             self.first_mtml_pos = self.last_mtml_pos
             T = self.set_orientation_mtml( self.last_good_psm2_transform[0:3,0:3] ) 
-            new_psm2_angles = self.psm1_kin.inverse(T, self.last_psm2_jnt)
+            new_psm2_angles = self.psm1_kin.inverse(T, q)
             
         if type(new_psm2_angles) == NoneType:
+            self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+            self.hw_mtml.set_gravity_compensation(False)
+            self.pub_unlock_mtml_orientation.publish()
             return
+        else:
+            self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+            self.hw_mtml.set_wrench_body_force([0, 0, 0])
+            self.hw_mtml.set_gravity_compensation(True)
             
         self.last_good_psm2_transform = T
         
@@ -435,7 +455,7 @@ class Teleop_class:
             msg.position = msg.position[0:-1]
             msg.name = msg.name[0:-1]
 
-        msg.position = [.8 * i for i in msg.position]
+#         msg.position = [.8 * i for i in msg.position]
         self.last_mtmr_jnt = msg.position
         
         if self.T_mtmr_000 == None :
@@ -464,6 +484,9 @@ class Teleop_class:
         self.last_mtmr_rot = rot
         
         if self.__enabled__ == False: return
+        
+        self.mtmr_wrist_adjustment.publish()
+        
         delta = pos - self.first_mtmr_pos
         delta = np.insert(delta, 3,1).transpose()
         p0 = np.insert(self.first_mtmr_pos, 3,1).reshape(4,1)
@@ -478,14 +501,24 @@ class Teleop_class:
         T = self.translate_mtmr(translation)
         T = self.set_orientation_mtmr(orientation, T)
         
-        new_psm1_angles = self.psm1_kin.inverse(T, self.last_psm1_jnt)
+        q = list(self.last_psm1_jnt)
+        q[4] = 0
+#         q[3] = 0
+        new_psm1_angles = self.psm1_kin.inverse(T, q)
         
         if type(new_psm1_angles) == NoneType:
             T[0:3, 0:3] = self.last_good_psm1_transform[0:3,0:3] 
-            new_psm1_angles = self.psm1_kin.inverse(T, self.last_psm1_jnt)
+            new_psm1_angles = self.psm1_kin.inverse(T, q)
             
         if type(new_psm1_angles) == NoneType:
-            return 
+            self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+            self.hw_mtmr.set_gravity_compensation(False)
+            self.pub_unlock_mtmr_orientation.publish()
+            return
+        else:
+            self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+            self.hw_mtmr.set_wrench_body_force([0, 0, 0])
+            self.hw_mtmr.set_gravity_compensation(True)
         
         self.last_good_psm1_transform = T
         

@@ -43,7 +43,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: CameraLeft
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -769,7 +769,7 @@ Visualization Manager:
       Marker Topic: /marker_subscriber
       Name: Marker
       Namespaces:
-        my_namespace: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -777,7 +777,7 @@ Visualization Manager:
       Marker Topic: /left_arm
       Name: left_tool
       Namespaces:
-        my_namespace: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Image
@@ -876,22 +876,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.155683
+      Distance: 1.01022
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.297806
-        Y: 0.047346
-        Z: 0.449582
+        X: -0.294542
+        Y: -0.0658531
+        Z: 0.308513
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.366516
+      Pitch: 0.514797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.27995
+      Yaw: 1.97741
     Saved: ~
 Window Geometry:
   CameraLeft:
