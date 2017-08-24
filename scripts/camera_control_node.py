@@ -2300,7 +2300,7 @@ def init_yappi():
     print('[YAPPI OUT]')
             
 def main():
-    init_yappi()
+#     init_yappi()
     app = QtGui.QApplication(sys.argv)
     form = camera_qt_gui()
     form.show()
