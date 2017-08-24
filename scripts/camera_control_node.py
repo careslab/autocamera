@@ -46,6 +46,8 @@ import rosbag
 from geometry_msgs.msg._Wrench import Wrench
 
 
+
+    
 class Teleop_class:
     class MODE:
         """
@@ -112,38 +114,38 @@ class Teleop_class:
         # Subscribe to MTMs
         self.sub_mtml = None; self.sub_mtmr = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_mtml = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.mtml_cb)
-            self.sub_mtmr = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.mtmr_cb)
+            self.sub_mtml = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_mtmr = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
         elif self.__mode__ == self.MODE.hardware:
-            self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb)
-            self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb)
+            self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
         
         # subscribe to head sensor
-        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
+        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb , queue_size=1, tcp_nodelay=True)
         
         # Subscribe to PSMs
         self.sub_psm1 = None; self.sub_psm2 = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_psm1 = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb)
-            self.sub_psm2 = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb)
-            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+            self.sub_psm1 = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_psm2 = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
         else:
-            self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb)
-            self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb)
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
-            self.sub_mtml_gripper = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.mtml_gripper_cb)
-            self.sub_mtmr_gripper = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.mtmr_gripper_cb)
+            self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_mtml_gripper = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.mtml_gripper_cb, queue_size=1, tcp_nodelay=True)
+            self.sub_mtmr_gripper = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.mtmr_gripper_cb, queue_size=1, tcp_nodelay=True)
             
         # MTM repositioning clutch
-        self.sub_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.clutch_cb)
+        self.sub_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.clutch_cb, queue_size=1, tcp_nodelay=True)
             
         # Publish to PSMs simulation
-        self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
-        self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
+        self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
         
         # Publish to MTMs simulation
-        self.pub_mtml = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
-        self.pub_mtmr = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=10)
+        self.pub_mtml = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
+        self.pub_mtmr = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=1)
         
         # Translation and orientation lock
         self.lock_mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
@@ -197,9 +199,8 @@ class Teleop_class:
         self.sub_psm1.unregister()
         self.sub_psm2.unregister()
         self.sub_ecm.unregister()
-        self.sub_mtml.unregister()
-        self.sub_mtmr.unregister()
         self.sub_headsensor_cb.unregister()
+        self.sub_clutch.unregister()
         self.sub_mtml_gripper.unregister()
         self.sub_mtmr_gripper.unregister()
         
@@ -786,13 +787,13 @@ class Autocamera_node_handler:
         self.logerror("start", debug=True)
         
         # Publishers to the simulation
-        self.ecm_pub = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
-        self.psm1_pub = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
-        self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        self.ecm_pub = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
+        self.psm1_pub = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
+        self.psm2_pub = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
         
         # Get the joint angles from the simulation
-        self.sub_ecm_sim = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.add_ecm_jnt)
-        self.sub_caminfo = rospy.Subscriber('/fakecam_node/camera_info', CameraInfo, self.get_cam_info)
+        self.sub_ecm_sim = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.add_ecm_jnt, queue_size=1, tcp_nodelay=True)
+        self.sub_caminfo = rospy.Subscriber('/fakecam_node/camera_info', CameraInfo, self.get_cam_info, queue_size=1, tcp_nodelay=True)
         
         try:
             self.sub_psm1_sim.unregister()
@@ -803,14 +804,14 @@ class Autocamera_node_handler:
             pass
         if self.__AUTOCAMERA_MODE__ == self.MODE.hardware :
             # Get the joint angles from the hardware and move the simulation from hardware
-            self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.add_psm1_jnt)
-            self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.add_psm2_jnt)
+            self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.add_psm1_jnt, queue_size=1, tcp_nodelay=True)
+            self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.add_psm2_jnt, queue_size=1, tcp_nodelay=True)
             
             
         elif self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
             # Get the joint angles from the simulation
-            self.sub_psm1_sim = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt)
-            self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt)
+            self.sub_psm1_sim = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.add_psm1_jnt, queue_size=1, tcp_nodelay=True)
+            self.sub_psm2_sim = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.add_psm2_jnt, queue_size=1, tcp_nodelay=True)
             
             # If hardware is connected, subscribe to it and set the psm joint angles in the simulation from the hardware
 #             self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.add_psm1_jnt_from_hw)
@@ -830,12 +831,12 @@ class Autocamera_node_handler:
         
         if self.__DEBUG_GRAPHICS__ == True:
             # Subscribe to fakecam images
-            self.sub_fake_image_left = rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb)
-            self.sub_fake_image_right = rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb)
+            self.sub_fake_image_left = rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb, queue_size=1)
+            self.sub_fake_image_right = rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb, queue_size=1)
          
         # Publish images
-        self.image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=10)
-        self.image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=10)
+        self.image_left_pub = rospy.Publisher('autocamera_image_left', Image, queue_size=1)
+        self.image_right_pub = rospy.Publisher('autocamera_image_right', Image, queue_size=1)
 
     def shutdown(self):
         try:
@@ -1064,7 +1065,6 @@ class Autocamera_node_handler:
                 
     def add_jnt(self, name, msg):
         self.joint_angles[name] = msg
-        
         if not None in self.joint_angles.values():
             if self.initialize_psms_initialized>0 and self.__AUTOCAMERA_MODE__ == self.MODE.simulation:        
                 self.initialize_psms()
@@ -2259,8 +2259,48 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.thread.start()
             
             
-        
+
+def init_yappi():
+  OUT_FILE = './yappy.txt'
+
+  import atexit
+  import yappi
+
+  print('[YAPPI START]')
+  yappi.set_clock_type('wall')
+  yappi.start()
+
+  @atexit.register
+  def finish_yappi():
+    print('[YAPPI STOP]')
+
+    yappi.stop()
+
+    print('[YAPPI WRITE]')
+
+    stats = yappi.get_func_stats()
+
+    for stat_type in ['pstat', 'callgrind', 'ystat']:
+      print('writing {}.{}'.format(OUT_FILE, stat_type))
+      stats.save('{}.{}'.format(OUT_FILE, stat_type), type=stat_type)
+
+    print('\n[YAPPI FUNC_STATS]')
+
+    print('writing {}.func_stats'.format(OUT_FILE))
+    with open('{}.func_stats'.format(OUT_FILE), 'wb') as fh:
+      stats.print_all(out=fh)
+
+    print('\n[YAPPI THREAD_STATS]')
+
+    print('writing {}.thread_stats'.format(OUT_FILE))
+    tstats = yappi.get_thread_stats()
+    with open('{}.thread_stats'.format(OUT_FILE), 'wb') as fh:
+      tstats.print_all(out=fh)
+
+    print('[YAPPI OUT]')
+            
 def main():
+    init_yappi()
     app = QtGui.QApplication(sys.argv)
     form = camera_qt_gui()
     form.show()
