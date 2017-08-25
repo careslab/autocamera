@@ -1383,18 +1383,29 @@ class ClutchControl:
 #             self.move_mtm_out_of_the_way()
              
         
-        
     def enable_teleop(self):
-        self.pub_mtmr_psm1_teleop.publish(String("ENABLED"))
-        self.pub_mtml_psm2_teleop.publish(String("ENABLED"))
+        self.__enabled__ = True
         
+        self.first_mtml_pos = self.last_mtml_pos
+        self.first_mtmr_pos = self.last_mtmr_pos
+        self.first_psm1_pos, _ = self.psm1_kin.FK( self.last_psm1_jnt)
+        self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
+        
+        self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.hw_mtml.set_wrench_body_force([0,0,0])
+        self.hw_mtml.set_gravity_compensation(True)
+        
+        self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.hw_mtmr.set_wrench_body_force([0,0,0])
+        self.hw_mtmr.set_gravity_compensation(True)
         
     def disable_teleop(self):
-        self.hw_mtml_orientation.lock_orientation_as_is()
-        self.hw_mtmr_orientation.lock_orientation_as_is()
+        self.__enabled__ = False
+        self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.hw_mtml.set_gravity_compensation(False)
         
-        self.pub_mtmr_psm1_teleop.publish(String("DISABLED"))
-        self.pub_mtml_psm2_teleop.publish(String("DISABLED"))
+        self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.hw_mtmr.set_gravity_compensation(False)
                 
     def camera_headsensor_cb(self, msg):
         if msg.buttons[0] == 1:
