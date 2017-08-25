@@ -163,22 +163,42 @@ class arm:
                                                                   Bool, latch=True, queue_size = 1)
 
         # subscribers
-        rospy.Subscriber(self.__full_ros_namespace + '/robot_state',
+        self.sub_robot_state = rospy.Subscriber(self.__full_ros_namespace + '/robot_state',
                          String, self.__robot_state_callback)
-        rospy.Subscriber(self.__full_ros_namespace + '/goal_reached',
+        self.sub_goal_reached = rospy.Subscriber(self.__full_ros_namespace + '/goal_reached',
                          Bool, self.__goal_reached_callback)
-        rospy.Subscriber(self.__full_ros_namespace + '/state_joint_desired',
+        self.sub_state_joint_desired = rospy.Subscriber(self.__full_ros_namespace + '/state_joint_desired',
                          JointState, self.__state_joint_desired_callback)
-        rospy.Subscriber(self.__full_ros_namespace + '/position_cartesian_desired',
+        self.sub_position_cartesian_desired = rospy.Subscriber(self.__full_ros_namespace + '/position_cartesian_desired',
                          PoseStamped, self.__position_cartesian_desired_callback)
-        rospy.Subscriber(self.__full_ros_namespace + '/state_joint_current',
+        self.sub_state_joint_current = rospy.Subscriber(self.__full_ros_namespace + '/state_joint_current',
                          JointState, self.__state_joint_current_callback)
-        rospy.Subscriber(self.__full_ros_namespace + '/position_cartesian_current',
+        self.sub_position_cartesian_current = rospy.Subscriber(self.__full_ros_namespace + '/position_cartesian_current',
                          PoseStamped, self.__position_cartesian_current_callback)
         # create node
         # rospy.init_node('arm_api', anonymous = True)
 #         rospy.init_node('arm_api',anonymous = True, log_level = rospy.WARN)
 #         rospy.loginfo(rospy.get_caller_id() + ' -> started arm: ' + self.__arm_name)
+    
+    def unregister(self):
+        self.sub_robot_state.unregister()
+        self.sub_goal_reached.unregister()
+        self.sub_state_joint_desired.unregister()
+        self.sub_position_cartesian_desired.unregister()
+        self.sub_state_joint_current.unregister()
+        self.sub_position_cartesian_current.unregister()
+        
+        self.set_gravity_compensation_publisher.unregister()
+        self.set_position_cartesian_publisher.unregister()
+        self.set_position_goal_cartesian_publisher.unregister()
+        self.set_position_goal_joint_publisher.unregister()
+        self.set_position_joint_publisher.unregister()
+        self.set_robot_state_publisher.unregister()
+        self.set_wrench_body_orientation_absolute_publisher.unregister()
+        self.set_wrench_body_publisher.unregister()
+        self.set_wrench_spatial_publisher.unregister()
+        
+        
     def get_robot_state(self):
         return self.__robot_state
     
@@ -264,7 +284,8 @@ class arm:
         if (self.__robot_state != 'DVRK_READY'):
             rospy.logfatal(rospy.get_caller_id() + ' -> failed to reach state DVRK_READY')
 #         rospy.loginfo(rospy.get_caller_id() + ' <- homing complete')
-
+    
+    
     def shutdown(self):
         """Stops providing power to the arm."""
 #         rospy.loginfo(rospy.get_caller_id() + ' -> end homing')

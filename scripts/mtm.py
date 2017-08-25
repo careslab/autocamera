@@ -15,7 +15,9 @@ class mtm(arm):
         self.unlock_orientation_publisher = rospy.Publisher(self._arm__full_ros_namespace
                                                             + '/unlock_orientation',
                                                             Empty, latch=True, queue_size = 1)
-
+    def unregister(self):
+        self.unlock_orientation_publisher.unregister()
+        
     def lock_orientation_as_is(self):
         "Lock orientation based on current orientation"
         current = self.get_current_cartesian_position()
