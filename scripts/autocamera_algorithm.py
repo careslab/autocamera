@@ -182,10 +182,10 @@ class Autocamera:
             self.last_midpoint = mid_point
 
         
-        if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
-            mid_point = self.last_midpoint
+#         if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
+#             mid_point = self.last_midpoint
 #         self.logerror("Distance is " + numpy.linalg.norm(mid_point-self.last_midpoint).__str__(), debug=True)
-    #     mid_point = ecm_pose[0:3,3] - numpy.array([0,0,.01]).reshape(3,1)
+#         mid_point = ecm_pose[0:3,3] - numpy.array([0,0,.01]).reshape(3,1)
         self.add_marker(PoseConv.to_homo_mat([mid_point, [0,0,0]]), '/marker_subscriber',color=[1,0,0], scale=[0.047/5,0.047/5,0.047/5])
         self.add_marker(PoseConv.to_homo_mat([key_hole,[0,0,0]]), '/keyhole_subscriber',[0,0,1])
         self.add_marker(ecm_pose, '/current_ecm_pose', [1,0,0], Marker.ARROW, scale=[.1,.005,.005])
@@ -218,7 +218,6 @@ class Autocamera:
         self.add_marker(ecm_pose, '/target_ecm_pose', [0,0,1], Marker.ARROW, scale=[.1,.005,.005])
         output_msg = clean_joints['ecm']
         
-        
         try:
             p = self.ecm_kin.inverse(ecm_pose)
         except Exception as e:
@@ -226,6 +225,8 @@ class Autocamera:
         if p != None:  
             p[3] = 0
             output_msg.position = p
+        else:
+            print("Autocamera Inverse Failure ")
         
         self.last_midpoint = mid_point
         return output_msg
@@ -389,8 +390,8 @@ class Autocamera:
     #     rospy.logerr('psm1 gripper = ' + joint['psm1'].position[-1].__str__() + 'gripper = ' + gripper.__str__())
         
         if gripper == gripper or gripper != gripper: # luke was here
-            goal_joints = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
-            output_msg.position =list( numpy.array(output_msg.position) + ( -numpy.array(output_msg.position)+ numpy.array(goal_joints.position)) *.0001)
+            output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
+#             output_msg.position =list( numpy.array(output_msg.position) + ( -numpy.array(output_msg.position)+ numpy.array(goal_joints.position)) *.0001)
             output_msg = self.find_zoom_level(output_msg, cam_info, clean_joints)
             pass
         

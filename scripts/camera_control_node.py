@@ -410,11 +410,11 @@ class Teleop_class:
         new_psm2_angles = self.psm2_kin.inverse(T, q)
             
         
-        if type(new_psm2_angles) == NoneType:
-            print("Frozen, Translation = " + translation.__str__())
-#             self.first_mtml_pos = self.last_mtml_pos
-            T = self.set_orientation_mtml( self.last_good_psm2_transform[0:3,0:3] ) 
-            new_psm2_angles = self.psm1_kin.inverse(T, q)
+#         if type(new_psm2_angles) == NoneType:
+#             print("Frozen, Translation = " + translation.__str__())
+# #             self.first_mtml_pos = self.last_mtml_pos
+#             T = self.set_orientation_mtml( self.last_good_psm2_transform[0:3,0:3] ) 
+#             new_psm2_angles = self.psm1_kin.inverse(T, q)
             
         if type(new_psm2_angles) == NoneType:
             self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
@@ -497,7 +497,6 @@ class Teleop_class:
         translation = ( self.T_ecm * translation)[0:3]
         
         orientation = self.T_ecm[0:3,0:3] * rot
-       
         
         T = self.translate_mtmr(translation)
         T = self.set_orientation_mtmr(orientation, T)
@@ -507,9 +506,9 @@ class Teleop_class:
 #         q[3] = 0
         new_psm1_angles = self.psm1_kin.inverse(T, q)
         
-        if type(new_psm1_angles) == NoneType:
-            T[0:3, 0:3] = self.last_good_psm1_transform[0:3,0:3] 
-            new_psm1_angles = self.psm1_kin.inverse(T, q)
+#         if type(new_psm1_angles) == NoneType:
+#             T[0:3, 0:3] = self.last_good_psm1_transform[0:3,0:3] 
+#             new_psm1_angles = self.psm1_kin.inverse(T, q)
             
         if type(new_psm1_angles) == NoneType:
             self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
@@ -521,7 +520,7 @@ class Teleop_class:
             self.hw_mtmr.set_wrench_body_force([0, 0, 0])
             self.hw_mtmr.set_gravity_compensation(True)
         
-        self.last_good_psm1_transform = T
+#         self.last_good_psm1_transform = T
         
         if self.__mode__ == self.MODE.hardware:
             gripper = (self.mtmr_gripper-.4) * 1.2/.4
