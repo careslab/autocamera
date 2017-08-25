@@ -1227,6 +1227,11 @@ class ClutchControl:
         self.pub_mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
         self.pub_mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
         
+        # MTML lock orientation
+        self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
+        self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+        
+        
         self.sub_ecm_cb = None
         if self.__mode__ == self.MODE.simulation:
             self.sub_ecm_cb = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
@@ -1279,6 +1284,8 @@ class ClutchControl:
             self.pub_mtml_psm2_teleop.unregister()
             self.pub_mtmr_psm1_teleop.unregister()
             self.pub_ecm_sim.unregister()
+            self.pub_lock_mtml_orientation.unregister()
+            self.pub_lock_mtmr_orientation.unregister()
             
             print( "Shutting down " + self.__class__.__name__)
             
@@ -1384,13 +1391,6 @@ class ClutchControl:
              
         
     def enable_teleop(self):
-        self.__enabled__ = True
-        
-        self.first_mtml_pos = self.last_mtml_pos
-        self.first_mtmr_pos = self.last_mtmr_pos
-        self.first_psm1_pos, _ = self.psm1_kin.FK( self.last_psm1_jnt)
-        self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
-        
         self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
         self.hw_mtml.set_wrench_body_force([0,0,0])
         self.hw_mtml.set_gravity_compensation(True)
@@ -1400,7 +1400,6 @@ class ClutchControl:
         self.hw_mtmr.set_gravity_compensation(True)
         
     def disable_teleop(self):
-        self.__enabled__ = False
         self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
         self.hw_mtml.set_gravity_compensation(False)
         
@@ -1417,16 +1416,28 @@ class ClutchControl:
             self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
                         
     def camera_clutch_cb(self, msg):
-        if msg.buttons[0] == 1 and self.head_sensor_pressed: # Camera clutch pressed
-            self.camera_clutch_pressed = True
-            self.mtml_starting_point = None
-            self.disable_teleop()
+        if msg.buttons[0] == 1 and self.head_sensor_pressed:
+            if self.camera_clutch_pressed == False:
+                self.camera_clutch_pressed = True
+                self.mtml_starting_point = None
+                self.disable_teleop()
+            mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
+            mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
+            mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
+            mtmr_quat = pose_converter.PoseConv.to_pos_quat(mtmr_pose)
+#              
+            ql = Quaternion(); ql.w, ql.x, ql.y, ql.z = mtml_quat[1]
+            qr = Quaternion(); qr.w, qr.x, qr.y, qr.z = mtmr_quat[1]
+             
+            self.pub_lock_mtml_orientation.publish(ql)
+            self.pub_lock_mtmr_orientation.publish(qr)
             
-        else: # Camera clutch not pressed anymore
+        elif self.camera_clutch_pressed == True:
             self.camera_clutch_pressed = False
-#             self.center = self.joint_angles
             if self.head_sensor_pressed:
                 self.enable_teleop()
+            
+            
                             
     def ecm_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
