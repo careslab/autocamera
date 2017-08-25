@@ -405,8 +405,9 @@ class Teleop_class:
         T = self.set_orientation_mtml( orientation, T)
         
         q = list(self.last_psm2_jnt)
-        q[4] = 0
-#         q[3] = 0
+        q[5] = 0
+	q[4] = 0
+        q[3] = 0
         new_psm2_angles = self.psm2_kin.inverse(T, q)
             
         
@@ -502,8 +503,9 @@ class Teleop_class:
         T = self.set_orientation_mtmr(orientation, T)
         
         q = list(self.last_psm1_jnt)
+	q[5] = 0
         q[4] = 0
-#         q[3] = 0
+        q[3] = 0
         new_psm1_angles = self.psm1_kin.inverse(T, q)
         
 #         if type(new_psm1_angles) == NoneType:
