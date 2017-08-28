@@ -91,7 +91,6 @@ class Teleop_class:
         self.T_mtmr_000 = None
         self.arms_homed = False
         
-        
         from autocamera_algorithm import Autocamera
         from visualization_msgs.msg import Marker
         self.autocamera = Autocamera()
@@ -181,6 +180,7 @@ class Teleop_class:
         if self.__mode__ == self.MODE.simulation:
             self.enable_teleop()
 
+    
     def home_arms(self):
         if self.arms_homed :
             return
@@ -1175,8 +1175,11 @@ class ClutchControl:
         simulation = "SIMULATION"
         hardware = "HARDWARE"
         
-    def __init__(self, mode = MODE.simulation):        
+        
+    def __init__(self, teleop_thread, mode = MODE.simulation):        
         self.__mode__ = mode
+        self.teleop_thread = teleop_thread
+        
         self.camera_clutch_pressed = False
         self.movement_scale = 1.5 
         self.joint_angles = [0,0,0,0]
@@ -1420,7 +1423,7 @@ class ClutchControl:
             if self.camera_clutch_pressed == False:
                 self.camera_clutch_pressed = True
                 self.mtml_starting_point = None
-                self.disable_teleop()
+                self.teleop_thread.pause()
             mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
             mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
             mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
@@ -1435,7 +1438,7 @@ class ClutchControl:
         elif self.camera_clutch_pressed == True:
             self.camera_clutch_pressed = False
             if self.head_sensor_pressed:
-                self.enable_teleop()
+                self.teleop_thread.resume()
             
             
                             
@@ -1888,6 +1891,11 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.node_handler.shutdown()
                 self.quit()
                 
+        def pause(self):
+            self.node_handler.disable_teleop()()
+        def resume(self):
+            self.node_handler.enable_teleop()()
+            
     class thread_bag_writer(QThread):
         def __init__(self, arm_names, file_name, recording_dir, mode):
             super(QThread, self).__init__()
@@ -1924,12 +1932,14 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.quit()
             
     class thread_clutchNGo(QThread):
-        def __init__(self, mode):
+        def __init__(self, mode, teleop_thread):
             super(QThread, self).__init__()
             self.node_handler = None
             self.__mode__ = mode
+            self.teleop_thread = teleop_thread
+            
         def run(self):
-            self.node_handler = ClutchControl()
+            self.node_handler = ClutchControl(self.teleop_thread)
             print('\nRunning {} in {}\n'.format("Clutch and Move",self.__mode__))
             self.node_handler.set_mode(self.__mode__)
             self.node_handler.spin()
