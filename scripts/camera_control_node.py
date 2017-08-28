@@ -90,6 +90,7 @@ class Teleop_class:
         self.T_mtml_000 = None
         self.T_mtmr_000 = None
         self.arms_homed = False
+        self.__paused__ = False
         
         from autocamera_algorithm import Autocamera
         from visualization_msgs.msg import Marker
@@ -120,7 +121,7 @@ class Teleop_class:
             self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
         
         # subscribe to head sensor
-        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb , queue_size=1, tcp_nodelay=True)
+        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
         
         # Subscribe to PSMs
         self.sub_psm1 = None; self.sub_psm2 = None
@@ -226,7 +227,11 @@ class Teleop_class:
         self.__init__nodes()
         rospy.spin()
         
-            
+    def pause(self):
+        self.__enabled__ = False
+    def resume(self):
+        self.__enabled__ = True
+                
     def enable_teleop(self):
         self.__enabled__ = True
         
@@ -287,22 +292,26 @@ class Teleop_class:
         return m, t
 
     
+    def lock_mtm_orientations(self):
+        mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
+        mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
+        mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
+        mtmr_quat = pose_converter.PoseConv.to_pos_quat(mtmr_pose)
+#              
+        ql = Quaternion(); ql.w, ql.x, ql.y, ql.z = mtml_quat[1]
+        qr = Quaternion(); qr.w, qr.x, qr.y, qr.z = mtmr_quat[1]
+         
+        self.pub_lock_mtml_orientation.publish(ql)
+        self.pub_lock_mtmr_orientation.publish(qr)
+        
     def clutch_cb(self, msg):
         if msg.buttons[0] == 1 and self.__enabled__:
             if self.clutch_active == False:
                 self.clutch_active = True
                 self.disable_teleop()
             
-            mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
-            mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
-            mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
-            mtmr_quat = pose_converter.PoseConv.to_pos_quat(mtmr_pose)
-#              
-            ql = Quaternion(); ql.w, ql.x, ql.y, ql.z = mtml_quat[1]
-            qr = Quaternion(); qr.w, qr.x, qr.y, qr.z = mtmr_quat[1]
-             
-            self.pub_lock_mtml_orientation.publish(ql)
-            self.pub_lock_mtmr_orientation.publish(qr)
+            self.lock_mtm_orientations()
+            
         elif self.clutch_active == True:
             self.clutch_active = False
             self.enable_teleop()
@@ -311,7 +320,7 @@ class Teleop_class:
             
             
             
-    def camera_headsensor_cb(self, msg):
+    def headsensor_cb(self, msg):
         if msg.buttons[0] == 1:
             self.enable_teleop()            
         else:
@@ -1221,18 +1230,9 @@ class ClutchControl:
         self.hw_mtml_orientation = mtm('MTML')
         self.hw_mtmr_orientation = mtm('MTMR')
         
-        self.pub_mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
-        self.pub_mtml_psm2_translation = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
-        
-        self.pub_mtmr_psm1_orientation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
-        self.pub_mtmr_psm1_translation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
-        
-        self.pub_mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
-        self.pub_mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
-        
         # MTML lock orientation
-        self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
-        self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+#         self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
+#         self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
         
         
         self.sub_ecm_cb = None
@@ -1246,7 +1246,7 @@ class ClutchControl:
         self.camera_clutch_pressed = False
         self.head_sensor_pressed = False
         self.sub_camera_clutch_cb = rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
-        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.camera_headsensor_cb )
+        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb )
         self.mtml_starting_point = None
         
         self.sub_mtml_cart_cb = rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
@@ -1258,6 +1258,8 @@ class ClutchControl:
         self.sub_psm1_joint_cb = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_joint_angles_cb)
         self.sub_psm2_joint_cb = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_joint_angles_cb)
         
+        self.T_mtml_pos_init = self.mtml_kin.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.T_mtmr_pos_init = self.T_mtml_pos_init
 #         self.hw_mtml_orientation.lock_orientation_as_is()
 #         self.hw_mtml_orientation.unlock_orientation()
     
@@ -1280,15 +1282,9 @@ class ClutchControl:
             
             self.pub_mtml_hw.unregister()
             self.pub_mtmr_hw.unregister()
-            self.pub_mtml_psm2_orientation.unregister()
-            self.pub_mtmr_psm1_orientation.unregister()
-            self.pub_mtml_psm2_translation.unregister()
-            self.pub_mtmr_psm1_translation.unregister()
-            self.pub_mtml_psm2_teleop.unregister()
-            self.pub_mtmr_psm1_teleop.unregister()
             self.pub_ecm_sim.unregister()
-            self.pub_lock_mtml_orientation.unregister()
-            self.pub_lock_mtmr_orientation.unregister()
+#             self.pub_lock_mtml_orientation.unregister()
+#             self.pub_lock_mtmr_orientation.unregister()
             
             print( "Shutting down " + self.__class__.__name__)
             
@@ -1313,12 +1309,60 @@ class ClutchControl:
         rospy.spin()
 
     def mtml_joint_angles_cb(self, msg):
-        self.mtml_joint_angles = list(msg.position)
-#         self.move_mtm_out_of_the_way()
+        self.mtml_joint_angles = list(msg.position)[0:-1]
+        
+        T_mtm = self.mtml_kin.forward(self.mtml_joint_angles)
+        T = ( self.T_mtml_pos_init **-1) * T_mtm 
+        transform = np.matrix( [ [0,-1,0,0], 
+                                [0,0,1,0], 
+                                [-1,0,0,0], 
+                                [0,0,0,1]])
+        T = transform * T
+        pos = T[0:3,3]
+        if self.camera_clutch_pressed:
+            if type(self.mtml_starting_point) == NoneType:
+                self.mtml_starting_point = pos
+            
+            # we may multiply the current_position and mtml_pos_before_clutch by some transformation matrix so
+            # the hand controllers feel more intuitive
+            
+            movement_vector = pos-self.mtml_pos_before_clutch
+            self.move_mtm_centerpoints()
+#             print("movement_vector = {}, {}, {}".format(movement_vector[0], movement_vector[1], movement_vector[2]))
+            self.mtml_pos = pos
+            self.ecm_pan_tilt(movement_vector)
+        else:
+#             self.center = self.joint_angles
+            try:
+                self.mtml_pos_before_clutch = pos
+            except:
+                pass
+            
     
     def mtmr_joint_angles_cb(self, msg):
-        self.mtmr_joint_angles = list(msg.position)
+        self.mtmr_joint_angles = list(msg.position)[0:-1]
         
+        T_mtm = self.mtmr_kin.forward(self.mtml_joint_angles)
+        T = ( self.T_mtmr_pos_init **-1) * T_mtm 
+        transform = np.matrix( [ [0,-1,0,0], 
+                                [0,0,1,0], 
+                                [-1,0,0,0], 
+                                [0,0,0,1]])
+        T = transform * T
+        
+        pos = T[0:3,3]
+        if self.camera_clutch_pressed:
+            if type(self.mtmr_starting_point) == NoneType:
+                self.mtmr_starting_point = pos
+            
+            movement_vector = pos-self.mtmr_pos_before_clutch
+            self.mtmr_pos = pos
+        else:
+            try:
+                self.mtmr_pos_before_clutch = pos
+            except:
+                pass
+            
     def psm1_joint_angles_cb(self,msg):
         self.psm1_joint_angles = list(msg.position)
     
@@ -1326,6 +1370,7 @@ class ClutchControl:
         self.psm2_joint_angles = list(msg.position)
     
     def mtml_cb(self, msg):
+        return
 #         msg.pose.position.x
         if self.camera_clutch_pressed:
             if type(self.mtml_starting_point) == NoneType:
@@ -1339,7 +1384,6 @@ class ClutchControl:
             self.move_mtm_centerpoints()
 #             print("movement_vector = {}, {}, {}".format(movement_vector[0], movement_vector[1], movement_vector[2]))
             self.mtml_pos = current_position
-            self.ecm_pan_tilt(movement_vector)
         else:
 #             self.center = self.joint_angles
             try:
@@ -1348,7 +1392,7 @@ class ClutchControl:
                 pass
     
     def mtmr_cb(self, msg):
-        pass
+        return
         if self.camera_clutch_pressed:
             pass
             if type(self.mtmr_starting_point) == NoneType:
@@ -1409,14 +1453,14 @@ class ClutchControl:
         self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
         self.hw_mtmr.set_gravity_compensation(False)
                 
-    def camera_headsensor_cb(self, msg):
+    def headsensor_cb(self, msg):
         if msg.buttons[0] == 1:
             self.head_sensor_pressed = True
-            self.enable_teleop()
+#             self.enable_teleop()
         else:
             self.head_sensor_pressed = False
-            self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-            self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+#             self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+#             self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
                         
     def camera_clutch_cb(self, msg):
         if msg.buttons[0] == 1 and self.head_sensor_pressed:
@@ -1424,21 +1468,16 @@ class ClutchControl:
                 self.camera_clutch_pressed = True
                 self.mtml_starting_point = None
                 self.teleop_thread.pause()
-            mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
-            mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
-            mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
-            mtmr_quat = pose_converter.PoseConv.to_pos_quat(mtmr_pose)
-#              
-            ql = Quaternion(); ql.w, ql.x, ql.y, ql.z = mtml_quat[1]
-            qr = Quaternion(); qr.w, qr.x, qr.y, qr.z = mtmr_quat[1]
-             
-            self.pub_lock_mtml_orientation.publish(ql)
-            self.pub_lock_mtmr_orientation.publish(qr)
+                self.hw_mtml_orientation.lock_orientation_as_is()
+                self.hw_mtmr_orientation.lock_orientation_as_is()
+#                 self.teleop_thread.lock_mtm_orientations()
             
         elif self.camera_clutch_pressed == True:
             self.camera_clutch_pressed = False
             if self.head_sensor_pressed:
                 self.teleop_thread.resume()
+                self.hw_mtml_orientation.unlock_orientation()
+                self.hw_mtmr_orientation.unlock_orientation()
             
             
                             
@@ -1892,9 +1931,12 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.quit()
                 
         def pause(self):
-            self.node_handler.disable_teleop()()
+            self.node_handler.pause()
         def resume(self):
-            self.node_handler.enable_teleop()()
+            self.node_handler.enable_teleop()
+        
+        def lock_mtm_orientations(self, msg):
+            self.node_handler.lock_mtm_orientations()
             
     class thread_bag_writer(QThread):
         def __init__(self, arm_names, file_name, recording_dir, mode):
@@ -2307,7 +2349,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.groupBoxAutocameraParams.setVisible(False)
             
         if name == self.node_name.clutchNGo :
-            self.thread = self.thread_clutchNGo(self.__mode__)
+            self.thread = self.thread_clutchNGo(self.__mode__, self.thread_tel)
             self.thread.start()
         elif name == self.node_name.autocamera:
             self.thread = None
