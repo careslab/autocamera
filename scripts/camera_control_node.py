@@ -1491,8 +1491,8 @@ class ClutchControl:
         movement_vector = [float(i) for i in movement_vector]
         if q:
             q = list(q)
-            q[0] = self.center[0] - movement_vector[0] * self.movement_scale # pitch
-            q[1] = self.center[1] + movement_vector[1] * self.movement_scale # yaw
+            q[0] = self.center[0] + movement_vector[0] * self.movement_scale # pitch
+            q[1] = self.center[1] - movement_vector[1] * self.movement_scale # yaw
             q[2] = self.center[2] - movement_vector[2] *.2 * self.movement_scale # insertion
             
             q = [round(i,4) for i in q]
