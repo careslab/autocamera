@@ -1309,7 +1309,7 @@ class ClutchControl:
         rospy.spin()
 
     def mtml_joint_angles_cb(self, msg):
-        self.mtml_joint_angles = list(msg.position)[0:-1]
+        self.mtml_joint_angles = list(msg.position)
         
         T_mtm = self.mtml_kin.forward(self.mtml_joint_angles)
         T = ( self.T_mtml_pos_init **-1) * T_mtm 
@@ -1317,7 +1317,7 @@ class ClutchControl:
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
-        T = transform * T
+        T = T_mtm # transform * T
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
             if type(self.mtml_starting_point) == NoneType:
@@ -1340,7 +1340,7 @@ class ClutchControl:
             
     
     def mtmr_joint_angles_cb(self, msg):
-        self.mtmr_joint_angles = list(msg.position)[0:-1]
+        self.mtmr_joint_angles = list(msg.position)
         
         T_mtm = self.mtmr_kin.forward(self.mtml_joint_angles)
         T = ( self.T_mtmr_pos_init **-1) * T_mtm 
@@ -1348,7 +1348,7 @@ class ClutchControl:
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
-        T = transform * T
+        T = T_mtm #transform * T
         
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
@@ -1413,8 +1413,8 @@ class ClutchControl:
         left = self.mtml_pos_before_clutch
         right = self.mtmr_pos_before_clutch
         
-        mtml_pos = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3]
-        mtmr_pos = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
+        mtml_pos = self.mtml_kin.forward(self.mtml_joint_angles)[0:3,3]
+        mtmr_pos = self.mtmr_kin.forward(self.mtmr_joint_angles)[0:3,3]
         
         mid = (left+right)/2.0
         
@@ -1425,7 +1425,7 @@ class ClutchControl:
             new_mid = mtml_pos + ml_vector
             new_mtmr_position = new_mid + mr_vector
             
-            mtmr_pose = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])
+            mtmr_pose = self.mtmr_kin.forward(self.mtmr_joint_angles)
             mtmr_pose[0:3, 3] = new_mtmr_position.reshape(3,1)
             mtmr_joint_angles = self.mtmr_kin.inverse(mtmr_pose)
 #             print('mtmr_joint_angles = ' + mtmr_joint_angles.__str__())
@@ -1503,8 +1503,8 @@ class ClutchControl:
         movement_vector = [float(i) for i in movement_vector]
         if q:
             q = list(q)
-            q[0] = self.center[0] + movement_vector[0] * self.movement_scale # pitch
-            q[1] = self.center[1] - movement_vector[1] * self.movement_scale # yaw
+            q[0] = self.center[0] - movement_vector[0] * self.movement_scale # pitch
+            q[1] = self.center[1] + movement_vector[1] * self.movement_scale # yaw
             q[2] = self.center[2] - movement_vector[2] *.2 * self.movement_scale # insertion
             
             q = [round(i,4) for i in q]
