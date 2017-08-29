@@ -1311,13 +1311,7 @@ class ClutchControl:
     def mtml_joint_angles_cb(self, msg):
         self.mtml_joint_angles = list(msg.position)
         
-        T_mtm = self.mtml_kin.forward(self.mtml_joint_angles)
-        T = ( self.T_mtml_pos_init **-1) * T_mtm 
-        transform = np.matrix( [ [0,-1,0,0], 
-                                [0,0,1,0], 
-                                [-1,0,0,0], 
-                                [0,0,0,1]])
-        T = T_mtm # transform * T
+        T = self.mtml_kin.forward(self.mtml_joint_angles)
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
             if type(self.mtml_starting_point) == NoneType:
@@ -1342,13 +1336,7 @@ class ClutchControl:
     def mtmr_joint_angles_cb(self, msg):
         self.mtmr_joint_angles = list(msg.position)
         
-        T_mtm = self.mtmr_kin.forward(self.mtml_joint_angles)
-        T = ( self.T_mtmr_pos_init **-1) * T_mtm 
-        transform = np.matrix( [ [0,-1,0,0], 
-                                [0,0,1,0], 
-                                [-1,0,0,0], 
-                                [0,0,0,1]])
-        T = T_mtm #transform * T
+        T = self.mtmr_kin.forward(self.mtml_joint_angles)
         
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
@@ -1469,7 +1457,7 @@ class ClutchControl:
                 self.mtml_starting_point = None
                 self.teleop_thread.pause()
                 self.hw_mtml_orientation.lock_orientation_as_is()
-                self.hw_mtmr_orientation.lock_orientation_as_is()
+#                 self.hw_mtmr_orientation.lock_orientation_as_is()
 #                 self.teleop_thread.lock_mtm_orientations()
             
         elif self.camera_clutch_pressed == True:
@@ -1477,7 +1465,7 @@ class ClutchControl:
             if self.head_sensor_pressed:
                 self.teleop_thread.resume()
                 self.hw_mtml_orientation.unlock_orientation()
-                self.hw_mtmr_orientation.unlock_orientation()
+#                 self.hw_mtmr_orientation.unlock_orientation()
             
             
                             
