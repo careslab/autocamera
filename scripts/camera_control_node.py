@@ -1245,7 +1245,7 @@ class ClutchControl:
         
         self.camera_clutch_pressed = False
         self.head_sensor_pressed = False
-        self.sub_camera_clutch_cb = rospy.Subscriber('/dvrk/footpedals/camera_minus', Joy, self.camera_clutch_cb )
+        self.sub_camera_clutch_cb = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.camera_clutch_cb )
         self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb )
         self.mtml_starting_point = None
         
@@ -1336,7 +1336,7 @@ class ClutchControl:
     def mtmr_joint_angles_cb(self, msg):
         self.mtmr_joint_angles = list(msg.position)
         
-        T = self.mtmr_kin.forward(self.mtml_joint_angles)
+        T = self.mtmr_kin.forward(self.mtmr_joint_angles)
         
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
@@ -1350,7 +1350,7 @@ class ClutchControl:
                 self.mtmr_pos_before_clutch = pos
             except:
                 pass
-            
+    
     def psm1_joint_angles_cb(self,msg):
         self.psm1_joint_angles = list(msg.position)
     
