@@ -64,7 +64,7 @@ def talker():
         	psm1_joint_angles.publish(msg)
 	if str(mylistener) == "counterclockwise":
 	    for i, j in itertools.product(frangerev(1.5707,0.0,0.01), frangerev(0.78535,0.0,0.01)):
-		#Jaw Open
+		#Jaw Close
 		joint_angles = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, i, j, -j]
 		msg = JointState()
         	msg.position = joint_angles
