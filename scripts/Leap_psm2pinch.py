@@ -33,24 +33,29 @@ def talker():
     # Creating a listener and controller
     mylistener = MyListener()
     controller = Leap.Controller()
+
     # Have the listener receive events from the controller
     controller.add_listener(mylistener)
     psm1_joint_angles = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
     psm2_joint_angles = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
     rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(10) # 10hz
+    rate = rospy.Rate(40) # 40hz
+
+    msg1 = JointState()
+    msg2 = JointState()
+
     while not rospy.is_shutdown():
-	i = mylistener
-	msg1 = JointState()
-	msg1.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (1-i.pinchstrengthright)*1.57, 0.0, 0.0]
+
+	msg1.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (1-mylistener.pinchstrengthright)*1.57, 0.0, 0.0]
         msg1.name = ['outer_yaw', 'outer_pitch', 'outer_pitch_1', 'outer_pitch_2', 'outer_pitch_3', 'outer_pitch_4', 'outer_pitch_5', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw', 'jaw_mimic_1', 'jaw_mimic_2']
         rospy.loginfo(msg1)
         psm1_joint_angles.publish(msg1)
-	msg2 = JointState()
-	msg2.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (1-i.pinchstrengthleft)*1.57, 0.0, 0.0]
+	
+	msg2.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (1-mylistener.pinchstrengthleft)*1.57, 0.0, 0.0]
         msg2.name = ['outer_yaw', 'outer_pitch', 'outer_pitch_1', 'outer_pitch_2', 'outer_pitch_3', 'outer_pitch_4', 'outer_pitch_5', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw', 'jaw_mimic_1', 'jaw_mimic_2']
         rospy.loginfo(msg2)
         psm2_joint_angles.publish(msg2)
+
 	rate.sleep()
 
 if __name__ == '__main__':
