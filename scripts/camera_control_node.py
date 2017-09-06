@@ -647,16 +647,23 @@ class bag_writer:
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
         self.arm_names = arm_names
-        # The topics we want to record
+        # The topics we want to record for each arm:
+#         Anything with state_joint_current
+#         /dvrk/footpedals/clutch
+#         /dvrk/footpedals/camera
+#         /dvrk/footpedals/coag
+#         The video feed
+        
 #         self.topics = '/dvrk/{}/state_joint_current'.format(ARM_NAME)
         self.topics = { arm_name:'/dvrk/{}/state_joint_current'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_hw = {arm_name : '/dvrk/{}/set_position_joint'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_sim = {arm_name : '/dvrk_{}/joint_states_robot'.format(arm_name.lower()) for arm_name in self.arm_names}
         
-#         self.out_topics = self.out_topics_sim
-        self.out_topics = self.out_topics_hw
-        # We have to initialize a ros node if we want to subsribe or publish messages
-#         rospy.init_node('rosbag_test_node')
+        self.sub_footpedal_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.cb_clutch)
+        self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
+        self.sub_footpedal_coag = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.cb_camera)
+        
+        # Add another subscriber here for image:
         
         for arm_name in self.arm_names:
             exec("self.sub_{} = rospy.Subscriber('{}', JointState, self.cb_{})".format(arm_name, self.topics[arm_name], arm_name))
@@ -677,6 +684,25 @@ class bag_writer:
     def spin(self):
         rospy.spin()
         
+    def cb_clutch(self, msg):
+        try:
+            self.bag_sim.write('/dvrk/footpedals/clutch', msg)
+            self.bag_hw.write('/dvrk/footpedals/clutch', msg)
+        except Exception:
+            print("there was an error")
+    def cb_camera(self, msg):
+        try:
+            self.bag_sim.write('/dvrk/footpedals/camera', msg)
+            self.bag_hw.write('/dvrk/footpedals/camera', msg)
+        except Exception:
+            print("there was an error")
+    def cb_coag(self, msg):
+        try:
+            self.bag_sim.write('/dvrk/footpedals/coag', msg)
+            self.bag_hw.write('/dvrk/footpedals/coag', msg)
+        except Exception:
+            print("there was an error")
+    
     def cb_MTML(self, msg):
         self.cb('MTML', msg)
     def cb_MTMR(self, msg):
