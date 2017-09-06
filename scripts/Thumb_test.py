@@ -14,13 +14,14 @@ class MyListener(Leap.Listener):
         frame = controller.frame()
 	# Get thumb
 	for hand in frame.hands:
+	    wrist = hand.wrist_position
 	    if hand.is_right:
-		print 'Right Hand Rotation %s'%(hand.rotation_angle(controller.frame(5),hand.basis.z_basis))
+		print 'Right wrist postion %s'%(wrist)
 	        #for finger in hand.fingers:
 		 #   if finger.type == 2:
 		  #      print 'Right MF %s'%(finger.tip_position[1]) 
-	    if hand.is_left:
-		print 'Left Hand Rotation %s'%(hand.rotation_angle(controller.frame(5),hand.basis.z_basis))
+	    #if hand.is_left:
+		#print 'Left Hand Rotation %s'%(hand.rotation_angle(controller.frame(5),hand.basis.z_basis))
 		#for finger in hand.fingers:
 		 #   if finger.type == 2:
 		   #     print 'Left MF %s'%(finger.tip_position[1])
