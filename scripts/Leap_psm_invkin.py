@@ -3,6 +3,9 @@
 import rospy
 import Leap, sys, thread, time
 from sensor_msgs.msg._JointState import JointState
+import numpy as np
+from urdf_parser_py.urdf import URDF
+from pykdl_utils.kdl_kinematics import KDLKinematics
 
 def talker():
     
@@ -22,6 +25,11 @@ def talker():
     outerinsertionleft = 0.0
     outerpitchleft = 0.0
     controller = Leap.Controller()
+
+    psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+    psm1_kin = KDLKinematics(psm1_robot, psm1_robot.links[0].name, psm1_robot.links[-1].name)
+    psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+    psm2_kin = KDLKinematics(psm2_robot, psm2_robot.links[0].name, psm2_robot.links[-1].name)
 
     #Publishers    
     psm1_joint_angles = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
