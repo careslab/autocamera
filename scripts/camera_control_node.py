@@ -186,10 +186,15 @@ class Teleop_class:
         if self.arms_homed :
             return
         # move the psms and mtms to a preferred initial position
-        r_psm1 = self.hw_psm1.move_joint_list([-0.491412938252654, 0.004927103573755237, 0.12736308508000002, 0.5969872691004409, -0.09468909433745022, -0.013042400593701237, -0.17428811856527596], interpolate=True)
-        r_psm2 = self.hw_psm2.move_joint_list([0.7011160267193464, 0.22136441510677135, 0.12160626119000001, -0.8150648103243462, -0.5017292271386973, 0.06607583378289802, -0.17477815076367886], interpolate=True)
-        r_mtml = self.hw_mtml.move_joint_list( [0.044688654936885334, -0.011651854738228436, 0.013282347608626847, -1.536878997367617, 0.7253564294471403, -0.16875639378974283, -0.076976598407095,0.0], interpolate=True)
-        r_mtmr = self.hw_mtmr.move_joint_list([0.02710054794953024, -0.018831916576920554, 0.004262673831747664, 1.5243832291804937, 0.8052936686107027, 0.11250426252649523, -0.02960638400272885, 0.0], interpolate=True)
+        
+        q_psm1 = [-0.491412938252654, 0.004927103573755237, 0.12736308508000002, 0.5969872691004409, -0.09468909433745022, -0.013042400593701237, -0.17428811856527596]
+        q_psm2 = [0.7011160267193464, 0.22136441510677135, 0.12160626119000001, -0.8150648103243462, -0.5017292271386973, 0.06607583378289802, -0.17477815076367886]
+        q_mtml = [0.0, 0.0, 0.0, -1.536878997367617, 0.0, 0.0, 0.0,0.0]
+        q_mtmr = [0.0, 0.0, 0.0, 1.536878997367617, 0.0, 0.0, 0.0,0.0]
+        r_psm1 = self.hw_psm1.move_joint_list(q_psm1, interpolate=True)
+        r_psm2 = self.hw_psm2.move_joint_list(q_psm2, interpolate=True)
+        r_mtml = self.hw_mtml.move_joint_list( q_mtml, interpolate=True)
+        r_mtmr = self.hw_mtmr.move_joint_list(q_mtmr, interpolate=True)
         
         if r_psm1 * r_psm2 * r_mtml * r_mtmr:
             self.arms_homed = True
@@ -381,9 +386,11 @@ class Teleop_class:
         if self.T_mtml_000 == None :
             self.T_mtml_000 = self.mtml_kin.forward(msg.position)
 
+        _, r_300_y_t = self.rotate('y', -np.pi/4.0)
         
         T_mtm = self.mtml_kin.forward(msg.position)
         T = ( self.T_mtml_000**-1) * T_mtm 
+        T =  T * r_300_y_t
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
@@ -481,10 +488,13 @@ class Teleop_class:
         
         if self.T_mtmr_000 == None :
             self.T_mtmr_000 = self.T_mtml_000
+        
+        _, r_300_y_t = self.rotate('y', -np.pi/4.0)
                         
         T_mtm = self.mtmr_kin.forward(msg.position)
         
         T = ( self.T_mtmr_000**-1) * T_mtm 
+        T = T * r_300_y_t
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
