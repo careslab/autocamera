@@ -44,10 +44,13 @@ def compute_fk(name):
             data.append(xyz)
         return data
     if name == "ecm":
-        psm2_joint_angles = file['ecm_angles']
+        ecm_joint_angles = file['ecm_angles']
         data = []
-        for angles in psm2_joint_angles:
-            xyz,_ = ecm_kin.FK(angles)
+        for angles in ecm_joint_angles:
+            T_rene_condom = np.eye(4)
+            T_rene_condom[2,3] = 0.021
+            T = T_rene_condom * ecm_kin.forward( angles)   
+            xyz = T[0:3,3]
             data.append(xyz)
         return data
 
@@ -69,10 +72,10 @@ def objective_function(xyzrpy):
     
     if objective_function.mode == 'ecm_psm1':
         pos_in_psm1rf = []
-        for psm2_xyz in objective_function.ecm_data:
-            psm2_xyz = np.insert(psm2_xyz,3,1)
-            psm2_xyz = psm2_xyz.transpose()
-            temp = T *  psm2_xyz
+        for ecm_xyz in objective_function.ecm_data:
+            ecm_xyz = np.insert(ecm_xyz,3,1)
+            ecm_xyz = ecm_xyz.transpose()
+            temp = T *  ecm_xyz
             pos_in_psm1rf.append(temp)
     else:
         pos_in_psm1rf = []
