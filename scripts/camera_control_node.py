@@ -386,11 +386,13 @@ class Teleop_class:
         if self.T_mtml_000 == None :
             self.T_mtml_000 = self.mtml_kin.forward(msg.position)
 
+        # These rotations help the robot move better
         _, r_315_y_t = self.rotate('y', -np.pi/4.0)
+        _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
         
         T_mtm = self.mtml_kin.forward(msg.position)
         T = ( self.T_mtml_000**-1) * T_mtm 
-        T =  T * r_315_y_t
+        T =  r_330_x_t * T * r_315_y_t 
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
@@ -489,12 +491,15 @@ class Teleop_class:
         if self.T_mtmr_000 == None :
             self.T_mtmr_000 = self.T_mtml_000
         
+        # These rotations help the robot move better
         _, r_315_y_t = self.rotate('y', -np.pi/4.0)
-                        
+        _, r_330_z_t = self.rotate('z', -np.pi/6.0)
+            
         T_mtm = self.mtmr_kin.forward(msg.position)
         
         T = ( self.T_mtmr_000**-1) * T_mtm 
-        T = T * r_315_y_t
+        T = r_330_x_t * T * r_315_y_t
+        
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
