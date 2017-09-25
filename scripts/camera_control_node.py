@@ -392,7 +392,7 @@ class Teleop_class:
         
         T_mtm = self.mtml_kin.forward(msg.position)
         T = ( self.T_mtml_000**-1) * T_mtm 
-        T =  r_330_x_t * T * r_315_y_t 
+        T =  r_330_z_t * T * r_315_y_t 
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
@@ -498,7 +498,7 @@ class Teleop_class:
         T_mtm = self.mtmr_kin.forward(msg.position)
         
         T = ( self.T_mtmr_000**-1) * T_mtm 
-        T = r_330_x_t * T * r_315_y_t
+        T = r_330_z_t * T * r_315_y_t
         
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
