@@ -675,6 +675,7 @@ class bag_writer:
         self.topics = { arm_name:'/dvrk/{}/state_joint_current'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_hw = {arm_name : '/dvrk/{}/set_position_joint'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_sim = {arm_name : '/dvrk_{}/joint_states_robot'.format(arm_name.lower()) for arm_name in self.arm_names}
+        #self.other_topics = ['']
         
         self.sub_footpedal_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.cb_clutch)
         self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
@@ -701,6 +702,13 @@ class bag_writer:
     def spin(self):
         rospy.spin()
         
+    def cb_generic(self, topic, msg):
+        try:
+            self.bag_sim.write(topic, msg)
+            self.bag_hw.write(topic, msg)
+        except Exception:
+            print("there was an error")
+            
     def cb_clutch(self, msg):
         try:
             self.bag_sim.write('/dvrk/footpedals/clutch', msg)
