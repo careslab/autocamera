@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Thu Jul 20 15:24:34 2017
+# Created: Wed Oct 11 15:47:03 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -97,15 +97,28 @@ class Ui_Dialog(object):
         self.label_4.setGeometry(QtCore.QRect(10, 56, 131, 20))
         self.label_4.setObjectName(_fromUtf8("label_4"))
         self.pushButtonRecord = QtGui.QPushButton(Dialog)
-        self.pushButtonRecord.setGeometry(QtCore.QRect(20, 430, 131, 27))
+        self.pushButtonRecord.setGeometry(QtCore.QRect(13, 480, 131, 27))
         self.pushButtonRecord.setObjectName(_fromUtf8("pushButtonRecord"))
-        self.textEditFilename = QtGui.QTextEdit(Dialog)
-        self.textEditFilename.setGeometry(QtCore.QRect(20, 470, 191, 31))
-        self.textEditFilename.setObjectName(_fromUtf8("textEditFilename"))
-        self.labelFilename = QtGui.QLabel(Dialog)
-        self.labelFilename.setGeometry(QtCore.QRect(20, 510, 191, 17))
-        self.labelFilename.setText(_fromUtf8(""))
-        self.labelFilename.setObjectName(_fromUtf8("labelFilename"))
+        self.labelSubjectInfo = QtGui.QLabel(Dialog)
+        self.labelSubjectInfo.setGeometry(QtCore.QRect(90, 453, 111, 20))
+        self.labelSubjectInfo.setText(_fromUtf8(""))
+        self.labelSubjectInfo.setObjectName(_fromUtf8("labelSubjectInfo"))
+        self.labelSubjectNumber = QtGui.QLabel(Dialog)
+        self.labelSubjectNumber.setGeometry(QtCore.QRect(12, 430, 131, 16))
+        self.labelSubjectNumber.setObjectName(_fromUtf8("labelSubjectNumber"))
+        self.spinBoxSubjectNumber = QtGui.QSpinBox(Dialog)
+        self.spinBoxSubjectNumber.setGeometry(QtCore.QRect(19, 450, 60, 27))
+        self.spinBoxSubjectNumber.setMinimum(1)
+        self.spinBoxSubjectNumber.setMaximum(20)
+        self.spinBoxSubjectNumber.setObjectName(_fromUtf8("spinBoxSubjectNumber"))
+        self.labelPatternNumber = QtGui.QLabel(Dialog)
+        self.labelPatternNumber.setGeometry(QtCore.QRect(12, 370, 131, 16))
+        self.labelPatternNumber.setObjectName(_fromUtf8("labelPatternNumber"))
+        self.spinBoxPatternNumber = QtGui.QSpinBox(Dialog)
+        self.spinBoxPatternNumber.setGeometry(QtCore.QRect(20, 390, 60, 27))
+        self.spinBoxPatternNumber.setMinimum(1)
+        self.spinBoxPatternNumber.setMaximum(5)
+        self.spinBoxPatternNumber.setObjectName(_fromUtf8("spinBoxPatternNumber"))
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -132,9 +145,6 @@ class Ui_Dialog(object):
         self.label_3.setText(_translate("Dialog", "Inner Zone Radius", None))
         self.label_4.setText(_translate("Dialog", "Dead Zone Radius", None))
         self.pushButtonRecord.setText(_translate("Dialog", "Record", None))
-        self.textEditFilename.setHtml(_translate("Dialog", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Ubuntu\'; font-size:11pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">test_run</p></body></html>", None))
+        self.labelSubjectNumber.setText(_translate("Dialog", "Subject Number", None))
+        self.labelPatternNumber.setText(_translate("Dialog", "Pattern Number", None))
 

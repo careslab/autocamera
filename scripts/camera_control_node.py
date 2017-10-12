@@ -657,7 +657,7 @@ class bag_writer:
         self.__mode__ = mode
         
         # initialize bags 
-        dir = '{}/'.format(recording_dir)+bag_name +'/'; dir = dir.__str__()
+        dir = '{}/'.format(recording_dir); dir = dir.__str__()
         if not os.path.exists(dir):
             os.system( ('mkdir -p '+ dir ).__str__())
         
@@ -2215,12 +2215,14 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonHome.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(False)
         self.pushButtonRecord.setEnabled(False)
-        self.textEditFilename.setEnabled(False)
+        self.spinBoxSubjectNumber.setEnabled(False)
+        self.spinBoxPatternNumber.setEnabled(False)
         self.groupBoxOperationMode.setEnabled(False)
         self.groupBoxCameraControlMethod.setEnabled(False)
         
         self.recording = False
         self.pushButtonRecord.clicked.connect(self.on_record)
+        
         
         try:
             # Get recording parameters from config file
@@ -2228,32 +2230,45 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.config_file = '../config/autocamera.conf'
             self.config.read(self.config_file)
             self.recording_dir = self.config.get('RECORDING', 'directory')
+            if os.path.exists(self.recording_dir):
+                subject_number = len(os.listdir(self.recording_dir)) 
+                self.spinBoxSubjectNumber.setValue(subject_number)
         except Exception:
             pass
     
     @pyqtSlot()
     def on_record(self):
         if self.recording == False:
-            file_name = self.textEditFilename.toPlainText()
-            if os.path.exists('{}/'.format(self.recording_dir)+file_name):
-                self.labelFilename.setText('File already exists')
-                self.labelFilename.setStyleSheet("color: red")
-                return
+            
+            folder_name = "subject" + str(self.spinBoxSubjectNumber.text())
+            number = 1
+            if os.path.exists('{}/'.format(self.recording_dir)+folder_name):
+                number = 1+len(os.listdir('{}/{}'.format(self.recording_dir, folder_name)))/2;
+                subject_number = len(os.listdir(self.recording_dir)) 
+                self.spinBoxSubjectNumber
+                self.labelSubjectInfo.setText('Task # ' + str(number))
+                self.labelSubjectInfo.setStyleSheet("color: brown")
             else:
-                self.labelFilename.setText('')
+                self.labelSubjectInfo.setText('')
             self.recording = True
-            self.textEditFilename.setEnabled(False)
+            self.spinBoxSubjectNumber.setEnabled(False)
+            self.spinBoxPatternNumber.setEnabled(False)
             self.pushButtonRecord.setStyleSheet("background-color: red")
             self.pushButtonRecord.setText('Stop Recording')
             arm_names = ['MTML', 'MTMR', 'PSM1', 'PSM2', 'ECM']
-            self.bag_writer = self.thread_bag_writer(arm_names, file_name, recording_dir=self.recording_dir, mode=self.MODE.hardware)
+            rdir = self.recording_dir+ '/' + folder_name 
+            pattern = str(self.spinBoxPatternNumber.text())
+            file_name = "{}_{}_pattern{}".format(number, self.__control_mode__, pattern)
+            
+            self.bag_writer = self.thread_bag_writer(arm_names, file_name, recording_dir=rdir, mode=self.MODE.hardware)
             self.bag_writer.start()
         else:
             self.recording = False
             self.pushButtonRecord.setStyleSheet("background-color: ")
             self.pushButtonRecord.setText('Record')
             self.bag_writer.kill()
-            self.textEditFilename.setEnabled(True)
+            self.spinBoxSubjectNumber.setEnabled(True)
+            self.spinBoxPatternNumber.setEnabled(True)
         
     
     @pyqtSlot()
@@ -2285,7 +2300,8 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.groupBoxOperationMode.setEnabled(True)
         self.groupBoxCameraControlMethod.setEnabled(True)
         self.pushButtonRecord.setEnabled(True)
-        self.textEditFilename.setEnabled(True)
+        self.spinBoxSubjectNumber.setEnabled(True)
+        self.spinBoxPatternNumber.setEnabled(True)
         
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
