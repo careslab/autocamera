@@ -714,8 +714,8 @@ class bag_writer:
         try:
             self.bag_sim.write('/usb_cam/image_left', msg)
             self.bag_hw.write('/usb_cam/image_left', msg)
-        except e:
-            print("There was an error " + e.__str__())
+        except Exception:
+            print("There was an error ")
                 
     def cb_clutch(self, msg):
         try:
