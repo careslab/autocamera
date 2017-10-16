@@ -681,6 +681,7 @@ class bag_writer:
         self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
         self.sub_footpedal_coag = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.cb_camera)
         
+        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw', Image, self.cb_image_left)
         # Add another subscriber here for image:
         
         for arm_name in self.arm_names:
@@ -708,7 +709,14 @@ class bag_writer:
             self.bag_hw.write(topic, msg)
         except Exception:
             print("there was an error")
-            
+    
+    def cb_image_left(self, msg):
+        try:
+            self.bag_hw.write('/usb_cam/image_left')
+            self.bag_sim.write('/usb_cam/image_left')
+        except Exception:
+            print("There was an error")
+                
     def cb_clutch(self, msg):
         try:
             self.bag_sim.write('/dvrk/footpedals/clutch', msg)
@@ -1176,7 +1184,6 @@ class Autocamera_node_handler:
                 pass
                 
             self.joint_angles = dict.fromkeys(self.joint_angles, None)    
-        
     
     # camera info callback
     def get_cam_info(self, msg):
@@ -1186,8 +1193,6 @@ class Autocamera_node_handler:
             self.cam_info['right'] = msg
         
 
-    
-        
     def left_image_cb(self, image_msg):
         self.image_cb(image_msg, 'left')    
         
