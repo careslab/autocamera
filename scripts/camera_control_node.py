@@ -684,7 +684,7 @@ class bag_writer:
         self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
         self.sub_footpedal_coag = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.cb_camera)
         
-        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw', Image, self.cb_image_left)
+#         self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw', Image, self.cb_image_left)
         # Add another subscriber here for image:
         
         for arm_name in self.arm_names:
