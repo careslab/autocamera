@@ -663,9 +663,11 @@ class bag_writer:
             os.system( ('mkdir -p '+ dir ).__str__())
         
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
-        self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
-        self.bag_hw.compression='bz2'
-        self.bag_sim.compression='bz2'
+#         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
+#         self.bag_hw.compression=rosbag.Compression.BZ2
+        self.bag_sim.compression=rosbag.Compression.BZ2
+        self.bag_sim.chunk_threshold=60000000
+#         self.bag_hw.chunk_threshold=60000000
         
         self.arm_names = arm_names
         # The topics we want to record for each arm:
@@ -704,10 +706,7 @@ class bag_writer:
         self.sub_footpedal_coag.unregister()
         self.sub_image_left.unregister()
         
-        self.bag_hw.flush()
-        self.bag_sim.flush()
-        
-        self.bag_hw.close()
+#         self.bag_hw.close()
         self.bag_sim.close()
         
         
@@ -729,7 +728,7 @@ class bag_writer:
     def cb_generic(self, topic, msg):
         try:
             self.bag_sim.write(topic, msg)
-            self.bag_hw.write(topic, msg)
+#             self.bag_hw.write(topic, msg)
         except Exception:
             print("there was an error")
     
