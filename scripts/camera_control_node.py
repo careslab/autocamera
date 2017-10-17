@@ -664,8 +664,8 @@ class bag_writer:
         
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
-        self.bag_hw.compression='bz2'
-        self.bag_sim.compression='bz2'
+#         self.bag_hw.compression='bz2'
+#         self.bag_sim.compression='bz2'
         
         self.arm_names = arm_names
         # The topics we want to record for each arm:
@@ -684,7 +684,7 @@ class bag_writer:
         self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
         self.sub_footpedal_coag = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.cb_camera)
         
-        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw/compressed', CompressedImage, self.cb_image_left)
+        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw', Image, self.cb_image_left)
         # Add another subscriber here for image:
         
         for arm_name in self.arm_names:
@@ -734,7 +734,7 @@ class bag_writer:
             print("there was an error")
     
     def cb_image_left(self, msg):
-        self.cb_generic('/usb_cam/image_raw/compressed', msg)
+        self.cb_generic('/usb_cam/image_raw', msg)
                 
     def cb_clutch(self, msg):
         self.cb_generic('/dvrk/footpedals/clutch', msg)
