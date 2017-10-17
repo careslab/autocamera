@@ -44,6 +44,7 @@ from std_msgs.msg._Float32 import Float32
 from PyQt4.Qt import QObject
 import rosbag
 from geometry_msgs.msg._Wrench import Wrench
+from sensor_msgs.msg._CompressedImage import CompressedImage
 
 
 
@@ -663,6 +664,9 @@ class bag_writer:
         
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
+        self.bag_hw.compression='bz2'
+        self.bag_sim.compression='bz2'
+        
         self.arm_names = arm_names
         # The topics we want to record for each arm:
 #         Anything with state_joint_current
@@ -675,13 +679,12 @@ class bag_writer:
         self.topics = { arm_name:'/dvrk/{}/state_joint_current'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_hw = {arm_name : '/dvrk/{}/set_position_joint'.format(arm_name) for arm_name in self.arm_names}
         self.out_topics_sim = {arm_name : '/dvrk_{}/joint_states_robot'.format(arm_name.lower()) for arm_name in self.arm_names}
-        #self.other_topics = ['']
         
         self.sub_footpedal_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.cb_clutch)
         self.sub_footpedal_camera = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.cb_coag)
         self.sub_footpedal_coag = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.cb_camera)
         
-        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw', Image, self.cb_image_left)
+        self.sub_image_left = rospy.Subscriber('/usb_cam/image_raw/compressed', CompressedImage, self.cb_image_left)
         # Add another subscriber here for image:
         
         for arm_name in self.arm_names:
@@ -696,13 +699,33 @@ class bag_writer:
             eval("self.sub_{}.unregister()".format(arm_name))
             rospy.timer.sleep(.1)
             
+        self.sub_footpedal_camera.unregister()
+        self.sub_footpedal_clutch.unregister()
+        self.sub_footpedal_coag.unregister()
+        self.sub_image_left.unregister()
+        
+        self.bag_hw.flush()
+        self.bag_sim.flush()
+        
         self.bag_hw.close()
         self.bag_sim.close()
         
         
+        
     def spin(self):
         rospy.spin()
+    
+    def run_once(f):
+        def wrapper(*args, **kwargs):
+            if not wrapper.has_run:
+                wrapper.has_run = True
+                return_value = f(*args, **kwargs)
+                wrapper.has_run = False
+                return return_value
+        wrapper.has_run = False
+        return wrapper
         
+    @run_once    
     def cb_generic(self, topic, msg):
         try:
             self.bag_sim.write(topic, msg)
@@ -711,30 +734,16 @@ class bag_writer:
             print("there was an error")
     
     def cb_image_left(self, msg):
-        try:
-            self.bag_sim.write('/usb_cam/image_left', msg)
-            self.bag_hw.write('/usb_cam/image_left', msg)
-        except Exception:
-            print("There was an error ")
+        self.cb_generic('/usb_cam/image_raw/compressed', msg)
                 
     def cb_clutch(self, msg):
-        try:
-            self.bag_sim.write('/dvrk/footpedals/clutch', msg)
-            self.bag_hw.write('/dvrk/footpedals/clutch', msg)
-        except Exception:
-            print("there was an error")
+        self.cb_generic('/dvrk/footpedals/clutch', msg)
+    
     def cb_camera(self, msg):
-        try:
-            self.bag_sim.write('/dvrk/footpedals/camera', msg)
-            self.bag_hw.write('/dvrk/footpedals/camera', msg)
-        except Exception:
-            print("there was an error")
+        self.cb_generic('/dvrk/footpedals/camera', msg)
+
     def cb_coag(self, msg):
-        try:
-            self.bag_sim.write('/dvrk/footpedals/coag', msg)
-            self.bag_hw.write('/dvrk/footpedals/coag', msg)
-        except Exception:
-            print("there was an error")
+        self.cb_generic('/dvrk/footpedals/coag', msg)
     
     def cb_MTML(self, msg):
         self.cb('MTML', msg)
@@ -747,23 +756,12 @@ class bag_writer:
     def cb_ECM(self, msg):
         self.cb('ECM', msg)
 
-    def run_once(f):
-        def wrapper(*args, **kwargs):
-            if not wrapper.has_run:
-                wrapper.has_run = True
-                return_value = f(*args, **kwargs)
-                wrapper.has_run = False
-                return return_value
-        wrapper.has_run = False
-        return wrapper
-    
-    @run_once                    
     def cb(self,arm_name, msg):
-        try:
-            self.bag_sim.write(self.out_topics_sim[arm_name], msg) # record the msg
-            self.bag_hw.write(self.out_topics_hw[arm_name], msg) # record the msg
-        except Exception:
-            print("there was an error") 
+#         try:
+        self.cb_generic(self.out_topics_sim[arm_name], msg) # record the msg
+#             self.bag_hw.write(self.out_topics_hw[arm_name], msg) # record the msg
+#         except Exception as e:
+#             print("there was an error in {}: {}".format(arm_name, e)) 
     
     # This is the destructor for this python class    
 #     def __del__(self):
