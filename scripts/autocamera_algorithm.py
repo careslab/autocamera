@@ -38,8 +38,10 @@ class Autocamera:
     def __init__(self):
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        
         self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
         self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
+        
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         

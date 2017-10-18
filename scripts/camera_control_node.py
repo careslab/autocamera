@@ -46,7 +46,7 @@ import rosbag
 from geometry_msgs.msg._Wrench import Wrench
 from sensor_msgs.msg._CompressedImage import CompressedImage
 
-
+import pexpect
 
     
 class Teleop_class:
@@ -662,6 +662,10 @@ class bag_writer:
         if not os.path.exists(dir):
             os.system( ('mkdir -p '+ dir ).__str__())
         
+        record_command = """/opt/ros/jade/bin/rosbag record /dvrk/MTML/state_joint_current /dvrk/MTMR/state_joint_current /dvrk/PSM1/state_joint_current /dvrk/PSM2/state_joint_current /dvrk/ECM/state_joint_current /dvrk/footpedals/clutch /dvrk/footpedals/camera /dvrk/footpedals/coag /usb_cam/image_raw/compressed  --lz4 -O {}""".format(dir + bag_name + '_sim.bag' )
+        print record_command
+        self.p = pexpect.spawn( record_command)
+        return
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
 #         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
 #         self.bag_hw.compression=rosbag.Compression.BZ2
@@ -697,6 +701,10 @@ class bag_writer:
     
     def shutdown(self):
         # unregister all subscribers
+        self.p.sendcontrol('c')
+        self.p.close()
+        print('recording finished')
+        return
         for arm_name in self.arm_names:
             eval("self.sub_{}.unregister()".format(arm_name))
             rospy.timer.sleep(.1)
@@ -712,6 +720,7 @@ class bag_writer:
         
         
     def spin(self):
+        self.p.wait()
         rospy.spin()
     
     def run_once(f):
@@ -1933,6 +1942,7 @@ class Oculus:
             
     def ecm_cb(self, message):
         pass
+
 class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     
     class node_name:
