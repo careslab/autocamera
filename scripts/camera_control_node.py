@@ -666,7 +666,7 @@ class bag_writer:
 #         self.bag_hw = rosbag.Bag(dir + bag_name + '_hw.bag', 'w')
 #         self.bag_hw.compression=rosbag.Compression.BZ2
         self.bag_sim.compression=rosbag.Compression.BZ2
-        self.bag_sim.chunk_threshold=60000000
+        self.bag_sim.chunk_threshold=6000000
 #         self.bag_hw.chunk_threshold=60000000
         
         self.arm_names = arm_names
