@@ -701,6 +701,7 @@ class bag_writer:
     
     def shutdown(self):
         # unregister all subscribers
+        self.p.sendcontrol('c')
         self.p.sendintr()
         self.p.close()
         print('recording finished')
