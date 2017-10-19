@@ -2256,7 +2256,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             folder_name = "subject" + str(self.spinBoxSubjectNumber.text())
             number = 1
             if os.path.exists('{}/'.format(self.recording_dir)+folder_name):
-                number = 1+len(os.listdir('{}/{}'.format(self.recording_dir, folder_name)))/2;
+                number = 1+len(os.listdir('{}/{}'.format(self.recording_dir, folder_name)));
                 subject_number = len(os.listdir(self.recording_dir)) 
                 self.spinBoxSubjectNumber
                 self.labelSubjectInfo.setText('Task # ' + str(number))
