@@ -92,6 +92,7 @@ class Teleop_class:
         self.T_mtmr_000 = None
         self.arms_homed = False
         self.__paused__ = False
+        self.__reenable_teleop__ = False
         
         from autocamera_algorithm import Autocamera
         from visualization_msgs.msg import Marker
@@ -265,6 +266,10 @@ class Teleop_class:
 #         self.lock_mtmr_psm1_orientation.publish(Bool(False))
         
     def disable_teleop(self):
+        self.last_mtml_gripper = self.mtml_gripper
+        self.last_mtmr_gripper = self.mtmr_gripper
+        
+        self.__reenable_teleop__ = False
         self.__enabled__ = False
         self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
         self.hw_mtml.set_gravity_compensation(False)
@@ -321,8 +326,8 @@ class Teleop_class:
             
         elif self.clutch_active == True:
             self.clutch_active = False
+            self.__reenable_teleop__ = False
             self.enable_teleop()
-             
             
             
             
@@ -366,6 +371,8 @@ class Teleop_class:
     
     def mtml_gripper_cb(self, msg):
         self.mtml_gripper = msg.data
+        
+                
     def mtmr_gripper_cb(self, msg):
         self.mtmr_gripper = msg.data
                 
