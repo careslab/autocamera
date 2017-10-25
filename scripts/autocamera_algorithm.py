@@ -181,9 +181,9 @@ class Autocamera:
     def point_towards_midpoint(self, clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose, cam_info):
         diff = clean_joints['psm1'].position[2] - clean_joints['psm2'].position[2]
         mid_point = None 
-        if diff < 0:
+        if diff > 0:
             mid_point = (psm1_pos * (1+numpy.abs(diff)/1) + psm2_pos)/2
-        elif diff > 0:
+        elif diff < 0:
             mid_point = (psm1_pos + psm2_pos * (1+numpy.abs(diff)/1) )/2
         else:
             mid_point = (psm1_pos + psm2_pos)/2
