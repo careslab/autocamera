@@ -178,8 +178,14 @@ class Autocamera:
         vis_pub.publish(marker)
         
     
-    def point_towards_midpoint(self, clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose):
-        mid_point = (psm1_pos + psm2_pos)/2
+    def point_towards_midpoint(self, clean_joints, psm1_pos, psm2_pos, key_hole,ecm_pose, cam_info):
+        diff = clean_joints['psm1'].position[2] - clean_joints['psm2'].position[2] 
+        if diff > 0:
+            mid_point = (psm1_pos * np.abs(diff) + psm2_pos)/2
+        elif diff < 0:
+            mid_point = (psm1_pos + psm2_pos * np.abs(diff))/2
+        l1,l2,lm, r1,r2,rm = self.find_2d_tool_coordinates_in_3d(cam_info, clean_joints)
+        
         if self.last_midpoint == None:
             self.last_midpoint = mid_point
 
@@ -232,6 +238,57 @@ class Autocamera:
         
         self.last_midpoint = mid_point
         return output_msg
+    
+    def find_2d_tool_coordinates_in_3d(self, cam_info, clean_joints):
+        if cam_info != None:
+            psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-5].name)
+            T1W = psm1_kin_to_wrist.forward(clean_joints['psm1'].position)
+            
+            psm2_kin_to_wrist = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-5].name)
+            T2W = psm2_kin_to_wrist.forward(clean_joints['psm2'].position)
+            
+            TEW = self.ecm_kin.forward(clean_joints['ecm'].position)
+            TEW_inv = numpy.linalg.inv(TEW)
+            T1W_inv = numpy.linalg.inv(T1W)
+            T2W_inv = numpy.linalg.inv(T2W)
+            
+            mid_point = (T1W[0:4,3] + T2W[0:4,3])/2
+            p1 = T1W[0:4,3]
+            p2 = T2W[0:4,3]
+            
+            T2E = TEW_inv * T2W
+    
+    #         ig = image_geometry.PinholeCameraModel()
+            ig = image_geometry.StereoCameraModel()
+            
+            ig.fromCameraInfo(cam_info['right'], cam_info['left'])
+            
+            # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+            # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+            r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+            r_inv = numpy.linalg.inv(r);
+            
+#             r = numpy.linalg.inv(r)
+            self.logerror( r.__str__())
+            
+#             rotate_vector = lambda x: (r * numpy.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
+             
+            l1, r1 = ig.project3dToPixel( ( r_inv * TEW_inv * T1W )[0:3,3]) # tool1 left and right pixel positions
+            l2, r2 = ig.project3dToPixel( ( r_inv * TEW_inv * T2W )[0:3,3]) # tool2 left and right pixel positions
+            lm, rm = ig.project3dToPixel( ( r_inv * TEW_inv * mid_point)[0:3,0]) # midpoint left and right pixel positions
+    #         add_100 = lambda x : (x[0] *.5 + cam_info.width/2, x[1])
+    #         l1 = add_100(l1)
+    #         l2 = add_100(l2)
+    #         lm = add_100(lm)
+    
+            self.zoom_level_positions = {'l1':l1, 'r1':r1, 'l2':l2, 'r2':r2, 'lm':lm, 'rm':rm}    
+
+            test1_l, test1_r = ig.project3dToPixel( [1,0,0])
+            test2_l, test2_r = ig.project3dToPixel( [0,0,1])
+            self.logerror('\ntest1_l = ' + test1_l.__str__() + '\ntest2_l = ' + test2_l.__str__() )
+            mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
+            
+        return l1,l2,lm, r1,r2,rm   
     
     def zoom_fitness(self, cam_info, mid_point, inner_margin, deadzone_margin, tool_point):
         x = cam_info.width; y = cam_info.height
@@ -392,7 +449,7 @@ class Autocamera:
     #     rospy.logerr('psm1 gripper = ' + joint['psm1'].position[-1].__str__() + 'gripper = ' + gripper.__str__())
         
         if gripper == gripper or gripper != gripper: # luke was here
-            output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose)
+            output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose, cam_info)
 #             output_msg.position =list( numpy.array(output_msg.position) + ( -numpy.array(output_msg.position)+ numpy.array(goal_joints.position)) *.0001)
             output_msg = self.find_zoom_level(output_msg, cam_info, clean_joints)
             pass
