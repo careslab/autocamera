@@ -48,7 +48,7 @@ def compute_fk(name):
         data = []
         for angles in ecm_joint_angles:
             T_rene_condom = np.eye(4)
-            T_rene_condom[2,3] = 0.034
+            T_rene_condom[2,3] = 0.034  # Should probably be closer to [0.0192, 0.0193] m
             T = ecm_kin.forward( angles) * T_rene_condom    
             xyz = T[0:3,3]
             data.append(xyz)
