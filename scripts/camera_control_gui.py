@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Wed Oct 11 15:47:03 2017
+# Created: Fri Oct 27 16:27:53 2017
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -119,6 +119,9 @@ class Ui_Dialog(object):
         self.spinBoxPatternNumber.setMinimum(1)
         self.spinBoxPatternNumber.setMaximum(5)
         self.spinBoxPatternNumber.setObjectName(_fromUtf8("spinBoxPatternNumber"))
+        self.labelTimer = QtGui.QLabel(Dialog)
+        self.labelTimer.setGeometry(QtCore.QRect(159, 485, 66, 17))
+        self.labelTimer.setObjectName(_fromUtf8("labelTimer"))
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -147,4 +150,5 @@ class Ui_Dialog(object):
         self.pushButtonRecord.setText(_translate("Dialog", "Record", None))
         self.labelSubjectNumber.setText(_translate("Dialog", "Subject Number", None))
         self.labelPatternNumber.setText(_translate("Dialog", "Pattern Number", None))
+        self.labelTimer.setText(_translate("Dialog", "0:0:0", None))
 

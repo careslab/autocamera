@@ -27,7 +27,7 @@ from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 import sensor_msgs
 import time
 from PyQt4.QtGui import *
-from PyQt4.QtCore import pyqtSlot, SIGNAL
+from PyQt4.QtCore import pyqtSlot, SIGNAL, pyqtSignal
 import threading
 from PyQt4.QtCore import QThread
 from PyQt4.QtCore import Qt
@@ -47,7 +47,8 @@ from geometry_msgs.msg._Wrench import Wrench
 from sensor_msgs.msg._CompressedImage import CompressedImage
 
 import pexpect
-
+import time
+from time import strptime
     
 class Teleop_class:
     class MODE:
@@ -2082,7 +2083,25 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             if self.node_handler != None:
                 self.node_handler.shutdown()
                 self.quit()
-                
+    
+    class thread_timer(QThread):
+        trigger = pyqtSignal(int)
+        
+        def __init__(self, parent=None):
+            super(QThread, self).__init__(parent)
+    
+        def setup(self, thread_no):
+            self.thread_no = thread_no
+    
+        def run(self):
+            while True:
+                time.sleep(1)  # random sleep to imitate working
+                self.trigger.emit(self.thread_no)
+        def kill(self):
+            self.trigger.disconnect()
+            self.quit()
+
+            
     """
         thread_home_arms:
                 This thread sets the PSM base frames so the MTM's and PSM's align correctly.
@@ -2257,6 +2276,8 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         except Exception:
             pass
     
+    
+        
     @pyqtSlot()
     def on_record(self):
         if self.recording == False:
@@ -2283,6 +2304,16 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             
             self.bag_writer = self.thread_bag_writer(arm_names, file_name, recording_dir=rdir, mode=self.MODE.hardware)
             self.bag_writer.start()
+            
+            self.recording_start_time = time.time()
+            
+            
+            
+                
+            self.timer_thread = self.thread_timer(self)
+            self.timer_thread.setup(0)
+            self.timer_thread.trigger.connect(self.update_timer)
+            self.timer_thread.start()
         else:
             self.recording = False
             self.pushButtonRecord.setStyleSheet("background-color: ")
@@ -2290,7 +2321,19 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.bag_writer.kill()
             self.spinBoxSubjectNumber.setEnabled(True)
             self.spinBoxPatternNumber.setEnabled(True)
+            self.timer_thread.kill()
+            self.labelTimer.setStyleSheet("color: black")
+            
+    
+    @pyqtSlot(int)            
+    def update_timer(self, thread_no):
+        import datetime
         
+        s = int(time.time() - self.recording_start_time)
+        m, s = divmod(s, 60)
+        h, m = divmod(m, 60)
+        self.labelTimer.setText( '{}:{}:{}'.format(h,m,s))
+        self.labelTimer.setStyleSheet("color: red")
     
     @pyqtSlot()
     def horizontalSliderInnerzoneCb(self):

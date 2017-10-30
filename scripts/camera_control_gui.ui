@@ -388,6 +388,19 @@
     <number>5</number>
    </property>
   </widget>
+  <widget class="QLabel" name="labelTimer">
+   <property name="geometry">
+    <rect>
+     <x>159</x>
+     <y>485</y>
+     <width>66</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>0:0:0</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>
