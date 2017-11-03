@@ -1678,6 +1678,9 @@ class Joystick:
         simulation = "SIMULATION"
         hardware = "HARDWARE"
         
+    RAKE_CONTROL = "RAKE_CONTROL"
+    ABSOLUTE_CONTROL = "ABSOLUTE_CONTROL"
+    
     def __init__(self, mode = MODE.simulation):        
         self.__mode__ = mode
         self.joint_angles = []
@@ -1685,6 +1688,7 @@ class Joystick:
         self.joystick_at_zero = True
         self.movement_scale = .2 
         self.last_z = 0
+        self.control_mode = self.ABSOLUTE_CONTROL 
         
     def __init_nodes__(self):
         self.hw_ecm = robot("ECM")
@@ -1785,8 +1789,14 @@ class Joystick:
         q = self.joint_angles
         if q:
             q = list(q)
-            q[0] += .4 * movement_vector[0] * self.movement_scale
-            q[1] += .08 * movement_vector[1] * self.movement_scale
+            if self.control_mode == self.RAKE_CONTROL:
+                q[0] += .4 * movement_vector[0] * self.movement_scale
+                q[1] += .08 * movement_vector[1] * self.movement_scale
+            
+            elif self.control_mode == self.ABSOLUTE_CONTROL:
+                q[0] = 1.0 * movement_vector[0] * self.movement_scale
+                q[1] = 1.0 * movement_vector[1] * self.movement_scale
+                
             q = [round(i,4) for i in q]
             q = [i+j for i,j in zip(self.center, q)]
 #             self.move_ecm(q)
