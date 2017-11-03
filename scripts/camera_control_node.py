@@ -671,7 +671,7 @@ class bag_writer:
         if not os.path.exists(dir):
             os.system( ('mkdir -p '+ dir ).__str__())
         
-        record_command = """rosbag record /dvrk/MTML/state_joint_current /dvrk/MTMR/state_joint_current /dvrk/PSM1/state_joint_current /dvrk/PSM2/state_joint_current /dvrk/ECM/state_joint_current /dvrk/footpedals/clutch /dvrk/footpedals/camera /dvrk/footpedals/coag /camera1/usb_cam_left/image_raw/compressed /camera2/usb_cam_right/image_raw/compressed  --lz4 -O {}""".format(dir + bag_name + '_sim.bag' )
+        record_command = """rosbag record /dvrk/MTML/state_joint_current /dvrk/MTMR/state_joint_current /dvrk/PSM1/state_joint_current /dvrk/PSM2/state_joint_current /dvrk/ECM/state_joint_current /dvrk/footpedals/clutch /dvrk/footpedals/camera /dvrk/footpedals/coag /joy /camera1/usb_cam_left/image_raw/compressed /camera2/usb_cam_right/image_raw/compressed  --lz4 --duration=600 -O {}""".format(dir + bag_name + '_sim.bag' )
         print record_command
         self.p = pexpect.spawn( record_command)
         return
