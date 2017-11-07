@@ -203,6 +203,9 @@ class Teleop_class:
         if r_psm1 * r_psm2 * r_mtml * r_mtmr:
             self.arms_homed = True
                 
+    def shutdown(self):
+        self.shut_down()
+        
     def shut_down(self):
         self.sub_mtml.unregister()
         self.sub_mtmr.unregister()
@@ -942,7 +945,7 @@ class Autocamera_node_handler:
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 self.sub_psm1_sim.unregister()
                 self.sub_psm2_sim.unregister()
-                self.sub_ecm_sim.unregister()
+            self.sub_ecm_sim.unregister()
             self.sub_psm1_hw.unregister()
             self.sub_psm2_hw.unregister()
             self.sub_caminfo.unregister()
@@ -2376,6 +2379,20 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonRecord.setEnabled(True)
         self.spinBoxSubjectNumber.setEnabled(True)
         self.spinBoxPatternNumber.setEnabled(True)
+        
+        if self.thread is not None:
+            self.thread.kill()
+        if self.thread_tel is not None:
+            self.thread_tel.kill()
+        if self.homing_thread is not None:
+            self.homing_thread.kill()
+        
+        super(camera_qt_gui, self).__init__(None)
+        self.setupUi(self)
+#         
+        self.thread = None
+        self.thread_tel = None
+        self.homing_thread = None
         
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
