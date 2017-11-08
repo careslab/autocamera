@@ -185,6 +185,11 @@ class Teleop_class:
             self.enable_teleop()
 
     
+    
+    def rehome(self):
+        self.arms_homed = False
+        self.home_arms()
+        
     def home_arms(self):
         if self.arms_homed :
             return
@@ -2004,6 +2009,10 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.node_handler.shutdown()
                 self.quit()
                 
+        def home(self):
+            print('Teleop homing')
+            self.node_handler.rehome()
+            
         def pause(self):
             self.node_handler.pause()
         def resume(self):
@@ -2125,101 +2134,19 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         def __init__(self):
             super(QThread, self).__init__()
             self.is_running = True
+            self.ecm = robot('ECM')
             
         def run(self):
-            self.counter = 100
-            psm1 = robot('PSM1')
-            psm2 = robot('PSM2')
-            ecm = robot('ECM')
-            mtml = robot('MTML')
-            mtmr = robot('MTMR')
-            psm1.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
-            psm2.move_joint_list([0.0, 0.0, 0.0, 0.0], [3,4,5,6], interpolate=True)
+            self.home()
             
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.set_base_frames)
+        def home(self):
+            r = self.ecm.move_joint_list([0.0,0.0,0.0,0.0],[0,1,2,3], interpolate=True)
             
-            
-#             mtml.move_joint_list([-1.57],[3], interpolate=True)
-#             mtmr.move_joint_list([1.57],[3], interpolate=True)
-            
-            ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
-            
-#             self.set_base_frames()
-            
-            self.is_running = False
             
         def kill(self):
-            if self.is_running == False:
-                self.quit()
-                        
-        def set_base_frames(self, msg):
-            return
-            print('set_base_frames', msg.position)
-            if msg.position and self.counter > 0:
-                self.counter -= 1
-                q = msg.position
-                
-                self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-                self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
-                self.ecm_base = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[3].name)
-                
-                self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-                self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[1].name)
-                
-                self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
-                self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[1].name)
-                
-                self.pub_psm1 = rospy.Publisher('/dvrk/PSM1/set_base_frame', Pose, queue_size=10)
-                self.pub_psm2 = rospy.Publisher('/dvrk/PSM2/set_base_frame', Pose, queue_size=10)
-            
-                ecm_ee = self.ecm_kin.forward(q)
-                ecm_base_frame = self.ecm_base.forward([]) 
-                
-                r_180_x = self.rotate('x', np.pi)
-                r_90_z = self.rotate('z', -np.pi/2)
-                
-                ecm_ee[0:3,0:3] = ecm_ee[0:3,0:3] * r_90_z * r_180_x
-                
-                print("joint_angles " + q.__str__())
-                print('ecm_ee' + ecm_ee.__str__())
-                print('ecm_base' + ecm_base_frame.__str__())
-                
-                psm1_base_frame =  (ecm_ee ** -1) * self.psm1_kin.forward([]) 
-                psm1_message = pose_converter.PoseConv.to_pose_msg(psm1_base_frame)
-                psm1_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm1_base_frame)
-            
-                psm2_base_frame = (ecm_ee ** -1) * self.psm2_kin.forward([])
-                psm2_message = pose_converter.PoseConv.to_pose_msg(psm2_base_frame)
-                psm2_message_stamped = pose_converter.PoseConv.to_pose_stamped_msg(psm2_base_frame)
-                
-                for _ in range(1,10):
-                    self.pub_psm1.publish(psm1_message)
-                    self.pub_psm2.publish(psm2_message)
-    #             ecm_message = pose_converter.PoseConv.to_pose_msg(ecm_base_frame)
-            else:
-                self.sub_ecm.unregister()
-                self.pub_psm1.unregister()
-                self.pub_psm2.unregister()
-            
-        def rotate(self, axis, angle):
-            """
-            Returns a rotation matrix
-                axis : 'x','y' or 'z'
-                angle : In radians
-            """
-            c = np.cos(angle)
-            s = np.sin(angle)
-            
-            m = np.eye(3)
-            
-            if axis.lower() == 'x':
-                m[1:,1:] = np.matrix( [ [c,-s], [s,c]])
-            elif axis.lower() == 'z':
-                m[:2,:2] = np.matrix( [ [c,-s], [s,c]])
-            elif axis.lower() == 'y':
-                m[0,0] = c; m[0,2] = s; m[2,0] = -s; m[2,2] = c;
-                
-            return m
+#             if self.is_running == False:
+            self.quit()
+            self.ecm.unregister()
     
     class run_dvrk_console(QThread):
         def run(self):
@@ -2248,6 +2175,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonHome.clicked.connect(self.home)
         self.pushButtonPowerOn.clicked.connect(self.power_on)
         self.pushButtonPowerOff.clicked.connect(self.power_off)
+        self.pushButtonReset.clicked.connect(self.reset)
         self.pushButtonExit.clicked.connect(self.exit_program)
         
         self.radioButtonTeleop.clicked.connect(self.on_teleop_select)
@@ -2268,6 +2196,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonHome.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(False)
         self.pushButtonRecord.setEnabled(False)
+        self.pushButtonReset.setEnabled(False)
         self.spinBoxSubjectNumber.setEnabled(False)
         self.spinBoxPatternNumber.setEnabled(False)
         self.groupBoxOperationMode.setEnabled(False)
@@ -2377,25 +2306,14 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.groupBoxOperationMode.setEnabled(True)
         self.groupBoxCameraControlMethod.setEnabled(True)
         self.pushButtonRecord.setEnabled(True)
+        self.pushButtonReset.setEnabled(True)
         self.spinBoxSubjectNumber.setEnabled(True)
         self.spinBoxPatternNumber.setEnabled(True)
         
-        if self.thread is not None:
-            self.thread.kill()
-        if self.thread_tel is not None:
-            self.thread_tel.kill()
-        if self.homing_thread is not None:
-            self.homing_thread.kill()
-        
-        super(camera_qt_gui, self).__init__(None)
-        self.setupUi(self)
-#         
-        self.thread = None
-        self.thread_tel = None
-        self.homing_thread = None
-        
         self.homing_thread = self.thread_home_arms()
         self.homing_thread.start()
+        self.homing_thread.home()
+        
 
     @pyqtSlot()
     def power_on(self):
@@ -2403,12 +2321,14 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonExit.setEnabled(False)
         self.pushButtonPowerOff.setEnabled(True)
         self.pushButtonPowerOn.setEnabled(False)
-
+        self.pushButtonReset.setEnabled(True)
+        
         rospy.Publisher('/dvrk/console/home', Empty, latch=True, queue_size=1).publish()
     
     @pyqtSlot()
     def power_off(self):
         self.pushButtonHome.setEnabled(False)
+        self.pushButtonReset.setEnabled(False)
         self.pushButtonExit.setEnabled(True)
         self.pushButtonPowerOff.setEnabled(False)
         self.pushButtonPowerOn.setEnabled(True)
@@ -2417,6 +2337,26 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         
         rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish(Empty())
                 
+    @pyqtSlot()
+    def reset(self):
+        self.radioButtonTeleop.setChecked(True)
+        
+        if self.thread is not None:
+            self.thread.kill()
+        if self.thread_tel is not None:
+            self.thread_tel.home()
+        else:
+            self.thread_tel = self.start_node_handler(self.node_name.teleop)
+            self.thread_tel.start()
+        if self.homing_thread is not None:
+            self.homing_thread.home()
+        else:
+            self.home()
+        
+        self.thread = None
+        
+        
+        
     @pyqtSlot()
     def exit_program(self):
         rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish()
