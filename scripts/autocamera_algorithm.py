@@ -350,7 +350,7 @@ class Autocamera:
             self.zones_times['outer_zone'] = 0
             self.zones_times['inner_zone'] = 0
             return 0
-    
+        return 0
     
     
     def unrectify_point(self, point, camera):
