@@ -325,24 +325,30 @@ class Autocamera:
         dist = lambda a,b : norm( [i-j for i,j in zip(a,b)] )
     
         self.logerror(dist(tool_point, tool_point2))
+        now = time.time()
+        
+        zoom_time_threshold = .5
+        midpoint_time_flag = 1
         
         if self.last_midpoint is None:
             self.last_midpoint = mid_point
         else:
-#             print (numpy.abs(numpy.linalg.norm(mid_point) - numpy.linalg.norm(self.last_midpoint) ))
-            if numpy.abs(numpy.linalg.norm(mid_point) - numpy.linalg.norm(self.last_midpoint) ) < .1:
-                pass
+#             print ( "midpoint difference = " )
+#             print( (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 ) 
+            if (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 < .2:
+                if now - self.midpoint_time > zoom_time_threshold:
+                    midpoint_time_flag = 1
             else:
                 self.last_midpoint = mid_point
-                self.midpoint_time = time.time()
+                self.midpoint_time = now
+                midpoint_time_flag = 0
                 
         
-        zoom_time_threshold = .5
         # Inner zone
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
             # return positive value
             if self.zones_times['inner_zone'] > 0:
-                if (time.time() - self.zones_times['inner_zone'] > zoom_time_threshold) and (time.time() - self.midpoint_time ) > zoom_time_threshold:
+                if (now - self.zones_times['inner_zone'] > zoom_time_threshold) and midpoint_time_flag:
                     return 0.0005 # in meters
             else:
                 self.zones_times['inner_zone'] = time.time()
@@ -351,7 +357,7 @@ class Autocamera:
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
             if self.zones_times['outer_zone'] > 0:
-                if (time.time() - self.zones_times['outer_zone']) > zoom_time_threshold and (time.time() - self.midpoint_time ) > zoom_time_threshold:
+                if (now - self.zones_times['outer_zone']) > zoom_time_threshold and midpoint_time_flag:
                     return -0.0005 # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
@@ -448,6 +454,8 @@ class Autocamera:
             mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
                                             tool_point2=l2, radius=self.zoom_innerzone_radius, deadzone_radius=self.zoom_deadzone_radius)
+            
+            print("zoom_percentage = {} ".format(zoom_percentage))
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00
