@@ -325,11 +325,12 @@ class Autocamera:
     
         self.logerror(dist(tool_point, tool_point2))
         
+        zoom_time_threshold = .5
         # Inner zone
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
             # return positive value
             if self.zones_times['inner_zone'] > 0:
-                if time.time() - self.zones_times['inner_zone'] > 2:
+                if time.time() - self.zones_times['inner_zone'] > zoom_time_threshold:
                     return 0.0005 # in meters
             else:
                 self.zones_times['inner_zone'] = time.time()
@@ -338,7 +339,7 @@ class Autocamera:
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
             if self.zones_times['outer_zone'] > 0:
-                if time.time() - self.zones_times['outer_zone'] > 2:
+                if time.time() - self.zones_times['outer_zone'] > zoom_time_threshold:
                     return -0.0005 # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
