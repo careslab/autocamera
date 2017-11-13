@@ -47,6 +47,7 @@ class Autocamera:
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         
         self.last_midpoint = None
+        self.midpoint_time = 0
         self.pan_tilt_deadzone_radius = .001
         
         self.zoom_deadzone_radius = .2
@@ -192,8 +193,8 @@ class Autocamera:
 #             
 #         l1,l2,lm, r1,r2,rm = self.find_2d_tool_coordinates_in_3d(cam_info, clean_joints)
         
-        if self.last_midpoint == None:
-            self.last_midpoint = mid_point
+#         if self.last_midpoint == None:
+#             self.last_midpoint = mid_point
 
         
 #         if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
@@ -242,7 +243,7 @@ class Autocamera:
         else:
             print("Autocamera Inverse Failure ")
         
-        self.last_midpoint = mid_point
+#         self.last_midpoint = mid_point
         return output_msg
     
     def find_2d_tool_coordinates_in_3d(self, cam_info, clean_joints):
@@ -325,12 +326,23 @@ class Autocamera:
     
         self.logerror(dist(tool_point, tool_point2))
         
+        if self.last_midpoint is None:
+            self.last_midpoint = mid_point
+        else:
+#             print (numpy.abs(numpy.linalg.norm(mid_point) - numpy.linalg.norm(self.last_midpoint) ))
+            if numpy.abs(numpy.linalg.norm(mid_point) - numpy.linalg.norm(self.last_midpoint) ) < .1:
+                pass
+            else:
+                self.last_midpoint = mid_point
+                self.midpoint_time = time.time()
+                
+        
         zoom_time_threshold = .5
         # Inner zone
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
             # return positive value
             if self.zones_times['inner_zone'] > 0:
-                if time.time() - self.zones_times['inner_zone'] > zoom_time_threshold:
+                if (time.time() - self.zones_times['inner_zone'] > zoom_time_threshold) and (time.time() - self.midpoint_time ) > zoom_time_threshold:
                     return 0.0005 # in meters
             else:
                 self.zones_times['inner_zone'] = time.time()
@@ -339,7 +351,7 @@ class Autocamera:
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
             if self.zones_times['outer_zone'] > 0:
-                if time.time() - self.zones_times['outer_zone'] > zoom_time_threshold:
+                if (time.time() - self.zones_times['outer_zone']) > zoom_time_threshold and (time.time() - self.midpoint_time ) > zoom_time_threshold:
                     return -0.0005 # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
