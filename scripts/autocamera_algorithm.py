@@ -328,7 +328,7 @@ class Autocamera:
         now = time.time()
         
         zoom_time_threshold = .5
-        midpoint_time_flag = 1
+        midpoint_time_flag = 0
         
         if self.last_midpoint is None:
             self.last_midpoint = mid_point
@@ -338,6 +338,8 @@ class Autocamera:
             if (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 < .01:
                 if now - self.midpoint_time > zoom_time_threshold:
                     midpoint_time_flag = 1
+                else:
+                    midpoint_time_flag = 0
             else:
                 self.last_midpoint = mid_point
                 self.midpoint_time = now
