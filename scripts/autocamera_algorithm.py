@@ -355,6 +355,7 @@ class Autocamera:
                     return -0.0005 # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
+                self.midpoint_time = time.time()
                 self.zones_times['inner_zone'] = 0
                 
 #         elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
