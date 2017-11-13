@@ -335,7 +335,7 @@ class Autocamera:
         else:
 #             print ( "midpoint difference = " )
 #             print( (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 ) 
-            if (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 < .2:
+            if (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 < .1:
                 if now - self.midpoint_time > zoom_time_threshold:
                     midpoint_time_flag = 1
             else:
