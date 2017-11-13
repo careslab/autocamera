@@ -31,6 +31,7 @@ from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
+import time
 
 class Autocamera:
     DEBUG = False # Print debug messages?
@@ -50,6 +51,7 @@ class Autocamera:
         
         self.zoom_deadzone_radius = .2
         self.zoom_innerzone_radius = .1
+        self.zones_times = {'inner_zone':0, 'outer_zone':0} # Keep track of how long the tools are in each of these 2 zones
         
         self.zoom_level_positions = {'l1':None, 'r1':None, 'l2':None, 'r2':None, 'lm':None, 'rm':None}
         self.logerror("autocamera_initialized")
@@ -323,16 +325,30 @@ class Autocamera:
     
         self.logerror(dist(tool_point, tool_point2))
         
-        
-        if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point > r
+        # Inner zone
+        if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
             # return positive value
-            return 0.0005 # in meters 
+            if self.zones_times['inner_zone'] > 0:
+                if time.time() - self.zones_times['inner_zone'] > 2:
+                    return 0.0005 # in meters
+            else:
+                self.zones_times['inner_zone'] = time.time()
+                self.zones_times['outer_zone'] = 0
+        # Outer zone 
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
-            return -0.0005
+            if self.zones_times['outer_zone'] > 0:
+                if time.time() - self.zones_times['outer_zone'] > 2:
+                    return -0.0005 # in meters
+            else:
+                self.zones_times['outer_zone'] = time.time()
+                self.zones_times['inner_zone'] = 0
+                
 #         elif not tool_in_view(tool_point, 20) or not tool_in_view(tool_point2, 20):
 #             return -0.001
-        else:
+        else: # Dead zone
+            self.zones_times['outer_zone'] = 0
+            self.zones_times['inner_zone'] = 0
             return 0
     
     
