@@ -46,6 +46,10 @@ class Autocamera:
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
         
+        
+        self.tool_timer = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
+        
+        
         self.last_midpoint = None
         self.midpoint_time = 0
         self.pan_tilt_deadzone_radius = .001
@@ -326,31 +330,18 @@ class Autocamera:
     
         self.logerror(dist(tool_point, tool_point2))
         now = time.time()
-        
         zoom_time_threshold = .5
-        midpoint_time_flag = 0
         
-        if self.last_midpoint is None:
-            self.last_midpoint = mid_point
-        else:
-#             print ( "midpoint difference = " )
-#             print( (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 ) 
-            if (mid_point[0]  - self.last_midpoint[0])**2 + (mid_point[1] - self.last_midpoint[1])**2 < .01:
-                if now - self.midpoint_time > zoom_time_threshold:
-                    midpoint_time_flag = 1
-                else:
-                    midpoint_time_flag = 0
-            else:
-                self.last_midpoint = mid_point
-                self.midpoint_time = now
-                midpoint_time_flag = 0
-                
+        tools_are_stationary = False
+        
+        if self.tool_timer['psm1_stationary_duration'] > zoom_time_threshold and self.tool_timer['psm2_stationary_duration'] > zoom_time_threshold:
+            tools_are_stationary = True     
         
         # Inner zone
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
             # return positive value
             if self.zones_times['inner_zone'] > 0:
-                if (now - self.zones_times['inner_zone'] > zoom_time_threshold) and midpoint_time_flag:
+                if (now - self.zones_times['inner_zone'] > zoom_time_threshold) and tools_are_stationary:
                     return 0.0005 # in meters
             else:
                 self.zones_times['inner_zone'] = time.time()
@@ -359,7 +350,7 @@ class Autocamera:
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
             # return a negative value
             if self.zones_times['outer_zone'] > 0:
-                if (now - self.zones_times['outer_zone']) > zoom_time_threshold and midpoint_time_flag:
+                if (now - self.zones_times['outer_zone']) > zoom_time_threshold and tools_are_stationary:
                     return -0.0005 # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
@@ -465,6 +456,33 @@ class Autocamera:
                 msg.position[2] = .15
         return msg   
     
+    
+    def track_tool_times(self, joints):
+        if self.tool_timer['last_psm1_pos'] is None:
+            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+            self.tool_timer['psm1_stay_start_time'] = time.time()
+        else:
+            # If the tool has moved
+            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <0.001):
+                self.tool_timer['psm1_stay_start_time'] = time.time()
+                self.tool_timer['psm1_stationary_duration'] = 0
+            else: # If the tool hasn't moved
+                self.tool_timer['psm1_stationary_duration'] = time.time() - self.tool_timer['psm1_stay_start_time']
+            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+                
+        if self.tool_timer['last_psm2_pos'] is None:
+            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
+            self.tool_timer['psm2_stay_start_time'] = time.time()
+        else:
+            # If the tool has moved
+            print('some number = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position))))
+            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <0.001):
+                self.tool_timer['psm2_stay_start_time'] = time.time()
+                self.tool_timer['psm2_stationary_duration'] = 0
+            else: # If the tool hasn't moved
+                self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
+            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
+    
     def compute_viewangle(self, joint, cam_info):
         kinematics = lambda name: self.psm1_kin if name == 'psm1' else self.psm2_kin if name == 'psm2' else self.ecm_kin 
         clean_joints = {}
@@ -491,6 +509,9 @@ class Autocamera:
         
         gripper= max( [ abs(joint['psm1'].position[-1]), abs(joint['psm2'].position[-1])] ) < math.pi/8
     #     rospy.logerr('psm1 gripper = ' + joint['psm1'].position[-1].__str__() + 'gripper = ' + gripper.__str__())
+        
+        # Track when the tools are stationary
+        self.track_tool_times(clean_joints)
         
         if gripper == gripper or gripper != gripper: # luke was here
             output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose, cam_info)
