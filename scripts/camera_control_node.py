@@ -847,6 +847,7 @@ class Autocamera_node_handler:
         self.last_ecm_jnt_pos = None
         
         self.first_run = True
+        self.headsensor_active = False
         
         # For forward and inverse kinematics
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
@@ -909,7 +910,8 @@ class Autocamera_node_handler:
             # Get the joint angles from the hardware and move the simulation from hardware
             self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.add_psm1_jnt, queue_size=1, tcp_nodelay=True)
             self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.add_psm2_jnt, queue_size=1, tcp_nodelay=True)
-            
+            # subscribe to head sensor
+            self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
             
         elif self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
             # Get the joint angles from the simulation
@@ -1085,7 +1087,13 @@ class Autocamera_node_handler:
         
         self.pub_ecm.publish(new_ecm_msg)
         
-        
+    
+    def headsensor_cb(self, msg):
+        if msg.buttons[0] == 1:
+            self.headsensor_active = True
+        else:
+            self.headsensor_active = False 
+           
     def camera_clutch_cb(self, msg):
         self.camera_clutch_pressed = msg.data
         self.logerror('Camera Clutch : ' + self.camera_clutch_pressed.__str__())
@@ -1172,6 +1180,8 @@ class Autocamera_node_handler:
                 
     def add_jnt(self, name, msg):
         self.joint_angles[name] = msg
+        if self.headsensor_active == False:
+            return
         if not None in self.joint_angles.values():
             if self.initialize_psms_initialized>0 and self.__AUTOCAMERA_MODE__ == self.MODE.simulation:        
                 self.initialize_psms()
