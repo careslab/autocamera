@@ -45,7 +45,7 @@ class Autocamera:
         
         self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
-        
+        self.zoom_percentage = 1
         
         self.tool_timer = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
         
@@ -330,7 +330,7 @@ class Autocamera:
     
         self.logerror(dist(tool_point, tool_point2))
         now = time.time()
-        zoom_time_threshold = .5
+        zoom_time_threshold = .3
         
         tools_are_stationary = False
         
@@ -447,7 +447,7 @@ class Autocamera:
             mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
                                             tool_point2=l2, radius=self.zoom_innerzone_radius, deadzone_radius=self.zoom_deadzone_radius)
-            
+            self.zoom_percentage = zoom_percentage
             print("zoom_percentage = {} ".format(zoom_percentage))
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
@@ -458,12 +458,18 @@ class Autocamera:
     
     
     def track_tool_times(self, joints):
+        tool_movement_threshold = 0.001
+        if self.zoom_percentage != 0:
+            tool_movement_threshold = 0.005
+            
         if self.tool_timer['last_psm1_pos'] is None:
             self.tool_timer['last_psm1_pos'] = joints['psm1'].position
             self.tool_timer['psm1_stay_start_time'] = time.time()
         else:
+            if self.zoom_percentage == 0:
+                print('psm1 difference = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position))))
             # If the tool has moved
-            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <0.002):
+            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <tool_movement_threshold):
                 self.tool_timer['psm1_stay_start_time'] = time.time()
                 self.tool_timer['psm1_stationary_duration'] = 0
             else: # If the tool hasn't moved
@@ -475,8 +481,9 @@ class Autocamera:
             self.tool_timer['psm2_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            print('some number = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position))))
-            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <0.002):
+            if self.zoom_percentage == 0:
+                print('psm2 difference = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position))))
+            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <tool_movement_threshold):
                 self.tool_timer['psm2_stay_start_time'] = time.time()
                 self.tool_timer['psm2_stationary_duration'] = 0
             else: # If the tool hasn't moved
