@@ -390,10 +390,10 @@ class Autocamera:
                  
     def find_zoom_level(self, msg, cam_info, clean_joints):
         if cam_info != None:
-            psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-5].name)
+            psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
             T1W = psm1_kin_to_wrist.forward(clean_joints['psm1'].position)
             
-            psm2_kin_to_wrist = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-5].name)
+            psm2_kin_to_wrist = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
             T2W = psm2_kin_to_wrist.forward(clean_joints['psm2'].position)
             
             TEW = self.ecm_kin.forward(clean_joints['ecm'].position)
@@ -463,7 +463,7 @@ class Autocamera:
             self.tool_timer['psm1_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <0.001):
+            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <0.002):
                 self.tool_timer['psm1_stay_start_time'] = time.time()
                 self.tool_timer['psm1_stationary_duration'] = 0
             else: # If the tool hasn't moved
@@ -476,7 +476,7 @@ class Autocamera:
         else:
             # If the tool has moved
             print('some number = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position))))
-            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <0.001):
+            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <0.002):
                 self.tool_timer['psm2_stay_start_time'] = time.time()
                 self.tool_timer['psm2_stationary_duration'] = 0
             else: # If the tool hasn't moved
