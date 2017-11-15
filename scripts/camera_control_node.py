@@ -910,6 +910,8 @@ class Autocamera_node_handler:
             # Get the joint angles from the hardware and move the simulation from hardware
             self.sub_psm1_hw = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.add_psm1_jnt, queue_size=1, tcp_nodelay=True)
             self.sub_psm2_hw = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.add_psm2_jnt, queue_size=1, tcp_nodelay=True)
+            self.sub_ecm_sim = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb_hw, queue_size=1, tcp_nodelay=True)
+            
             # subscribe to head sensor
             self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
             
@@ -1133,6 +1135,11 @@ class Autocamera_node_handler:
         self.hw_psm2.move_joint_list(msg.position, interpolate=False)
     
     # ecm callback    
+    
+    def ecm_cb_hw(self, msg):
+        msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+        self.pub_ecm.publish(msg)
+        
     def add_ecm_jnt(self, msg):
         if self.camera_clutch_pressed == False and msg != None:
             if self.__MOVE_ECM_WITH_SLIDERS__ == False:
@@ -1188,22 +1195,39 @@ class Autocamera_node_handler:
                 time.sleep(.01)
                 self.initialize_psms_initialized -= 1
             try:
+                old_zoom = self.joint_angles['ecm'].position[-2]
                 jnt_msg = 'error'
                 jnt_msg = self.autocamera.compute_viewangle(self.joint_angles, self.cam_info)
                 
-                self.pub_ecm.publish(jnt_msg)
+#                 self.pub_ecm.publish(jnt_msg)
                 
                 jnt_msg.position = [ round(i,4) for i in jnt_msg.position]
                 if len(jnt_msg.position) != 4 or len(jnt_msg.name) != 4 :
                     return
                 #return # stop here until we co-register the arms
                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
-                    pos = jnt_msg.position
-#                     if self.first_run:
-#                         result = self.hw_ecm.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
-#                     else:
-#                     pos = jnt_msg.position[0:2] + [jnt_msg.position[3]]
-                    result = self.hw_ecm.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
+                    pos = list(jnt_msg.position)
+                    result = False
+                    if self.first_run:
+                        result = self.hw_ecm.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
+                    else:
+                        new_zoom = pos[2]
+                        u = (old_zoom + new_zoom)/2.0
+#                         del pos[2]
+                        
+                        # Move everything besides the zoom
+                        result = self.hw_ecm.move_joint_list(pos, index=[0,1,2,3], interpolate=self.first_run)
+                        
+#                         x = np.arange(old_zoom, new_zoom, np.sign(new_zoom - old_zoom) * 0.00001)
+#                         y = ( (1/np.sqrt(2*np.pi))*np.e**((-((x-u)**2)/2)))
+#                         y2 = y - y[0]
+#                         x2 = x + y2
+#                         print('old_zoom = {}\nnew_zoom = {}\nx={}\ny={}\n'.format(old_zoom, new_zoom, x2,y2))
+#                         print('len(y) = {}'.format(len(y2)))
+#                         for z in x:
+#                             z = float(z)
+#                             r = self.hw_ecm.move_joint_list([z], index = [2], interpolate=False)
+#                             print('r = {}'.format(r))
 #                     pos = [jnt_msg.position[2]]
 #                     result= self.hw_ecm.move_joint_list(pos, index=[2], interpolate=self.first_run)
                     # Interpolate the insertion joint individually and the rest without interpolation

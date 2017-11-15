@@ -339,19 +339,21 @@ class Autocamera:
         
         # Inner zone
         if dist(tool_point, mid_point) < abs(r): # the tool's distance from the mid_point < r
+            d =  abs(r) - dist(tool_point, mid_point)
             # return positive value
             if self.zones_times['inner_zone'] > 0:
                 if (now - self.zones_times['inner_zone'] > zoom_time_threshold) and tools_are_stationary:
-                    return 0.0005 # in meters
+                    return 0.001 # * d/abs(r) # in meters
             else:
                 self.zones_times['inner_zone'] = time.time()
                 self.zones_times['outer_zone'] = 0
         # Outer zone 
         elif dist(tool_point, mid_point) > abs(r + dr): #  the tool's distance from the mid_point < r
+            d = dist(tool_point, mid_point) - abs(r + dr)
             # return a negative value
             if self.zones_times['outer_zone'] > 0:
                 if (now - self.zones_times['outer_zone']) > zoom_time_threshold and tools_are_stationary:
-                    return -0.0005 # in meters
+                    return -0.001 # * d/abs(dr) # in meters
             else:
                 self.zones_times['outer_zone'] = time.time()
                 self.midpoint_time = time.time()
@@ -466,8 +468,6 @@ class Autocamera:
             self.tool_timer['last_psm1_pos'] = joints['psm1'].position
             self.tool_timer['psm1_stay_start_time'] = time.time()
         else:
-            if self.zoom_percentage == 0:
-                print('psm1 difference = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position))))
             # If the tool has moved
             if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <tool_movement_threshold):
                 self.tool_timer['psm1_stay_start_time'] = time.time()
@@ -481,8 +481,6 @@ class Autocamera:
             self.tool_timer['psm2_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if self.zoom_percentage == 0:
-                print('psm2 difference = {}\n'.format(numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position))))
             if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <tool_movement_threshold):
                 self.tool_timer['psm2_stay_start_time'] = time.time()
                 self.tool_timer['psm2_stationary_duration'] = 0
