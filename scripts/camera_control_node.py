@@ -914,8 +914,8 @@ class Autocamera_node_handler:
             self.sub_ecm_sim = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb_hw, queue_size=1, tcp_nodelay=True)
             
             # subscribe to head sensor
-            self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
-            self.sub_repositioning_clutch_cb = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.repositioning_clutch_cb , queue_size=1, tcp_nodelay=True)
+            self.sub_headsensor = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
+            self.sub_repositioning_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.repositioning_clutch_cb , queue_size=1, tcp_nodelay=True)
             
         elif self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
             # Get the joint angles from the simulation
@@ -952,10 +952,13 @@ class Autocamera_node_handler:
             if self.__DEBUG_GRAPHICS__ == True:
                 self.sub_fake_image_left.unregister()
                 self.sub_fake_image_right.unregister()
-                
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 self.sub_psm1_sim.unregister()
                 self.sub_psm2_sim.unregister()
+            if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
+                self.sub_headsensor.unregister()
+                self.sub_repositioning_clutch.unregister()
+            
             self.sub_ecm_sim.unregister()
             self.sub_psm1_hw.unregister()
             self.sub_psm2_hw.unregister()
