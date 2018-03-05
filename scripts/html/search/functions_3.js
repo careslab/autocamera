@@ -1,0 +1,11 @@
+var searchData=
+[
+  ['get_5fcurrent_5fcartesian_5fposition',['get_current_cartesian_position',['../classarm_1_1arm.html#ac893260c5e3edc669db9c4b8658f41b5',1,'arm.arm.get_current_cartesian_position()'],['../classrobot_1_1robot.html#a24d47d697c485ec681cea22d1b5d2eef',1,'robot.robot.get_current_cartesian_position()']]],
+  ['get_5fcurrent_5fjoint_5feffort',['get_current_joint_effort',['../classarm_1_1arm.html#ae735b4510a3ef3a27b354a6d569907a6',1,'arm.arm.get_current_joint_effort()'],['../classrobot_1_1robot.html#a69ee320aa8bd577693a86dc57edbe88d',1,'robot.robot.get_current_joint_effort()']]],
+  ['get_5fcurrent_5fjoint_5fposition',['get_current_joint_position',['../classarm_1_1arm.html#a7bea36edebe3da880a74ec93143a6c75',1,'arm.arm.get_current_joint_position()'],['../classrobot_1_1robot.html#a65a10aad3fb07d7b740c5aeb6a98f4fe',1,'robot.robot.get_current_joint_position()']]],
+  ['get_5fcurrent_5fjoint_5fvelocity',['get_current_joint_velocity',['../classarm_1_1arm.html#a0bd1909fb2e302139bf0e4fac8ae456a',1,'arm.arm.get_current_joint_velocity()'],['../classrobot_1_1robot.html#a3f936417edb192eea87094cf4f1ebf81',1,'robot.robot.get_current_joint_velocity()']]],
+  ['get_5fdesired_5fcartesian_5fposition',['get_desired_cartesian_position',['../classarm_1_1arm.html#ab1b18a438ae056c2ba3e845ec2d5216d',1,'arm.arm.get_desired_cartesian_position()'],['../classrobot_1_1robot.html#a6c1363d7ee90df1bd551d21c4bf85405',1,'robot.robot.get_desired_cartesian_position()']]],
+  ['get_5fdesired_5fjoint_5feffort',['get_desired_joint_effort',['../classarm_1_1arm.html#a6f56c0ea86dbc842477a68d1da2ac8f6',1,'arm.arm.get_desired_joint_effort()'],['../classrobot_1_1robot.html#acb3f4d16c51d3285750c6b102f435ecd',1,'robot.robot.get_desired_joint_effort()']]],
+  ['get_5fdesired_5fjoint_5fposition',['get_desired_joint_position',['../classarm_1_1arm.html#a690f5778bad590b39daa32676bbf3182',1,'arm.arm.get_desired_joint_position()'],['../classrobot_1_1robot.html#a8ad506ad78ebcbf8537d68acd3221d46',1,'robot.robot.get_desired_joint_position()']]],
+  ['get_5fjoint_5fnumber',['get_joint_number',['../classarm_1_1arm.html#ae80a7d886ac4ea721b4f5df9154f71e4',1,'arm.arm.get_joint_number()'],['../classrobot_1_1robot.html#a3381917875e5eb4a2580f89d30a29048',1,'robot.robot.get_joint_number()']]]
+];

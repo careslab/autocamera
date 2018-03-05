@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+@package camera_control_node.py
+
+This file contains a GUI made using PyQt. This is used to power the system on, 
+home the arms, switch between simulation and hardware and choose a camera control 
+method. It also provides the capability to record all the movements.
+"""
+
 import sys
 import rospy
 from autocamera_algorithm import Autocamera
@@ -61,125 +69,137 @@ class Teleop_class:
         simulation = "SIMULATION"
         hardware = "HARDWARE"
         
+    # @param mode hardware or simulation mode
+    #  @param self The object pointer.
     def __init__(self, mode = MODE.simulation):
+        """!
+        Initialize the parameters for the Teleop_class
+        @param mode : hardwre or simulation mode
+        """
+        
         self.__mode__ = mode
+        
+        ## The scale of movements from MTMs to PSMs
         self.scale = 0.5
+        
         self.__enabled__ = False
-        self.clutch_active = False
+        self.__clutch_active__ = False
          
-        self.last_mtml_pos = None
-        self.last_mtml_rot = None
-        self.last_mtmr_pos = None
-        self.last_mtmr_rot = None
+        self.__last_mtml_pos__ = None
+        self.__last_mtml_rot__ = None
+        self.__last_mtmr_pos__ = None
+        self.__last_mtmr_rot__ = None
     
-        self.last_good_psm1_transform = None
-        self.last_good_psm2_transform = None
+        self.__last_good_psm1_transform__ = None
+        self.__last_good_psm2_transform__ = None
         
-        self.mtml_gripper = None
-        self.mtmr_gripper = None
+        self.__mtml_gripper__ = None
+        self.__mtmr_gripper__ = None
         
-        self.last_psm1_jnt = None
-        self.last_psm2_jnt = None
+        self.__last_psm1_jnt__ = None
+        self.__last_psm2_jnt__ = None
         
-        self.last_ecm_jnt = None
+        self.__last_ecm_jnt__ = None
         
-        self.first_mtml_pos = None
-        self.first_mtmr_pos = None
-        self.first_psm1_pos = None
-        self.first_psm2_pos = None
+        self.__first_mtml_pos__ = None
+        self.__first_mtmr_pos__ = None
+        self.__first_psm1_pos__ = None
+        self.__first_psm2_pos__ = None
         
-        self.T_ecm = None
-        self.T_mtml_000 = None
-        self.T_mtmr_000 = None
-        self.arms_homed = False
+        self.__T_ecm__ = None
+        self.__T_mtml_000__ = None
+        self.__T_mtmr_000__ = None
+        self.__arms_homed__ = False
         self.__paused__ = False
         self.__reenable_teleop__ = False
         
-        from autocamera_algorithm import Autocamera
-        from visualization_msgs.msg import Marker
-        self.autocamera = Autocamera()
+#         from autocamera_algorithm import Autocamera
+#         from visualization_msgs.msg import Marker
+#         self.autocamera = Autocamera()
         
         
     def __init__nodes(self):
-        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
-        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
-        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
-        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        """!
+        Initialize the ros publishers and subscribers
+        """
         
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
-        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
-        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        self.__mtml_robot__ = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.__mtmr_robot__ = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.__psm2_robot__ = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        self.__psm1_robot__ = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        
+        self.__mtml_kin__ = KDLKinematics(self.__mtml_robot__, self.__mtml_robot__.links[0].name, self.__mtml_robot__.links[-1].name)
+        self.__mtmr_kin__ = KDLKinematics(self.__mtmr_robot__, self.__mtmr_robot__.links[0].name, self.__mtmr_robot__.links[-1].name)
+        self.__psm1_kin__ = KDLKinematics(self.__psm1_robot__, self.__psm1_robot__.links[0].name, self.__psm1_robot__.links[-1].name)
+        self.__psm2_kin__ = KDLKinematics(self.__psm2_robot__, self.__psm2_robot__.links[0].name, self.__psm2_robot__.links[-1].name)
+        self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
     
         # Subscribe to MTMs
-        self.sub_mtml = None; self.sub_mtmr = None
+        self.__sub_mtml__ = None; self.__sub_mtmr__ = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_mtml = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_mtmr = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtml__ = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtmr__ = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
         elif self.__mode__ == self.MODE.hardware:
-            self.sub_mtml = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_mtmr = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtml__ = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.mtml_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtmr__ = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.mtmr_cb, queue_size=1, tcp_nodelay=True)
         
         # subscribe to head sensor
-        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
+        self.__sub_headsensor__ = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb , queue_size=1, tcp_nodelay=True)
         
         # Subscribe to PSMs
-        self.sub_psm1 = None; self.sub_psm2 = None
+        self.__sub_psm1__ = None; self.__sub_psm2__ = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_psm1 = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_psm2 = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_psm1__ = rospy.Subscriber('/dvrk_psm1/joint_states', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_psm2__ = rospy.Subscriber('/dvrk_psm2/joint_states', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
         else:
-            self.sub_psm1 = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_psm2 = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_mtml_gripper = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.mtml_gripper_cb, queue_size=1, tcp_nodelay=True)
-            self.sub_mtmr_gripper = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.mtmr_gripper_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_psm1__ = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_psm2__ = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtml_gripper__ = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.mtml_gripper_cb, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtmr_gripper__ = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.mtmr_gripper_cb, queue_size=1, tcp_nodelay=True)
             
         # MTM repositioning clutch
-        self.sub_clutch = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.clutch_cb, queue_size=1, tcp_nodelay=True)
+        self.__sub_clutch__ = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.clutch_cb, queue_size=1, tcp_nodelay=True)
             
         # Publish to PSMs simulation
-        self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
-        self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
+        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
+        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
         
         # Publish to MTMs simulation
-        self.pub_mtml = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
-        self.pub_mtmr = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=1)
+        self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
+        self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=1)
         
         # Translation and orientation lock
-        self.lock_mtml_psm2_orientation = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
-        self.lock_mtml_psm2_translation = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
+        self.__lock_mtml_psm2_orientation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
+        self.__lock_mtml_psm2_translation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
         
-        self.lock_mtmr_psm1_orientation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
-        self.lock_mtmr_psm1_translation = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
+        self.__lock_mtmr_psm1_orientation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
+        self.__lock_mtmr_psm1_translation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
 
         # MTML lock orientation
-        self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
-        self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+        self.__pub_lock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
+        self.__pub_lock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
         
-        self.pub_unlock_mtml_orientation = rospy.Publisher('/dvrk/MTML/unlock_orientation', Empty, latch=True, queue_size = 1)
-        self.pub_unlock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/unlock_orientation', Empty, latch=True, queue_size = 1)
+        self.__pub_unlock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/unlock_orientation', Empty, latch=True, queue_size = 1)
+        self.__pub_unlock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/unlock_orientation', Empty, latch=True, queue_size = 1)
         
-        self.pub_mtmr_psm1_teleop = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
-        self.pub_mtml_psm2_teleop = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
+        self.__pub_mtmr_psm1_teleop__ = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
+        self.__pub_mtml_psm2_teleop__ = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
         
         # Wrist Adjustments
-        self.mtml_wrist_adjustment = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True)
-        self.mtmr_wrist_adjustment = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True)
+        self.__mtml_wrist_adjustment__ = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True)
+        self.__mtmr_wrist_adjustment__ = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True)
         
         # Access psm hardware
-        self.hw_psm1 = robot('PSM1')
-        self.hw_psm2 = robot('PSM2')
+        self.__hw_psm1__ = robot('PSM1')
+        self.__hw_psm2__ = robot('PSM2')
         
         # Access mtm hardware
-        self.hw_mtml = robot('MTML')
-        self.hw_mtmr = robot('MTMR')
-        
-        
+        self.__hw_mtml__ = robot('MTML')
+        self.__hw_mtmr__ = robot('MTMR')
         
         if self.__mode__ == self.MODE.simulation:
             self.enable_teleop()
@@ -187,57 +207,74 @@ class Teleop_class:
     
     
     def rehome(self):
-        self.arms_homed = False
+        """!
+        Home all the arms again
+        """
+        self.__arms_homed__ = False
         self.home_arms()
         
     def home_arms(self):
-        if self.arms_homed :
+        """!
+        Move the psms and mtms to a preferred initial position
+        """
+        
+        if self.__arms_homed__ :
             return
-        # move the psms and mtms to a preferred initial position
         
         q_psm1 = [0.12544035007602872, 0.2371651265674347, 0.13711766733000003, 0.8391791538250665, -0.12269957678936552, -0.14898520116918784, -0.17461480669754448]
         q_psm2 = [-0.01502071544036667, -0.050506672997428295, 0.14912649789000001, -0.9888977734730169, -0.18391272868428285, -0.05774053780206659, -0.17461480669754453]
         q_mtml = [0.0867019358531589, 0.008250772814637434, 0.1410445179152299, -1.498627346290218, 0.0740159621884837, -0.15691383983958546, 0.00592127680054577, 0.0]
         q_mtmr = [0.13146490673506123, -0.06150289811827064, 0.16527587983749847, 1.5291786517226071, 0.28422129480377745, 0.14211064740188872, 0.05329149120491193, 0.0]
         
-        r_psm1 = self.hw_psm1.move_joint_list(q_psm1, interpolate=True)
-        r_psm2 = self.hw_psm2.move_joint_list(q_psm2, interpolate=True)
-        r_mtml = self.hw_mtml.move_joint_list( q_mtml, interpolate=True)
-        r_mtmr = self.hw_mtmr.move_joint_list(q_mtmr, interpolate=True)
+        r_psm1 = self.__hw_psm1__.move_joint_list(q_psm1, interpolate=True)
+        r_psm2 = self.__hw_psm2__.move_joint_list(q_psm2, interpolate=True)
+        r_mtml = self.__hw_mtml__.move_joint_list( q_mtml, interpolate=True)
+        r_mtmr = self.__hw_mtmr__.move_joint_list(q_mtmr, interpolate=True)
         
         if r_psm1 * r_psm2 * r_mtml * r_mtmr:
-            self.arms_homed = True
+            self.__arms_homed__ = True
                 
     def shutdown(self):
+        """!
+        Unregister all the ros publishers and subscribers
+        """
         self.shut_down()
         
     def shut_down(self):
-        self.sub_mtml.unregister()
-        self.sub_mtmr.unregister()
-        self.sub_psm1.unregister()
-        self.sub_psm2.unregister()
-        self.sub_ecm.unregister()
-        self.sub_headsensor_cb.unregister()
-        self.sub_clutch.unregister()
-        self.sub_mtml_gripper.unregister()
-        self.sub_mtmr_gripper.unregister()
+        """!
+        Same as shutdown
+        """
         
-        self.pub_psm1.unregister()
-        self.pub_psm2.unregister()
-        self.pub_mtml.unregister()
-        self.pub_mtmr.unregister()
-        self.pub_lock_mtml_orientation.unregister()
-        self.pub_lock_mtmr_orientation.unregister()
-        self.pub_unlock_mtml_orientation.unregister()
-        self.pub_unlock_mtmr_orientation.unregister()
+        self.__sub_mtml__.unregister()
+        self.__sub_mtmr__.unregister()
+        self.__sub_psm1__.unregister()
+        self.__sub_psm2__.unregister()
+        self.__sub_ecm__.unregister()
+        self.__sub_headsensor__.unregister()
+        self.__sub_clutch__.unregister()
+        self.__sub_mtml_gripper__.unregister()
+        self.__sub_mtmr_gripper__.unregister()
         
-        self.hw_mtml.unregister()
-        self.hw_mtmr.unregister()
-        self.hw_psm1.unregister()
-        self.hw_psm2.unregister()
+        self.__pub_psm1__.unregister()
+        self.__pub_psm2__.unregister()
+        self.__pub_mtml__.unregister()
+        self.__pub_mtmr__.unregister()
+        self.__pub_lock_mtml_orientation__.unregister()
+        self.__pub_lock_mtmr_orientation__.unregister()
+        self.__pub_unlock_mtml_orientation__.unregister()
+        self.__pub_unlock_mtmr_orientation__.unregister()
+        
+        self.__hw_mtml__.unregister()
+        self.__hw_mtmr__.unregister()
+        self.__hw_psm1__.unregister()
+        self.__hw_psm2__.unregister()
         
     
     def set_mode(self, mode):
+        """!
+        Set the operation mode to either simulation or hardware
+        @param mode : MODE.simulation or MODE.hardware
+        """
         self.__mode__ = mode
         
     def spin(self):
@@ -245,57 +282,70 @@ class Teleop_class:
         rospy.spin()
         
     def pause(self):
+        """!
+        Pause the teleoperation
+        """
         self.__enabled__ = False
+        
     def resume(self):
+        """!
+        Resume the teleopration
+        """
         self.__enabled__ = True
                 
     def enable_teleop(self):
+        """!
+        Enable teleoperation
+        """
         self.__enabled__ = True
         
-        self.first_mtml_pos = self.last_mtml_pos
-        self.first_mtmr_pos = self.last_mtmr_pos
-        self.first_psm1_pos, _ = self.psm1_kin.FK( self.last_psm1_jnt)
-        self.first_psm2_pos, _ = self.psm2_kin.FK( self.last_psm2_jnt)
+        self.__first_mtml_pos__ = self.__last_mtml_pos__
+        self.__first_mtmr_pos__ = self.__last_mtmr_pos__
+        self.__first_psm1_pos__, _ = self.__psm1_kin__.FK( self.__last_psm1_jnt__)
+        self.__first_psm2_pos__, _ = self.__psm2_kin__.FK( self.__last_psm2_jnt__)
         
-        self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-        self.hw_mtml.set_wrench_body_force([0,0,0])
-        self.hw_mtml.set_gravity_compensation(True)
+        self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.__hw_mtml__.set_wrench_body_force([0,0,0])
+        self.__hw_mtml__.set_gravity_compensation(True)
         
-        self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-        self.hw_mtmr.set_wrench_body_force([0,0,0])
-        self.hw_mtmr.set_gravity_compensation(True)
+        self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.__hw_mtmr__.set_wrench_body_force([0,0,0])
+        self.__hw_mtmr__.set_gravity_compensation(True)
         
         
 #         self.align_mtms_to_psms()
         
-#         self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-#         self.lock_mtml_psm2_translation.publish(Bool(False))
-#         self.lock_mtml_psm2_orientation.publish(Bool(False))
-#         self.lock_mtmr_psm1_translation.publish(Bool(False))
-#         self.lock_mtmr_psm1_orientation.publish(Bool(False))
+#         self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+#         self.__lock_mtml_psm2_translation__.publish(Bool(False))
+#         self.__lock_mtml_psm2_orientation__.publish(Bool(False))
+#         self.__lock_mtmr_psm1_translation__.publish(Bool(False))
+#         self.__lock_mtmr_psm1_orientation__.publish(Bool(False))
         
     def disable_teleop(self):
-        self.last_mtml_gripper = self.mtml_gripper
-        self.last_mtmr_gripper = self.mtmr_gripper
+        """!
+        Disable teleoperation
+        """
+        self.__last_mtml_gripper__ = self.__mtml_gripper__
+        self.__last_mtmr_gripper__ = self.__mtmr_gripper__
         
         self.__reenable_teleop__ = False
         self.__enabled__ = False
-        self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-        self.hw_mtml.set_gravity_compensation(False)
+        self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.__hw_mtml__.set_gravity_compensation(False)
         
-        self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-        self.hw_mtmr.set_gravity_compensation(False)
+        self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.__hw_mtmr__.set_gravity_compensation(False)
         
-#         self.lock_mtml_psm2_translation.publish(Bool(True))
-#         self.lock_mtml_psm2_orientation.publish(Bool(True))
-#         self.lock_mtmr_psm1_translation.publish(Bool(True))
-#         self.lock_mtmr_psm1_orientation.publish(Bool(True))
+#         self.__lock_mtml_psm2_translation__.publish(Bool(True))
+#         self.__lock_mtml_psm2_orientation__.publish(Bool(True))
+#         self.__lock_mtmr_psm1_translation__.publish(Bool(True))
+#         self.__lock_mtmr_psm1_orientation__.publish(Bool(True))
     
     def rotate(self, axis, angle):
-        """
+        """!
         Returns a rotation matrix and a transformation matrix
-            axis : 'x','y' or 'z'
-            angle : In radians
+            @param axis : 'x','y' or 'z'
+            @param angle : In radians
         """
         c = np.cos(angle)
         s = np.sin(angle)
@@ -314,27 +364,30 @@ class Teleop_class:
 
     
     def lock_mtm_orientations(self):
-        mtml_pose = self.mtml_kin.forward(self.last_mtml_jnt)
-        mtmr_pose = self.mtmr_kin.forward(self.last_mtmr_jnt)
+        """!
+        Lock the orientations of MTMs
+        """
+        mtml_pose = self.__mtml_kin__.forward(self.__last_mtml_jnt__)
+        mtmr_pose = self.__mtmr_kin__.forward(self.__last_mtmr_jnt__)
         mtml_quat = pose_converter.PoseConv.to_pos_quat(mtml_pose)
         mtmr_quat = pose_converter.PoseConv.to_pos_quat(mtmr_pose)
 #              
         ql = Quaternion(); ql.w, ql.x, ql.y, ql.z = mtml_quat[1]
         qr = Quaternion(); qr.w, qr.x, qr.y, qr.z = mtmr_quat[1]
          
-        self.pub_lock_mtml_orientation.publish(ql)
-        self.pub_lock_mtmr_orientation.publish(qr)
+        self.__pub_lock_mtml_orientation__.publish(ql)
+        self.__pub_lock_mtmr_orientation__.publish(qr)
         
     def clutch_cb(self, msg):
         if msg.buttons[0] == 1 and self.__enabled__:
-            if self.clutch_active == False:
-                self.clutch_active = True
+            if self.__clutch_active__ == False:
+                self.__clutch_active__ = True
                 self.disable_teleop()
             
             self.lock_mtm_orientations()
             
-        elif self.clutch_active == True:
-            self.clutch_active = False
+        elif self.__clutch_active__ == True:
+            self.__clutch_active__ = False
             self.__reenable_teleop__ = False
             self.enable_teleop()
             
@@ -349,11 +402,11 @@ class Teleop_class:
             
     def ecm_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
-            self.last_ecm_jnt = msg.position[0:2] + msg.position[-2:]
+            self.__last_ecm_jnt__ = msg.position[0:2] + msg.position[-2:]
         elif self.__mode__ == self.MODE.hardware:
-            self.last_ecm_jnt = msg.position[0:3] + tuple([0])
+            self.__last_ecm_jnt__ = msg.position[0:3] + tuple([0])
         
-        self.T_ecm = self.ecm_kin.forward(self.last_ecm_jnt)
+        self.__T_ecm__ = self.__ecm_kin__.forward(self.__last_ecm_jnt__)
           
     def psm1_cb(self, msg):
         if self.__mode__ == self.MODE.simulation:
@@ -361,9 +414,9 @@ class Teleop_class:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        self.last_psm1_jnt = msg.position[0:-1]
+        self.__last_psm1_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
-            self.pub_psm1.publish(msg)
+            self.__pub_psm1__.publish(msg)
             
             
         
@@ -373,24 +426,24 @@ class Teleop_class:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        self.last_psm2_jnt = msg.position[0:-1]
+        self.__last_psm2_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
-            self.pub_psm2.publish(msg)
+            self.__pub_psm2__.publish(msg)
             
     
     def mtml_gripper_cb(self, msg):
-        self.mtml_gripper = msg.data
+        self.__mtml_gripper__ = msg.data
         
                 
     def mtmr_gripper_cb(self, msg):
-        self.mtmr_gripper = msg.data
+        self.__mtmr_gripper__ = msg.data
                 
     def mtml_cb(self, msg):
         # Find mtm end effector position and orientation
         self.home_arms()
 #         self.align_mtms_to_psms()
         
-        if self.last_ecm_jnt == None: return
+        if self.__last_ecm_jnt__ == None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
@@ -399,18 +452,18 @@ class Teleop_class:
             msg.name = msg.name[0:-1]
 #         msg.position = [.8 * i for i in msg.position]
         
-        self.last_mtml_jnt = msg.position
+        self.__last_mtml_jnt__ = msg.position
         
-        if self.T_mtml_000 == None :
-            self.T_mtml_000 = self.mtml_kin.forward(msg.position)
+        if self.__T_mtml_000__ == None :
+            self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
 
         # These rotations help the robot move better
         _, r_330_y_t = self.rotate('y', -np.pi/6.0)
         _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
         _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
-        T_mtm = self.mtml_kin.forward(msg.position)
-        T = ( self.T_mtml_000**-1) * T_mtm 
+        T_mtm = self.__mtml_kin__.forward(msg.position)
+        T = ( self.__T_mtml_000__**-1) * T_mtm 
         T =  r_330_z_t * T * r_330_y_t * r_30_x_t
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
@@ -424,70 +477,68 @@ class Teleop_class:
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
-        if self.last_mtml_pos == None or self.clutch_active:
-            self.first_mtml_pos = pos
-            self.last_mtml_pos = pos
-            self.last_mtml_rot = rot
+        if self.__last_mtml_pos__ == None or self.__clutch_active__:
+            self.__first_mtml_pos__ = pos
+            self.__last_mtml_pos__ = pos
+            self.__last_mtml_rot__ = rot
             return
         
-        self.last_mtml_pos = pos
-        self.last_mtml_rot = rot
+        self.__last_mtml_pos__ = pos
+        self.__last_mtml_rot__ = rot
         
         if self.__enabled__ == False: return
-        self.mtml_wrist_adjustment.publish()
+        self.__mtml_wrist_adjustment__.publish()
         
-#         self.autocamera.add_marker(T, 'mtml_delta', scale= [.02,0,0], type=Marker.LINE_LIST, points=[self.first_mtml_pos, pos], frame = "left_wrist_roll_link")
-        
-        delta = pos - self.first_mtml_pos
+        delta = pos - self.__first_mtml_pos__
         delta = np.insert(delta, 3,1).transpose()
-        p0 = np.insert(self.first_mtml_pos, 3,1).reshape(4,1)
+        p0 = np.insert(self.__first_mtml_pos__, 3,1).reshape(4,1)
         p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         translation = (p1-p0)
-        translation = ( self.T_ecm * translation)[0:3]
+        translation = ( self.__T_ecm__ * translation)[0:3]
         
-        orientation = self.T_ecm[0:3,0:3] * rot
+        orientation = self.__T_ecm__[0:3,0:3] * rot
 
         T = self.translate_mtml(translation)
         T = self.set_orientation_mtml( orientation, T)
         
-        q = list(self.last_psm2_jnt)
+        q = list(self.__last_psm2_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
-        new_psm2_angles = self.psm2_kin.inverse(T, q)
+        new_psm2_angles = self.__psm2_kin__.inverse(T, q)
             
         
 #         if type(new_psm2_angles) == NoneType:
 #             print("Frozen, Translation = " + translation.__str__())
-# #             self.first_mtml_pos = self.last_mtml_pos
-#             T = self.set_orientation_mtml( self.last_good_psm2_transform[0:3,0:3] ) 
-#             new_psm2_angles = self.psm1_kin.inverse(T, q)
+# #             self.__first_mtml_pos__ = self.__last_mtml_pos__
+#             T = self.set_orientation_mtml( self.__last_good_psm2_transform__[0:3,0:3] ) 
+#             new_psm2_angles = self.__psm1_kin__.inverse(T, q)
             
         if type(new_psm2_angles) == NoneType:
-            self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-            self.hw_mtml.set_gravity_compensation(False)
-            self.pub_unlock_mtml_orientation.publish()
+            self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+            self.__hw_mtml__.set_gravity_compensation(False)
+            self.__pub_unlock_mtml_orientation__.publish()
             return
         else:
-            self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-            self.hw_mtml.set_wrench_body_force([0, 0, 0])
-            self.hw_mtml.set_gravity_compensation(True)
+            self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+            self.__hw_mtml__.set_wrench_body_force([0, 0, 0])
+            self.__hw_mtml__.set_gravity_compensation(True)
             
-        self.last_good_psm2_transform = T
+        self.__last_good_psm2_transform__ = T
         
         if self.__mode__ == self.MODE.hardware:
-            gripper = (self.mtml_gripper-.4) * 1.4/.6
+            gripper = (self.__mtml_gripper__-.4) * 1.4/.6
             new_psm2_angles = np.append(new_psm2_angles, gripper)
             
         if self.__mode__ == self.MODE.hardware:
-            self.hw_psm2.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
+            self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
         
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = new_psm2_angles.tolist()
             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-            self.pub_psm2.publish(msg)
+            self.__pub_psm2__.publish(msg)
             
         
         
@@ -495,7 +546,7 @@ class Teleop_class:
     
     def mtmr_cb(self, msg):
         # Find mtm end effector position and orientation
-        if self.last_ecm_jnt == None: return
+        if self.__last_ecm_jnt__ == None: return
         
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
@@ -505,19 +556,19 @@ class Teleop_class:
             msg.name = msg.name[0:-1]
 
 #         msg.position = [.8 * i for i in msg.position]
-        self.last_mtmr_jnt = msg.position
+        self.__last_mtmr_jnt__ = msg.position
         
-        if self.T_mtmr_000 == None :
-            self.T_mtmr_000 = self.T_mtml_000
+        if self.__T_mtmr_000__ == None :
+            self.__T_mtmr_000__ = self.__T_mtml_000__
         
         # These rotations help the robot move better
         _, r_330_y_t = self.rotate('y', -np.pi/6.0)
         _, r_330_z_t = self.rotate('z', -np.pi/6.0)
         _, r_330_x_t = self.rotate('x', -np.pi/6.0)
         
-        T_mtm = self.mtmr_kin.forward(msg.position)
+        T_mtm = self.__mtmr_kin__.forward(msg.position)
         
-        T = ( self.T_mtmr_000**-1) * T_mtm 
+        T = ( self.__T_mtmr_000__**-1) * T_mtm 
         T = r_330_z_t * T * r_330_y_t * r_330_x_t
         
         transform = np.matrix( [ [0,-1,0,0], 
@@ -530,87 +581,87 @@ class Teleop_class:
         pos = T[0:3,3]
         
         
-        if self.last_mtmr_pos == None  or self.clutch_active:
-            self.first_mtmr_pos = pos
-            self.last_mtmr_pos = pos
-            self.last_mtmr_rot = rot
+        if self.__last_mtmr_pos__ == None  or self.__clutch_active__:
+            self.__first_mtmr_pos__ = pos
+            self.__last_mtmr_pos__ = pos
+            self.__last_mtmr_rot__ = rot
             return
         
-        self.last_mtmr_pos = pos
-        self.last_mtmr_rot = rot
+        self.__last_mtmr_pos__ = pos
+        self.__last_mtmr_rot__ = rot
         
         if self.__enabled__ == False: return
         
-        self.mtmr_wrist_adjustment.publish()
+        self.__mtmr_wrist_adjustment__.publish()
         
-        delta = pos - self.first_mtmr_pos
+        delta = pos - self.__first_mtmr_pos__
         delta = np.insert(delta, 3,1).transpose()
-        p0 = np.insert(self.first_mtmr_pos, 3,1).reshape(4,1)
+        p0 = np.insert(self.__first_mtmr_pos__, 3,1).reshape(4,1)
         p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         translation = (p1-p0)
-        translation = ( self.T_ecm * translation)[0:3]
+        translation = ( self.__T_ecm__ * translation)[0:3]
         
-        orientation = self.T_ecm[0:3,0:3] * rot
+        orientation = self.__T_ecm__[0:3,0:3] * rot
         
         T = self.translate_mtmr(translation)
         T = self.set_orientation_mtmr(orientation, T)
         
-        q = list(self.last_psm1_jnt)
+        q = list(self.__last_psm1_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
-        new_psm1_angles = self.psm1_kin.inverse(T, q)
+        new_psm1_angles = self.__psm1_kin__.inverse(T, q)
         
 #         if type(new_psm1_angles) == NoneType:
-#             T[0:3, 0:3] = self.last_good_psm1_transform[0:3,0:3] 
-#             new_psm1_angles = self.psm1_kin.inverse(T, q)
+#             T[0:3, 0:3] = self.__last_good_psm1_transform__[0:3,0:3] 
+#             new_psm1_angles = self.__psm1_kin__.inverse(T, q)
             
         if type(new_psm1_angles) == NoneType:
-            self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-            self.hw_mtmr.set_gravity_compensation(False)
-            self.pub_unlock_mtmr_orientation.publish()
+            self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+            self.__hw_mtmr__.set_gravity_compensation(False)
+            self.__pub_unlock_mtmr_orientation__.publish()
             return
         else:
-            self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-            self.hw_mtmr.set_wrench_body_force([0, 0, 0])
-            self.hw_mtmr.set_gravity_compensation(True)
+            self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+            self.__hw_mtmr__.set_wrench_body_force([0, 0, 0])
+            self.__hw_mtmr__.set_gravity_compensation(True)
         
-#         self.last_good_psm1_transform = T
+#         self.__last_good_psm1_transform__ = T
         
         if self.__mode__ == self.MODE.hardware:
-            gripper = (self.mtmr_gripper-.4) * 1.2/.4
+            gripper = (self.__mtmr_gripper__-.4) * 1.2/.4
             new_psm1_angles = np.append(new_psm1_angles, gripper)
                 
         if self.__mode__ == self.MODE.hardware:
-            self.hw_psm1.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
+            self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
         
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = new_psm1_angles.tolist()
             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-            self.pub_psm1.publish(msg)
+            self.__pub_psm1__.publish(msg)
             
         
         
     
     def align_mtms_to_psms(self):
-        T_psm1 = self.psm1_kin.forward(self.last_psm1_jnt)
-        T_psm2 = self.psm2_kin.forward(self.last_psm2_jnt)
+        T_psm1 = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
+        T_psm2 = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
         
-        T_mtml = self.mtml_kin.forward(self.last_mtml_jnt)
-        T_mtmr = self.mtmr_kin.forward(self.last_mtmr_jnt)
-        T_mtml_000 = self.mtml_kin.forward([0,0,0,0,0,0,0])
+        T_mtml = self.__mtml_kin__.forward(self.__last_mtml_jnt__)
+        T_mtmr = self.__mtmr_kin__.forward(self.__last_mtmr_jnt__)
+        T_mtml_000 = self.__mtml_kin__.forward([0,0,0,0,0,0,0])
         
-        T_mtml[0:3,0:3] = (((self.T_ecm * (T_mtml_000 ** -1)) ** -1) * T_psm2)[0:3,0:3]
+        T_mtml[0:3,0:3] = (((self.__T_ecm__ * (T_mtml_000 ** -1)) ** -1) * T_psm2)[0:3,0:3]
         T_mtmr[0:3, 0:3] = T_psm1[0:3, 0:3]
         
-        jnt_mtml = self.mtml_kin.inverse(T_mtml)
-        jnt_mtmr = self.mtmr_kin.inverse(T_mtmr)
+        jnt_mtml = self.__mtml_kin__.inverse(T_mtml)
+        jnt_mtmr = self.__mtmr_kin__.inverse(T_mtmr)
         print('aligning')
         if self.__mode__ == self.MODE.hardware:
-            self.hw_mtml.move_joint_list( jnt_mtml.tolist(), range(0, len(jnt_mtml)), interpolate=True)
-            self.hw_mtmr.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolate=True)
+            self.__hw_mtml__.move_joint_list( jnt_mtml.tolist(), range(0, len(jnt_mtml)), interpolate=True)
+            self.__hw_mtmr__.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolate=True)
             
         
         
@@ -618,9 +669,9 @@ class Teleop_class:
         if self.__enabled__ == False: return
         
         translation = translation * self.scale
-        psm2_pos = self.first_psm2_pos#self.psm2_kin.FK(self.last_psm2_jnt)
+        psm2_pos = self.__first_psm2_pos__#self.__psm2_kin__.FK(self.__last_psm2_jnt__)
         if T==None:
-            T = self.psm2_kin.forward(self.last_psm2_jnt)
+            T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
         new_psm2_pos = psm2_pos + translation
         T[0:3, 3] = new_psm2_pos
 #         self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
@@ -630,10 +681,10 @@ class Teleop_class:
         if self.__enabled__ == False: return
         
         translation = translation * self.scale
-        psm1_pos = self.first_psm1_pos #self.psm1_kin.FK(self.last_psm1_jnt)
+        psm1_pos = self.__first_psm1_pos__ #self.__psm1_kin__.FK(self.__last_psm1_jnt__)
         
         if T==None:
-            T = self.psm1_kin.forward(self.last_psm1_jnt)
+            T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
             
         new_psm1_pos = psm1_pos + translation
         T[0:3, 3] = new_psm1_pos
@@ -645,14 +696,14 @@ class Teleop_class:
         if self.__enabled__ == False: return
         
         if T==None:
-            T = self.psm2_kin.forward(self.last_psm2_jnt)
+            T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
         T[0:3,0:3] = orientation
         return T
         
     def set_orientation_mtmr(self,orientation, T = None): # align a psm arm to mtm
         if self.__enabled__ == False: return
         if T == None:
-            T = self.psm1_kin.forward(self.last_psm1_jnt)
+            T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
         T[0:3,0:3] = orientation
         return T
             
@@ -851,14 +902,14 @@ class Autocamera_node_handler:
         self.repositioning_clutch_active = False
         
         # For forward and inverse kinematics
-        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
-        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
-        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
-        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
+        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
+        self.__psm1_robot__ = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.__psm1_kin__ = KDLKinematics(self.__psm1_robot__, self.__psm1_robot__.links[0].name, self.__psm1_robot__.links[-1].name)
+        self.__mtml_robot__ = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.__mtml_kin__ = KDLKinematics(self.__mtml_robot__, self.__mtml_robot__.links[0].name, self.__mtml_robot__.links[-1].name)
+        self.__mtmr_robot__ = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.__mtmr_kin__ = KDLKinematics(self.__mtmr_robot__, self.__mtmr_robot__.links[0].name, self.__mtmr_robot__.links[-1].name)
         
         
         # For camera clutch control    
@@ -884,8 +935,8 @@ class Autocamera_node_handler:
         
     def __init_nodes__(self):
         self.hw_ecm = robot('ECM')
-        self.hw_psm1 = robot('PSM1')
-        self.hw_psm2 = robot('PSM2')
+        self.__hw_psm1__ = robot('PSM1')
+        self.__hw_psm2__ = robot('PSM2')
             
         #rospy.init_node('autocamera_node')
         
@@ -893,8 +944,8 @@ class Autocamera_node_handler:
         
         # Publishers to the simulation
         self.pub_ecm = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
-        self.pub_psm1 = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
-        self.pub_psm2 = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
+        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
+        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1, tcp_nodelay=True)
         
         # Get the joint angles from the simulation
         self.sub_ecm_sim = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.add_ecm_jnt, queue_size=1, tcp_nodelay=True)
@@ -967,12 +1018,12 @@ class Autocamera_node_handler:
             self.pub_image_left.unregister()
             self.pub_image_right.unregister()
             self.pub_ecm.unregister()
-            self.pub_psm1.unregister()
-            self.pub_psm2.unregister()
+            self.__pub_psm1__.unregister()
+            self.__pub_psm2__.unregister()
             
             self.hw_ecm.unregister()
-            self.hw_psm1.unregister()
-            self.hw_psm2.unregister()
+            self.__hw_psm1__.unregister()
+            self.__hw_psm2__.unregister()
             print( "Shutting down " + self.__class__.__name__)
             
         except Exception:
@@ -1061,20 +1112,20 @@ class Autocamera_node_handler:
         # TODO: Find forward kinematics from mtmr and ecm. Move mtmr. Find the movement vector. Add it to the 
         # ecm position, use inverse kinematics and move the ecm.
             
-        self.logerror("mtml" + self.mtml_kin.get_joint_names().__str__())
-        start_coordinates,_ = self.mtml_kin.FK( self.mtml_start_position.position[:-1]) # Returns (position, rotation)
-        end_coordinates,_ = self.mtml_kin.FK(mtml_msg.position[:-1])
+        self.logerror("mtml" + self.__mtml_kin__.get_joint_names().__str__())
+        start_coordinates,_ = self.__mtml_kin__.FK( self.mtml_start_position.position[:-1]) # Returns (position, rotation)
+        end_coordinates,_ = self.__mtml_kin__.FK(mtml_msg.position[:-1])
         
         diff = np.subtract(end_coordinates, start_coordinates)
         self.logerror("diff = " + diff.__str__())
         
         # Find the ecm 3d coordinates, add the 'diff' to it, then do an inverse kinematics
-        ecm_coordinates,_ = self.ecm_kin.FK(ecm_msg.position[0:2] + ecm_msg.position[-2:]) # There are a lot of excessive things here that we don't need
-        ecm_pose = self.ecm_kin.forward(ecm_msg.position[0:2] + ecm_msg.position[-2:])
+        ecm_coordinates,_ = self.__ecm_kin__.FK(ecm_msg.position[0:2] + ecm_msg.position[-2:]) # There are a lot of excessive things here that we don't need
+        ecm_pose = self.__ecm_kin__.forward(ecm_msg.position[0:2] + ecm_msg.position[-2:])
         
         # Figure out the new orientation and position to be used in the inverse kinematics
-        b,_ = self.ecm_kin.FK([ecm_msg.position[0],ecm_msg.position[1],.14,ecm_msg.position[3]])
-        keyhole, _ = self.ecm_kin.FK([0,0,0,0])
+        b,_ = self.__ecm_kin__.FK([ecm_msg.position[0],ecm_msg.position[1],.14,ecm_msg.position[3]])
+        keyhole, _ = self.__ecm_kin__.FK([0,0,0,0])
         ecm_current_direction = b-keyhole
         new_ecm_coordinates = np.add(ecm_coordinates, diff)
         ecm_new_direction = new_ecm_coordinates - keyhole
@@ -1082,9 +1133,9 @@ class Autocamera_node_handler:
         
         ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3] 
         ecm_pose[0:3,3] = new_ecm_coordinates
-        new_ecm_joint_angles = self.ecm_kin.inverse(ecm_pose)
+        new_ecm_joint_angles = self.__ecm_kin__.inverse(ecm_pose)
         
-        new_ecm_msg = ecm_msg; new_ecm_msg.position = new_ecm_joint_angles; new_ecm_msg.name = self.ecm_kin.get_joint_names()
+        new_ecm_msg = ecm_msg; new_ecm_msg.position = new_ecm_joint_angles; new_ecm_msg.name = self.__ecm_kin__.get_joint_names()
         
         self.logerror("ecm_new_direction " + ecm_new_direction.__str__())
         self.logerror('ecm_coordinates' + ecm_coordinates.__str__())
@@ -1134,7 +1185,7 @@ class Autocamera_node_handler:
         msg.name = msg.name + ['jaw']
         msg.position = msg.position + [jaw]
         
-        self.hw_psm1.move_joint_list(msg.position, interpolate=False)
+        self.__hw_psm1__.move_joint_list(msg.position, interpolate=False)
     
     def move_psm2(self, msg):
         jaw = msg.position[-3]
@@ -1143,7 +1194,7 @@ class Autocamera_node_handler:
         msg.name = msg.name + ['jaw']
         msg.position = msg.position + [jaw]
         
-        self.hw_psm2.move_joint_list(msg.position, interpolate=False)
+        self.__hw_psm2__.move_joint_list(msg.position, interpolate=False)
     
     # ecm callback    
     
@@ -1170,13 +1221,13 @@ class Autocamera_node_handler:
         if self.camera_clutch_pressed == False and msg != None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-                self.pub_psm1.publish(msg)
+                self.__pub_psm1__.publish(msg)
 
     def add_psm2_jnt_from_hw(self, msg):
         if self.camera_clutch_pressed == False and msg != None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-                self.pub_psm2.publish(msg)
+                self.__pub_psm2__.publish(msg)
                 
     # psm1 callback    
     def add_psm1_jnt(self, msg):
@@ -1184,7 +1235,7 @@ class Autocamera_node_handler:
             # We need to set the names, otherwise the simulation won't move
             if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-                self.pub_psm1.publish(msg)
+                self.__pub_psm1__.publish(msg)
             self.add_jnt('psm1', msg)
                 
          
@@ -1193,7 +1244,7 @@ class Autocamera_node_handler:
         if self.camera_clutch_pressed == False and msg != None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.hardware :
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-                self.pub_psm2.publish(msg)
+                self.__pub_psm2__.publish(msg)
             self.add_jnt('psm2', msg)
                 
     def add_jnt(self, name, msg):
@@ -1274,9 +1325,9 @@ class Autocamera_node_handler:
             msg = JointState()
             msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
             msg.position = [0.84 , -0.65, 0.10, 0.00, 0.00, 0.00, 0.00]
-            self.pub_psm1.publish(msg)
+            self.__pub_psm1__.publish(msg)
             msg.position = [-0.84 , -0.53, 0.10, 0.00, 0.00, 0.00, 0.00]
-            self.pub_psm2.publish(msg)
+            self.__pub_psm2__.publish(msg)
             self.logerror('psms initialized!')
             
     
@@ -1333,31 +1384,31 @@ class ClutchControl:
 #         rospy.init_node('ecm_clutch_control')
         
         self.hw_ecm = robot("ECM")
-        self.hw_mtmr = robot("MTMR")
-        self.hw_mtml = robot("MTML")
+        self.__hw_mtmr__ = robot("MTMR")
+        self.__hw_mtml__ = robot("MTML")
         
         self.pub_mtml_hw = rospy.Publisher('/dvrk/MTML/set_position_joint', JointState, queue_size=1)
         self.pub_mtmr_hw = rospy.Publisher('/dvrk/MTMR/set_position_joint', JointState, queue_size=1)
         
         self.pub_ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
-        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-        self.mtmr_robot = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
-        self.mtml_robot = URDF.from_parameter_server('/dvrk_mtml/robot_description')
-        self.psm1_robot = URDF.from_parameter_server('/dvrk_psm1/robot_description')
-        self.psm2_robot = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.__mtmr_robot__ = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.__mtml_robot__ = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.__psm1_robot__ = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        self.__psm2_robot__ = URDF.from_parameter_server('/dvrk_psm2/robot_description')
         
-        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
-        self.mtmr_kin = KDLKinematics(self.mtmr_robot, self.mtmr_robot.links[0].name, self.mtmr_robot.links[-1].name)
-        self.mtml_kin = KDLKinematics(self.mtml_robot, self.mtml_robot.links[0].name, self.mtml_robot.links[-1].name)
-        self.psm1_kin = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
-        self.psm2_kin = KDLKinematics(self.psm2_robot, self.psm2_robot.links[0].name, self.psm2_robot.links[-1].name)
+        self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
+        self.__mtmr_kin__ = KDLKinematics(self.__mtmr_robot__, self.__mtmr_robot__.links[0].name, self.__mtmr_robot__.links[-1].name)
+        self.__mtml_kin__ = KDLKinematics(self.__mtml_robot__, self.__mtml_robot__.links[0].name, self.__mtml_robot__.links[-1].name)
+        self.__psm1_kin__ = KDLKinematics(self.__psm1_robot__, self.__psm1_robot__.links[0].name, self.__psm1_robot__.links[-1].name)
+        self.__psm2_kin__ = KDLKinematics(self.__psm2_robot__, self.__psm2_robot__.links[0].name, self.__psm2_robot__.links[-1].name)
         
         self.hw_mtml_orientation = mtm('MTML')
         self.hw_mtmr_orientation = mtm('MTMR')
         
         # MTML lock orientation
-#         self.pub_lock_mtml_orientation = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
-#         self.pub_lock_mtmr_orientation = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+#         self.__pub_lock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
+#         self.__pub_lock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
         
         
         self.sub_ecm_cb = None
@@ -1371,7 +1422,7 @@ class ClutchControl:
         self.camera_clutch_pressed = False
         self.head_sensor_pressed = False
         self.sub_camera_clutch_cb = rospy.Subscriber('/dvrk/footpedals/camera', Joy, self.camera_clutch_cb )
-        self.sub_headsensor_cb = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb )
+        self.__sub_headsensor__ = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.headsensor_cb )
         self.mtml_starting_point = None
         
         self.sub_mtml_cart_cb = rospy.Subscriber('/dvrk/MTML/position_cartesian_local_current', PoseStamped, self.mtml_cb)
@@ -1383,7 +1434,7 @@ class ClutchControl:
         self.sub_psm1_joint_cb = rospy.Subscriber('/dvrk/PSM1/state_joint_current', JointState, self.psm1_joint_angles_cb)
         self.sub_psm2_joint_cb = rospy.Subscriber('/dvrk/PSM2/state_joint_current', JointState, self.psm2_joint_angles_cb)
         
-        self.T_mtml_pos_init = self.mtml_kin.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.T_mtml_pos_init = self.__mtml_kin__.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.T_mtmr_pos_init = self.T_mtml_pos_init
 #         self.hw_mtml_orientation.lock_orientation_as_is()
 #         self.hw_mtml_orientation.unlock_orientation()
@@ -1392,7 +1443,7 @@ class ClutchControl:
         try:
             self.sub_ecm_cb.unregister()
             self.sub_camera_clutch_cb.unregister()
-            self.sub_headsensor_cb.unregister()
+            self.__sub_headsensor__.unregister()
             self.sub_mtml_cart_cb.unregister()
             self.sub_mtml_joint_cb.unregister()
             self.sub_mtmr_cart_cb.unregister()
@@ -1400,16 +1451,16 @@ class ClutchControl:
             self.sub_psm1_joint_cb.unregister()
             self.sub_psm2_joint_cb.unregister()
             
-            self.hw_mtml.unregister()
-            self.hw_mtmr.unregister()
+            self.__hw_mtml__.unregister()
+            self.__hw_mtmr__.unregister()
             self.hw_mtml_orientation.unregister()
             self.hw_mtmr_orientation.unregister()
             
             self.pub_mtml_hw.unregister()
             self.pub_mtmr_hw.unregister()
             self.pub_ecm_sim.unregister()
-#             self.pub_lock_mtml_orientation.unregister()
-#             self.pub_lock_mtmr_orientation.unregister()
+#             self.__pub_lock_mtml_orientation__.unregister()
+#             self.__pub_lock_mtmr_orientation__.unregister()
             
             print( "Shutting down " + self.__class__.__name__)
             
@@ -1436,7 +1487,7 @@ class ClutchControl:
     def mtml_joint_angles_cb(self, msg):
         self.mtml_joint_angles = list(msg.position)
         
-        T = self.mtml_kin.forward(self.mtml_joint_angles)
+        T = self.__mtml_kin__.forward(self.mtml_joint_angles)
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
             if type(self.mtml_starting_point) == NoneType:
@@ -1461,7 +1512,7 @@ class ClutchControl:
     def mtmr_joint_angles_cb(self, msg):
         self.mtmr_joint_angles = list(msg.position)
         
-        T = self.mtmr_kin.forward(self.mtmr_joint_angles)
+        T = self.__mtmr_kin__.forward(self.mtmr_joint_angles)
         
         pos = T[0:3,3]
         if self.camera_clutch_pressed:
@@ -1492,7 +1543,7 @@ class ClutchControl:
             # we may multiply the current_position and mtml_pos_before_clutch by some transformation matrix so
             # the hand controllers feel more intuitive
             
-            current_position = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3] 
+            current_position = self.__mtml_kin__.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3] 
             movement_vector = current_position-self.mtml_pos_before_clutch
             self.move_mtm_centerpoints()
 #             print("movement_vector = {}, {}, {}".format(movement_vector[0], movement_vector[1], movement_vector[2]))
@@ -1500,7 +1551,7 @@ class ClutchControl:
         else:
 #             self.center = self.joint_angles
             try:
-                self.mtml_pos_before_clutch = self.mtml_kin.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3]
+                self.mtml_pos_before_clutch = self.__mtml_kin__.forward(list(self.mtml_joint_angles)[0:-1])[0:3,3]
             except:
                 pass
     
@@ -1510,14 +1561,14 @@ class ClutchControl:
             pass
             if type(self.mtmr_starting_point) == NoneType:
                 self.mtmr_starting_point = np.array([msg.pose.position.x,msg.pose.position.y,msg.pose.position.z])
-            current_position = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3] 
+            current_position = self.__mtmr_kin__.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3] 
             movement_vector = current_position-self.mtmr_starting_point
             self.mtmr_pos = current_position
 #             self.ecm_pan_tilt(movement_vector[0:2])
         else:
 #             self.center = self.joint_angles
             try :
-                self.mtmr_pos_before_clutch = self.mtmr_kin.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
+                self.mtmr_pos_before_clutch = self.__mtmr_kin__.forward(list(self.mtmr_joint_angles)[0:-1])[0:3,3]
             except:
                 pass
     
@@ -1526,8 +1577,8 @@ class ClutchControl:
         left = self.mtml_pos_before_clutch
         right = self.mtmr_pos_before_clutch
         
-        mtml_pos = self.mtml_kin.forward(self.mtml_joint_angles)[0:3,3]
-        mtmr_pos = self.mtmr_kin.forward(self.mtmr_joint_angles)[0:3,3]
+        mtml_pos = self.__mtml_kin__.forward(self.mtml_joint_angles)[0:3,3]
+        mtmr_pos = self.__mtmr_kin__.forward(self.mtmr_joint_angles)[0:3,3]
         
         mid = (left+right)/2.0
         
@@ -1538,33 +1589,33 @@ class ClutchControl:
             new_mid = mtml_pos + ml_vector
             new_mtmr_position = new_mid + mr_vector
             
-            mtmr_pose = self.mtmr_kin.forward(self.mtmr_joint_angles)
+            mtmr_pose = self.__mtmr_kin__.forward(self.mtmr_joint_angles)
             mtmr_pose[0:3, 3] = new_mtmr_position.reshape(3,1)
-            mtmr_joint_angles = self.mtmr_kin.inverse(mtmr_pose)
+            mtmr_joint_angles = self.__mtmr_kin__.inverse(mtmr_pose)
 #             print('mtmr_joint_angles = ' + mtmr_joint_angles.__str__())
             
             mtmr_joint_angles = [float(i) for i in mtmr_joint_angles]
             mtmr_joint_angles.append(0.0)
-            self.hw_mtmr.move_joint_list(mtmr_joint_angles[0:3], [0,1,2], interpolate=False)
+            self.__hw_mtmr__.move_joint_list(mtmr_joint_angles[0:3], [0,1,2], interpolate=False)
             
 #             self.move_mtm_out_of_the_way()
              
         
     def enable_teleop(self):
-        self.hw_mtml.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-        self.hw_mtml.set_wrench_body_force([0,0,0])
-        self.hw_mtml.set_gravity_compensation(True)
+        self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.__hw_mtml__.set_wrench_body_force([0,0,0])
+        self.__hw_mtml__.set_gravity_compensation(True)
         
-        self.hw_mtmr.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-        self.hw_mtmr.set_wrench_body_force([0,0,0])
-        self.hw_mtmr.set_gravity_compensation(True)
+        self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+        self.__hw_mtmr__.set_wrench_body_force([0,0,0])
+        self.__hw_mtmr__.set_gravity_compensation(True)
         
     def disable_teleop(self):
-        self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-        self.hw_mtml.set_gravity_compensation(False)
+        self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.__hw_mtml__.set_gravity_compensation(False)
         
-        self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-        self.hw_mtmr.set_gravity_compensation(False)
+        self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+        self.__hw_mtmr__.set_gravity_compensation(False)
                 
     def headsensor_cb(self, msg):
         if msg.buttons[0] == 1:
@@ -1572,8 +1623,8 @@ class ClutchControl:
 #             self.enable_teleop()
         else:
             self.head_sensor_pressed = False
-#             self.hw_mtml.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-#             self.hw_mtmr.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+#             self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+#             self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
                         
     def camera_clutch_cb(self, msg):
         if msg.buttons[0] == 1 and self.head_sensor_pressed:
@@ -1605,7 +1656,7 @@ class ClutchControl:
                 self.center = msg.position[0:2] + msg.position[-2:]
             elif self.__mode__ == self.MODE.hardware:
                 self.center = msg.position[0:3] + tuple([0])
-            self.center_cart = np.array(self.ecm_kin.FK(self.center)[0])
+            self.center_cart = np.array(self.__ecm_kin__.FK(self.center)[0])
 #         print("self.center is : " + self.center.__str__())  
 #         print("ecm joint angles are : " + msg.position.__str__())
 #         print("self.joint_angles is : " + self.joint_angles.__str__())
@@ -1635,14 +1686,14 @@ class ClutchControl:
             self.hw_ecm.move_joint_list(joint_angles, interpolate=False)
     
     def ecm_inverse(self, goal_pos):
-        key_hole,_ = self.ecm_kin.FK([0,0,0,0])
+        key_hole,_ = self.__ecm_kin__.FK([0,0,0,0])
         safe_angles = list(self.joint_angles)
         safe_angles[2] = 0.14
         
-        ecm_pose = self.ecm_kin.forward(safe_angles)
+        ecm_pose = self.__ecm_kin__.forward(safe_angles)
         ab_vector = (goal_pos - key_hole)
         
-        b, _ = self.ecm_kin.FK(safe_angles)
+        b, _ = self.__ecm_kin__.FK(safe_angles)
         
         ecm_current_direction = b - key_hole
         
@@ -1669,7 +1720,7 @@ class ClutchControl:
         
         p = None
         try:
-            p = self.ecm_kin.inverse(ecm_pose)
+            p = self.__ecm_kin__.inverse(ecm_pose)
         except Exception as e:
             rospy.logerr('error, cannot do inverse kinematics of ecm')
         if type(p) != NoneType: 
@@ -1746,14 +1797,14 @@ class Joystick:
     def __init_nodes__(self):
         self.hw_ecm = robot("ECM")
         self.pub_ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
-        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
-        self.sub_ecm = None
+        self.__sub_ecm__ = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
         elif self.__mode__ == self.MODE.hardware:
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
 #             self.hw_ecm.home()
             self.hw_ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
@@ -1762,7 +1813,7 @@ class Joystick:
     def shutdown(self):
         print('shutting down joystick control')
         try:
-            self.sub_ecm.unregister()
+            self.__sub_ecm__.unregister()
             self.sub_joy.unregister()
             self.pub_ecm_sim.unregister()
             self.hw_ecm.unregister()
@@ -1868,14 +1919,14 @@ class Joystick:
             self.hw_ecm.move_joint_list(joint_angles, index, interpolate=False)
     
     def ecm_inverse(self, goal_pos):
-        key_hole,_ = self.ecm_kin.FK([0,0,0,0])
+        key_hole,_ = self.__ecm_kin__.FK([0,0,0,0])
         safe_angles = list(self.joint_angles)
         safe_angles[2] += 0.14
         
-        ecm_pose = self.ecm_kin.forward(safe_angles)
+        ecm_pose = self.__ecm_kin__.forward(safe_angles)
         ab_vector = (goal_pos - key_hole)
         
-        b, _ = self.ecm_kin.FK(safe_angles)
+        b, _ = self.__ecm_kin__.FK(safe_angles)
         
         ecm_current_direction = b - key_hole
         
@@ -1902,7 +1953,7 @@ class Joystick:
         
         p = None
         try:
-            p = self.ecm_kin.inverse(ecm_pose)
+            p = self.__ecm_kin__.inverse(ecm_pose)
         except Exception as e:
             rospy.logerr('error')
         if p != None:  
@@ -1972,14 +2023,14 @@ class Oculus:
     def __init_nodes__(self):
         self.hw_ecm = robot("ECM")
         self.pub_ecm_sim = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
-        self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
-        self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
+        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
-        self.sub_ecm = None
+        self.__sub_ecm__ = None
         if self.__mode__ == self.MODE.simulation:
-            self.sub_ecm = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk_ecm/joint_states', JointState, self.ecm_cb)
         elif self.__mode__ == self.MODE.hardware:
-            self.sub_ecm = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
+            self.__sub_ecm__ = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
 #             self.hw_ecm.home()
             self.hw_ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
@@ -1988,7 +2039,7 @@ class Oculus:
     def shutdown(self):
         print('shutting down oculus control')
         try:
-            self.sub_ecm.unregister()
+            self.__sub_ecm__.unregister()
             self.sub_oculus.unregister()
             self.pub_ecm_sim.unregister()
             
