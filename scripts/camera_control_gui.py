@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'camera_control_gui.ui'
 #
-# Created: Wed Nov  8 11:39:16 2017
+# Created: Mon Mar 19 14:10:57 2018
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -40,7 +40,7 @@ class Ui_Dialog(object):
         self.radioButtonHardware.setGeometry(QtCore.QRect(10, 40, 116, 22))
         self.radioButtonHardware.setObjectName(_fromUtf8("radioButtonHardware"))
         self.groupBoxCameraControlMethod = QtGui.QGroupBox(Dialog)
-        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 300, 171, 131))
+        self.groupBoxCameraControlMethod.setGeometry(QtCore.QRect(10, 300, 171, 151))
         self.groupBoxCameraControlMethod.setAutoFillBackground(False)
         self.groupBoxCameraControlMethod.setObjectName(_fromUtf8("groupBoxCameraControlMethod"))
         self.radioButtonAutocamera = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
@@ -58,6 +58,9 @@ class Ui_Dialog(object):
         self.radioButtonOculus = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
         self.radioButtonOculus.setGeometry(QtCore.QRect(10, 100, 141, 22))
         self.radioButtonOculus.setObjectName(_fromUtf8("radioButtonOculus"))
+        self.radioButtonClutchless = QtGui.QRadioButton(self.groupBoxCameraControlMethod)
+        self.radioButtonClutchless.setGeometry(QtCore.QRect(10, 120, 141, 22))
+        self.radioButtonClutchless.setObjectName(_fromUtf8("radioButtonClutchless"))
         self.groupBoxPower = QtGui.QGroupBox(Dialog)
         self.groupBoxPower.setGeometry(QtCore.QRect(10, 20, 120, 181))
         self.groupBoxPower.setObjectName(_fromUtf8("groupBoxPower"))
@@ -100,30 +103,30 @@ class Ui_Dialog(object):
         self.label_4.setGeometry(QtCore.QRect(10, 56, 131, 20))
         self.label_4.setObjectName(_fromUtf8("label_4"))
         self.pushButtonRecord = QtGui.QPushButton(Dialog)
-        self.pushButtonRecord.setGeometry(QtCore.QRect(13, 540, 131, 27))
+        self.pushButtonRecord.setGeometry(QtCore.QRect(13, 565, 131, 27))
         self.pushButtonRecord.setObjectName(_fromUtf8("pushButtonRecord"))
         self.labelSubjectInfo = QtGui.QLabel(Dialog)
-        self.labelSubjectInfo.setGeometry(QtCore.QRect(90, 513, 111, 20))
+        self.labelSubjectInfo.setGeometry(QtCore.QRect(90, 538, 111, 20))
         self.labelSubjectInfo.setText(_fromUtf8(""))
         self.labelSubjectInfo.setObjectName(_fromUtf8("labelSubjectInfo"))
         self.labelSubjectNumber = QtGui.QLabel(Dialog)
-        self.labelSubjectNumber.setGeometry(QtCore.QRect(12, 490, 131, 16))
+        self.labelSubjectNumber.setGeometry(QtCore.QRect(12, 515, 131, 16))
         self.labelSubjectNumber.setObjectName(_fromUtf8("labelSubjectNumber"))
         self.spinBoxSubjectNumber = QtGui.QSpinBox(Dialog)
-        self.spinBoxSubjectNumber.setGeometry(QtCore.QRect(19, 510, 60, 27))
+        self.spinBoxSubjectNumber.setGeometry(QtCore.QRect(19, 535, 60, 27))
         self.spinBoxSubjectNumber.setMinimum(1)
         self.spinBoxSubjectNumber.setMaximum(20)
         self.spinBoxSubjectNumber.setObjectName(_fromUtf8("spinBoxSubjectNumber"))
         self.labelPatternNumber = QtGui.QLabel(Dialog)
-        self.labelPatternNumber.setGeometry(QtCore.QRect(12, 430, 131, 16))
+        self.labelPatternNumber.setGeometry(QtCore.QRect(12, 455, 131, 16))
         self.labelPatternNumber.setObjectName(_fromUtf8("labelPatternNumber"))
         self.spinBoxPatternNumber = QtGui.QSpinBox(Dialog)
-        self.spinBoxPatternNumber.setGeometry(QtCore.QRect(20, 450, 60, 27))
+        self.spinBoxPatternNumber.setGeometry(QtCore.QRect(20, 475, 60, 27))
         self.spinBoxPatternNumber.setMinimum(1)
         self.spinBoxPatternNumber.setMaximum(5)
         self.spinBoxPatternNumber.setObjectName(_fromUtf8("spinBoxPatternNumber"))
         self.labelTimer = QtGui.QLabel(Dialog)
-        self.labelTimer.setGeometry(QtCore.QRect(159, 545, 66, 17))
+        self.labelTimer.setGeometry(QtCore.QRect(159, 570, 66, 17))
         self.labelTimer.setObjectName(_fromUtf8("labelTimer"))
 
         self.retranslateUi(Dialog)
@@ -140,6 +143,7 @@ class Ui_Dialog(object):
         self.radioButtonJoystick.setText(_translate("Dialog", "Joystick Control", None))
         self.radioButtonTeleop.setText(_translate("Dialog", "Teleop", None))
         self.radioButtonOculus.setText(_translate("Dialog", "Oculus", None))
+        self.radioButtonClutchless.setText(_translate("Dialog", "Clutchless System", None))
         self.groupBoxPower.setTitle(_translate("Dialog", "Power", None))
         self.pushButtonHome.setText(_translate("Dialog", "Home", None))
         self.pushButtonPowerOff.setText(_translate("Dialog", "Power Off", None))

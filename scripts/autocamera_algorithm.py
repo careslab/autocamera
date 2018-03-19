@@ -53,6 +53,7 @@ class Autocamera:
         self.last_midpoint = None
         self.midpoint_time = 0
         self.pan_tilt_deadzone_radius = .001
+        self.distance_to_midpoint = None
         
         self.zoom_deadzone_radius = .2
         self.zoom_innerzone_radius = .1
@@ -197,8 +198,7 @@ class Autocamera:
 #             
 #         l1,l2,lm, r1,r2,rm = self.find_2d_tool_coordinates_in_3d(cam_info, clean_joints)
         
-#         if self.last_midpoint == None:
-#             self.last_midpoint = mid_point
+
 
         
 #         if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
@@ -210,6 +210,7 @@ class Autocamera:
         self.add_marker(ecm_pose, '/current_ecm_pose', [1,0,0], Marker.ARROW, scale=[.1,.005,.005])
         temp = clean_joints['ecm'].position
         b,_ = self.ecm_kin.FK([temp[0],temp[1],.14,temp[3]])
+        
         # find the equation of the line that goes through the key_hole and the 
         # mid_point
         ab_vector = (mid_point-key_hole)
@@ -218,10 +219,20 @@ class Autocamera:
         
         self.add_marker(PoseConv.to_homo_mat([ab_vector,[0,0,0]]), '/ab_vector',[0,1,0], type=Marker.ARROW)
         r = self.find_rotation_matrix_between_two_vectors(ecm_current_direction, ab_vector)
-        m = math.sqrt(ab_vector[0]**2 + ab_vector[1]**2 + ab_vector[2]**2) # ab_vector's length
         
+        # Distance from keyhole to midpoint
+        m = math.sqrt(ab_vector[0]**2 + ab_vector[1]**2 + ab_vector[2]**2) # ab_vector's length
+        if self.last_midpoint == None:
+            self.last_midpoint = m
+            
         # insertion joint length
-        l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+        # use the distance_to_midpoint variable to keep the distance to midpoint the same instead of keeping
+        # the distance to keyhole consistent
+        
+        if self.distance_to_midpoint is None:
+            l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+        else:
+            l = m - self.distance_to_midpoint
         
         # Equation of the line that passes through the midpoint of the tools and the key hole
         x = lambda t: key_hole[0] + ab_vector[0] * t
@@ -456,6 +467,8 @@ class Autocamera:
                 msg.position[2] = 0.00
             elif msg.position[2] > .15: # maximum .23
                 msg.position[2] = .15
+                
+            self.distance_to_midpoint = self.last_midpoint - msg.position[2]
         return msg   
     
     
