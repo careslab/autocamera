@@ -1290,7 +1290,7 @@ class Autocamera_node_handler:
                 jnt_msg = 'error'
                 jnt_msg = self.autocamera.compute_viewangle(self.joint_angles, self.cam_info)
                 
-#                 self.pub_ecm.publish(jnt_msg)
+                self.pub_ecm.publish(jnt_msg)
                 
                 jnt_msg.position = [ round(i,4) for i in jnt_msg.position]
                 if len(jnt_msg.position) != 4 or len(jnt_msg.name) != 4 :
@@ -2096,7 +2096,7 @@ class Oculus:
     def __ecm_cb__(self, message):
         pass
 
-class Teleop_class:
+class ClutchlessSystem:
     class MODE:
         """
             simulation mode: Use the hardware for the master side, 
@@ -2210,40 +2210,85 @@ class Teleop_class:
         self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
         self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=1)
         
-        # Translation and orientation lock
-        self.__lock_mtml_psm2_orientation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
-        self.__lock_mtml_psm2_translation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
+        # Publish to ECM simulation
+        self.__pub_ecm__ = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=1)
         
-        self.__lock_mtmr_psm1_orientation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
-        self.__lock_mtmr_psm1_translation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
-
-        # MTML lock orientation
-        self.__pub_lock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
-        self.__pub_lock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+        if self.__mode__ == self.MODE.hardware:
+            # Translation and orientation lock
+            self.__lock_mtml_psm2_orientation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_rotation', Bool, queue_size=1, latch=True )
+            self.__lock_mtml_psm2_translation__ = rospy.Publisher('/dvrk/MTML_PSM2/lock_translation', Bool, queue_size=1, latch=True )
+            
+            self.__lock_mtmr_psm1_orientation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_rotation', Bool, queue_size=1, latch=True )
+            self.__lock_mtmr_psm1_translation__ = rospy.Publisher('/dvrk/MTMR_PSM1/lock_translation', Bool, queue_size=1, latch=True )
+    
+            # MTML lock orientation
+            self.__pub_lock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/lock_orientation', Quaternion, latch=True, queue_size = 1)
+            self.__pub_lock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/lock_orientation', Quaternion, latch=True, queue_size = 1)
+            
+            self.__pub_unlock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/unlock_orientation', Empty, latch=True, queue_size = 1)
+            self.__pub_unlock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/unlock_orientation', Empty, latch=True, queue_size = 1)
+            
+            self.__pub_mtmr_psm1_teleop__ = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
+            self.__pub_mtml_psm2_teleop__ = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
+            
+            # Wrist Adjustments
+            self.__mtml_wrist_adjustment__ = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True, queue_size=1)
+            self.__mtmr_wrist_adjustment__ = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True, queue_size=1)
+            
+            # Access psm hardware
+            self.__hw_psm1__ = robot('PSM1')
+            self.__hw_psm2__ = robot('PSM2')
+            
+            # Access mtm hardware
+            self.__hw_mtml__ = robot('MTML')
+            self.__hw_mtmr__ = robot('MTMR')
         
-        self.__pub_unlock_mtml_orientation__ = rospy.Publisher('/dvrk/MTML/unlock_orientation', Empty, latch=True, queue_size = 1)
-        self.__pub_unlock_mtmr_orientation__ = rospy.Publisher('/dvrk/MTMR/unlock_orientation', Empty, latch=True, queue_size = 1)
-        
-        self.__pub_mtmr_psm1_teleop__ = rospy.Publisher('/dvrk/MTMR_PSM1/set_desired_state', String, latch=True, queue_size=1)
-        self.__pub_mtml_psm2_teleop__ = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
-        
-        # Wrist Adjustments
-        self.__mtml_wrist_adjustment__ = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True)
-        self.__mtmr_wrist_adjustment__ = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True)
-        
-        # Access psm hardware
-        self.__hw_psm1__ = robot('PSM1')
-        self.__hw_psm2__ = robot('PSM2')
-        
-        # Access mtm hardware
-        self.__hw_mtml__ = robot('MTML')
-        self.__hw_mtmr__ = robot('MTMR')
+            # Access ecm hardware
+            self.__hw_ecm__ = robot('ECM')
         
         if self.__mode__ == self.MODE.simulation:
             self.enable_teleop()
 
     
     
+    def move_arm_joints(self, arm_name, joints, interpolate = False):
+        if self.__mode__ == self.MODE.hardware:
+            msg = JointState()
+            if arm_name.lower() == 'mtml':
+                msg.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+                msg.position = joints
+                self.__pub_mtml__.publish()
+            elif arm_name.lower() == 'mtmr':
+                msg.position = joints
+                msg.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+                self.__pub_mtmr__.publish()
+            elif arm_name.lower() == 'psm1':
+                msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                msg.position = joints
+                self.__pub_psm1__.publish()
+            elif arm_name.lower() == 'psm2':
+                msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                msg.position = joints
+                self.__pub_psm2__.publish()
+            if arm_name.lower() == 'ecm':
+                msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+                msg.position = joints
+                self.__pub_ecm__.publish()
+        
+        if self.__mode__ == self.MODE.hardware:
+            if arm_name.lower() == 'mtml':
+                return self.__hw_mtml__.move_joint_list(joints, interpolate)
+            elif arm_name.lower() == 'mtmr':
+                return self.__hw_mtmr__.move_joint_list(joints, interpolate)
+            elif arm_name.lower() == 'psm1':
+                return self.__hw_psm1__.move_joint_list(joints, interpolate)
+            elif arm_name.lower() == 'psm2':
+                return self.__hw_psm2__.move_joint_list(joints, interpolate)
+            elif arm_name.lower() == 'ecm':
+                return self.__hw_ecm__.move_joint_list(joints, interpolate)
+            
+        return True
+        
     def rehome(self):
         """!
         Home all the arms again
@@ -2264,10 +2309,10 @@ class Teleop_class:
         q_mtml = [0.0867019358531589, 0.008250772814637434, 0.1410445179152299, -1.498627346290218, 0.0740159621884837, -0.15691383983958546, 0.00592127680054577, 0.0]
         q_mtmr = [0.13146490673506123, -0.06150289811827064, 0.16527587983749847, 1.5291786517226071, 0.28422129480377745, 0.14211064740188872, 0.05329149120491193, 0.0]
         
-        r_psm1 = self.__hw_psm1__.move_joint_list(q_psm1, interpolate=True)
-        r_psm2 = self.__hw_psm2__.move_joint_list(q_psm2, interpolate=True)
-        r_mtml = self.__hw_mtml__.move_joint_list( q_mtml, interpolate=True)
-        r_mtmr = self.__hw_mtmr__.move_joint_list(q_mtmr, interpolate=True)
+        r_psm1 = self.move_arm_joints('psm1', q_psm1, interpolate=True)
+        r_psm2 = self.move_arm_joints('psm2', q_psm2, interpolate=True)
+        r_mtml = self.move_arm_joints('mtml',  q_mtml, interpolate=True)
+        r_mtmr = self.move_arm_joints('mtmr', q_mtmr, interpolate=True)
         
         if r_psm1 * r_psm2 * r_mtml * r_mtmr:
             self.__arms_homed__ = True
@@ -2290,13 +2335,14 @@ class Teleop_class:
         self.__sub_ecm__.unregister()
         self.__sub_headsensor__.unregister()
         self.__sub_clutch__.unregister()
-        self.__sub_mtml_gripper__.unregister()
-        self.__sub_mtmr_gripper__.unregister()
+        
         
         self.__pub_psm1__.unregister()
         self.__pub_psm2__.unregister()
         self.__pub_mtml__.unregister()
         self.__pub_mtmr__.unregister()
+        self.__pub_ecm__.unregister()
+        
         self.__pub_lock_mtml_orientation__.unregister()
         self.__pub_lock_mtmr_orientation__.unregister()
         self.__pub_unlock_mtml_orientation__.unregister()
@@ -2306,7 +2352,11 @@ class Teleop_class:
         self.__hw_mtmr__.unregister()
         self.__hw_psm1__.unregister()
         self.__hw_psm2__.unregister()
+        self.__hw_ecm__.unregister()
         
+        if self.__mode__ == self.MODE.hardware:
+            self.__sub_mtml_gripper__.unregister()
+            self.__sub_mtmr_gripper__.unregister()
     
     def set_mode(self, mode):
         """!
@@ -2467,6 +2517,9 @@ class Teleop_class:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+        if self.__first_psm1_pos__ is None:
+            self.__first_psm1_pos__, _ = self.__psm1_kin__.FK( msg.position[0:-1] )
+            
         self.__last_psm1_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm1__.publish(msg)
@@ -2483,6 +2536,9 @@ class Teleop_class:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+        if self.__first_psm2_pos__ is None:
+            self.__first_psm2_pos__, _ = self.__psm2_kin__.FK( msg.position[0:-1] )
+            
         self.__last_psm2_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm2__.publish(msg)
@@ -2517,7 +2573,9 @@ class Teleop_class:
 #         msg.position = [.8 * i for i in msg.position]
         
         self.__last_mtml_jnt__ = msg.position
-        
+        if self.__first_mtml_pos__ is None:
+            self.__first_mtml_pos__, _ = self.__mtml_kin__.FK( msg.position)
+            
         if self.__T_mtml_000__ == None :
             self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
 
@@ -2551,7 +2609,8 @@ class Teleop_class:
         self.__last_mtml_rot__ = rot
         
         if self.__enabled__ == False: return
-        self.__mtml_wrist_adjustment__.publish()
+        if self.__mode__ == self.MODE.hardware:
+            self.__mtml_wrist_adjustment__.publish()
         
         delta = pos - self.__first_mtml_pos__
         delta = np.insert(delta, 3,1).transpose()
@@ -2578,16 +2637,16 @@ class Teleop_class:
 # #             self.__first_mtml_pos__ = self.__last_mtml_pos__
 #             T = self.__set_orientation_mtml__( self.__last_good_psm2_transform__[0:3,0:3] ) 
 #             new_psm2_angles = self.__psm1_kin__.inverse(T, q)
-            
-        if type(new_psm2_angles) == NoneType:
-            self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-            self.__hw_mtml__.set_gravity_compensation(False)
-            self.__pub_unlock_mtml_orientation__.publish()
-            return
-        else:
-            self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-            self.__hw_mtml__.set_wrench_body_force([0, 0, 0])
-            self.__hw_mtml__.set_gravity_compensation(True)
+        if self.__mode__ == self.MODE.hardware:    
+            if type(new_psm2_angles) == NoneType:
+                self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+                self.__hw_mtml__.set_gravity_compensation(False)
+                self.__pub_unlock_mtml_orientation__.publish()
+                return
+            else:
+                self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+                self.__hw_mtml__.set_wrench_body_force([0, 0, 0])
+                self.__hw_mtml__.set_gravity_compensation(True)
             
         self.__last_good_psm2_transform__ = T
         
@@ -2597,12 +2656,13 @@ class Teleop_class:
             
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
-        
+         
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = new_psm2_angles.tolist()
             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
             self.__pub_psm2__.publish(msg)
+#         self.move_arm_joints('psm2', new_psm2_angles.tolist())
             
         
         
@@ -2621,7 +2681,9 @@ class Teleop_class:
 
 #         msg.position = [.8 * i for i in msg.position]
         self.__last_mtmr_jnt__ = msg.position
-        
+        if self.__first_mtmr_pos__ is None:
+            self.__first_mtmr_pos__, _ = self.__mtml_kin__.FK( msg.position )
+            
         if self.__T_mtmr_000__ == None :
             self.__T_mtmr_000__ = self.__T_mtml_000__
         
@@ -2656,7 +2718,8 @@ class Teleop_class:
         
         if self.__enabled__ == False: return
         
-        self.__mtmr_wrist_adjustment__.publish()
+        if self.__mode__ == self.MODE.hardware:
+            self.__mtmr_wrist_adjustment__.publish()
         
         delta = pos - self.__first_mtmr_pos__
         delta = np.insert(delta, 3,1).transpose()
@@ -2680,16 +2743,16 @@ class Teleop_class:
 #         if type(new_psm1_angles) == NoneType:
 #             T[0:3, 0:3] = self.__last_good_psm1_transform__[0:3,0:3] 
 #             new_psm1_angles = self.__psm1_kin__.inverse(T, q)
-            
-        if type(new_psm1_angles) == NoneType:
-            self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
-            self.__hw_mtmr__.set_gravity_compensation(False)
-            self.__pub_unlock_mtmr_orientation__.publish()
-            return
-        else:
-            self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
-            self.__hw_mtmr__.set_wrench_body_force([0, 0, 0])
-            self.__hw_mtmr__.set_gravity_compensation(True)
+        if self.__mode__ == self.MODE.hardware:            
+            if type(new_psm1_angles) == NoneType:
+                self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
+                self.__hw_mtmr__.set_gravity_compensation(False)
+                self.__pub_unlock_mtmr_orientation__.publish()
+                return
+            else:
+                self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
+                self.__hw_mtmr__.set_wrench_body_force([0, 0, 0])
+                self.__hw_mtmr__.set_gravity_compensation(True)
         
 #         self.__last_good_psm1_transform__ = T
         
@@ -2752,7 +2815,7 @@ class Teleop_class:
         
         if T==None:
             T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
-            
+
         new_psm1_pos = psm1_pos + translation
         T[0:3, 3] = new_psm1_pos
         
@@ -2784,6 +2847,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         joystick = 'joystick'
         teleop = 'teleop'
         oculus = 'oculus'
+        clutchless = 'clutchless'
         
     class MODE:
         """
@@ -2911,6 +2975,34 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.node_handler.shutdown()
                 self.quit()
     
+    class thread_clutchless(QThread):
+        def __init__(self, mode):
+            super(QThread, self).__init__()
+            self.node_handler = None
+            self.__mode__ = mode
+        def run(self):
+            self.node_handler = ClutchlessSystem()
+            print('\nRunning {} in {}\n'.format("clutchless system",self.__mode__))
+            self.node_handler.set_mode(self.__mode__)
+            self.node_handler.spin()
+        
+        def kill(self):
+            if self.node_handler != None:
+                self.node_handler.shutdown()
+                self.quit()
+                
+        def home(self):
+            print('clutchless homing')
+            self.node_handler.rehome()
+            
+        def pause(self):
+            self.node_handler.pause()
+        def resume(self):
+            self.node_handler.enable_teleop()
+        
+        def lock_mtm_orientations(self, msg):
+            self.node_handler.lock_mtm_orientations()
+            
     class thread_timer(QThread):
         trigger = pyqtSignal(int)
         
@@ -2988,6 +3080,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.radioButtonClutchAndMove.clicked.connect(self.on_clutchNGo_select)
         self.radioButtonJoystick.clicked.connect(self.on_joystick_select)
         self.radioButtonOculus.clicked.connect(self.on_oculus_select)
+        self.radioButtonClutchless.clicked.connect(self.on_clutchless_select)
         
         self.horizontalSliderInnerzone.valueChanged[int].connect(self.horizontalSliderInnerzoneCb)
         self.horizontalSliderDeadzone.valueChanged[int].connect(self.horizontalSliderDeadzoneCb)
@@ -3199,7 +3292,12 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     def on_oculus_select(self):
         self.__control_mode__ = self.node_name.oculus
         self.start_node_handler(self.node_name.oculus)
-            
+
+    @pyqtSlot()
+    def on_clutchless_select(self):
+        self.__control_mode__ = self.node_name.clutchless
+        self.start_node_handler(self.node_name.clutchless)
+                    
     @pyqtSlot()
     def on_simulation_select(self):
         if self.__mode__ != self.MODE.simulation :
@@ -3230,7 +3328,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
 #         rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
 #         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
 
-        if self.thread_tel == None:
+        if self.thread_tel == None and name != self.node_name.clutchless:
             self.thread_tel = self.thread_teleop(self.__mode__)
             self.thread_tel.start()
         
@@ -3253,7 +3351,12 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         elif name == self.node_name.oculus:
             self.thread = self.thread_oculus(self.__mode__)
             self.thread.start()
-            
+        elif name == self.node_name.clutchless:
+            if self.thread_tel :
+                self.thread_tel.kill()
+            self.thread = self.thread_clutchless(self.__mode__)
+            self.thread.start()
+            self.thread.home()
             
 
 def init_yappi():

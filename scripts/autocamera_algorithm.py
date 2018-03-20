@@ -226,13 +226,14 @@ class Autocamera:
             self.last_midpoint = m
             
         # insertion joint length
+        l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
         # use the distance_to_midpoint variable to keep the distance to midpoint the same instead of keeping
         # the distance to keyhole consistent
         
-        if self.distance_to_midpoint is None:
-            l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
-        else:
-            l = m - self.distance_to_midpoint
+#         if self.distance_to_midpoint is None:
+#             l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+#         else:
+#             l = m - self.distance_to_midpoint
         
         # Equation of the line that passes through the midpoint of the tools and the key hole
         x = lambda t: key_hole[0] + ab_vector[0] * t
