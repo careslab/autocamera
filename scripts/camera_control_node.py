@@ -21,7 +21,7 @@ import cv_bridge
 import threading
 
 
-from mtm import mtm 
+
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 from PyQt4.QtCore import pyqtSlot, SIGNAL, pyqtSignal
 from PyQt4.QtCore import QThread
@@ -29,7 +29,7 @@ from PyQt4.QtCore import Qt
 from PyQt4 import QtGui
 from PyQt4.QtGui import *
 from PyQt4.Qt import QObject
-from hrl_geom import pose_converter
+
 
 import configparser
 import camera_control_gui

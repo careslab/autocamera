@@ -36,7 +36,7 @@ class JoystickClass:
 #             self.hw_ecm.home()
             self.hw_ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
-        self.sub_joy = rospy.Subscriber('/joy', msg.Joy, self.on_joystick_change_cb)
+        self.sub_joy = rospy.Subscriber('/joy', Joy, self.on_joystick_change_cb)
         
     def shutdown(self):
         print('shutting down joystick control')
@@ -47,7 +47,7 @@ class JoystickClass:
             self.hw_ecm.unregister()
             
             print( "Shutting down " + self.__class__.__name__)
-        except e:
+        except Exception:
             print("couldn't unregister all the topics")
 
     def set_mode(self, mode):
@@ -77,7 +77,7 @@ class JoystickClass:
         self.joystick_at_zero = False     
            
     def on_joystick_change_cb(self, message):
-        j = msg.Joy()
+        j = Joy()
         if sum( np.abs(message.axes[0:2])) != 0 and self.joystick_at_zero == False:
             return
         self.joystick_at_zero = True
