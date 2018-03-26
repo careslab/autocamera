@@ -37,6 +37,8 @@ class Autocamera:
     DEBUG = False # Print debug messages?
     
     def __init__(self):
+        self.method_number = 1
+        
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
@@ -61,6 +63,9 @@ class Autocamera:
         
         self.zoom_level_positions = {'l1':None, 'r1':None, 'l2':None, 'r2':None, 'lm':None, 'rm':None}
         self.logerror("autocamera_initialized")
+        
+    def set_method(self, n):
+        self.method_number = n
         
     def logerror(self, msg, debug = False):
         if self.DEBUG or debug:
@@ -226,14 +231,16 @@ class Autocamera:
             self.last_midpoint = m
             
         # insertion joint length
-        l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
-        # use the distance_to_midpoint variable to keep the distance to midpoint the same instead of keeping
-        # the distance to keyhole consistent
         
-#         if self.distance_to_midpoint is None:
-#             l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
-#         else:
-#             l = m - self.distance_to_midpoint
+        if self.method_number == 1:
+            l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+        elif self.method_number == 2:
+            # use the distance_to_midpoint variable to keep the distance to midpoint the same instead of keeping
+            # the distance to keyhole consistent
+            if self.distance_to_midpoint is None:
+                l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+            else:
+                l = m - self.distance_to_midpoint
         
         # Equation of the line that passes through the midpoint of the tools and the key hole
         x = lambda t: key_hole[0] + ab_vector[0] * t

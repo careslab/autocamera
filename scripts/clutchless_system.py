@@ -1,4 +1,5 @@
 from __common_imports__ import *
+from autocamera_algorithm import Autocamera
 class ClutchlessSystem:
     class MODE:
         """
@@ -19,17 +20,28 @@ class ClutchlessSystem:
         """
         
         self.__mode__ = mode
+        self.__autocamera__ = Autocamera()
+        self.__cam_info__ = {'left':CameraInfo(), 'right':CameraInfo()}
         
         ## The scale of movements from MTMs to PSMs
         self.scale = 0.5
+        self.__x_scale__ = self.scale
+        self.__y_scale__ = self.scale
+        self.__z_scale__ = self.scale
+        
+        # Hand controller's desired position
+        self.__mtml_home_position__ = None
+        self.__mtmr_home_position__ = None
+        self.__mtml_dir__ = [0,0,0] # mtml movement direction
+        self.__mtmr_dir__ = [0,0,0]
         
         self.__enabled__ = False
         self.__clutch_active__ = False
          
-        self.__last_mtml_pos__ = None
-        self.__last_mtml_rot__ = None
-        self.__last_mtmr_pos__ = None
-        self.__last_mtmr_rot__ = None
+        self.__mtml_last_pos__ = None
+        self.__mtml_last_rot__ = None
+        self.__mtmr_last_pos__ = None
+        self.__mtmr_last_rot__ = None
     
         self.__last_good_psm1_transform__ = None
         self.__last_good_psm2_transform__ = None
@@ -37,15 +49,15 @@ class ClutchlessSystem:
         self.__mtml_gripper__ = None
         self.__mtmr_gripper__ = None
         
-        self.__last_psm1_jnt__ = None
-        self.__last_psm2_jnt__ = None
+        self.__psm1_last_jnt__ = None
+        self.__psm2_last_jnt__ = None
         
-        self.__last_ecm_jnt__ = None
+        self.__ecm_last_jnt__ = None
         
-        self.__first_mtml_pos__ = None
-        self.__first_mtmr_pos__ = None
-        self.__first_psm1_pos__ = None
-        self.__first_psm2_pos__ = None
+        self.__mtml_first_pos__ = None
+        self.__mtmr_first_pos__ = None
+        self.__psm1_first_pos__ = None
+        self.__psm2_first_pos__ = None
         
         self.__T_ecm__ = None
         self.__T_mtml_000__ = None
@@ -53,10 +65,6 @@ class ClutchlessSystem:
         self.__arms_homed__ = False
         self.__paused__ = False
         self.__reenable_teleop__ = False
-        
-#         from autocamera_algorithm import Autocamera
-#         from visualization_msgs.msg import Marker
-#         self.autocamera = Autocamera()
         
         
     def __init__nodes(self):
@@ -89,6 +97,9 @@ class ClutchlessSystem:
         # subscribe to head sensor
         self.__sub_headsensor__ = rospy.Subscriber('/dvrk/footpedals/coag', Joy, self.__headsensor_cb__ , queue_size=1, tcp_nodelay=True)
         
+        # subscribe to camera info
+        self.__sub_caminfo__ = rospy.Subscriber('/fakecam_node/camera_info', CameraInfo, self.__get_cam_info, queue_size=1, tcp_nodelay=True)
+        
         # Subscribe to PSMs
         self.__sub_psm1__ = None; self.__sub_psm2__ = None
         if self.__mode__ == self.MODE.simulation:
@@ -106,15 +117,15 @@ class ClutchlessSystem:
         self.__sub_clutch__ = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.__clutch_cb__, queue_size=1, tcp_nodelay=True)
             
         # Publish to PSMs simulation
-        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
-        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
+        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
+        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
         
         # Publish to MTMs simulation
-        self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
-        self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=1)
+        self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
+        self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=10)
         
         # Publish to ECM simulation
-        self.__pub_ecm__ = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=1)
+        self.__pub_ecm__ = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
         
         if self.__mode__ == self.MODE.hardware:
             # Translation and orientation lock
@@ -220,13 +231,20 @@ class ClutchlessSystem:
         
         q_psm1 = [0.125, 0.237, 0.137, 0.839, -0.122, -0.148, -0.174]
         q_psm2 = [-0.015, -0.050, 0.149, -0.988, -0.183, -0.057, -0.174]
-        q_mtml = [0.086, 0.008, 0.141, -1.498, 0.074, -0.156, 0.005, 0.0]
-        q_mtmr = [0.131, -0.061, 0.165, 1.529, 0.284, 0.142, 0.053, 0.0]
         
-        r_psm1 = self.move_arm_joints('psm1', q_psm1, interpolate=True)
-        r_psm2 = self.move_arm_joints('psm2', q_psm2, interpolate=True)
-        r_mtml = self.move_arm_joints('mtml',  q_mtml, interpolate=True)
-        r_mtmr = self.move_arm_joints('mtmr', q_mtmr, interpolate=True)
+        q_mtml = [0.086, 0.008, 0.141, -1.498, 0.074, -0.156, 0.005]
+        q_mtmr = [0.131, -0.061, 0.165, 1.529, 0.284, 0.142, 0.053]
+        if self.__mode__ == self.MODE.hardware:
+            q_mtml.append(0.0)
+            q_mtmr.append(0.0)
+        
+        for i in range(20): 
+            r_psm1 = self.move_arm_joints('psm1', q_psm1, interpolate=True)
+            r_psm2 = self.move_arm_joints('psm2', q_psm2, interpolate=True)
+            r_mtml = self.move_arm_joints('mtml',  q_mtml, interpolate=True)
+            r_mtmr = self.move_arm_joints('mtmr', q_mtmr, interpolate=True)
+            if self.__mode__ == self.MODE.hardware:
+                break
         
         if r_psm1 * r_psm2 * r_mtml * r_mtmr:
             self.__arms_homed__ = True
@@ -249,7 +267,7 @@ class ClutchlessSystem:
         self.__sub_ecm__.unregister()
         self.__sub_headsensor__.unregister()
         self.__sub_clutch__.unregister()
-        
+        self.__sub_caminfo__.unregister()
         
         self.__pub_psm1__.unregister()
         self.__pub_psm2__.unregister()
@@ -301,10 +319,10 @@ class ClutchlessSystem:
         """
         self.__enabled__ = True
         
-        self.__first_mtml_pos__ = self.__last_mtml_pos__
-        self.__first_mtmr_pos__ = self.__last_mtmr_pos__
-        self.__first_psm1_pos__, _ = self.__psm1_kin__.FK( self.__last_psm1_jnt__)
-        self.__first_psm2_pos__, _ = self.__psm2_kin__.FK( self.__last_psm2_jnt__)
+        self.__mtml_first_pos__ = self.__mtml_last_pos__
+        self.__mtmr_first_pos__ = self.__mtmr_last_pos__
+        self.__psm1_first_pos__, _ = self.__psm1_kin__.FK( self.__psm1_last_jnt__)
+        self.__psm2_first_pos__, _ = self.__psm2_kin__.FK( self.__psm2_last_jnt__)
         
         if self.__mode__ == self.MODE.hardware:
             self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
@@ -415,17 +433,32 @@ class ClutchlessSystem:
         else:
             self.disable_teleop()
             
+    
+    # camera info callback
+    def __get_cam_info(self, msg):
+        if msg.header.frame_id == '/fake_cam_left_optical_link':
+            self.__cam_info__['left'] = msg
+        elif msg.header.frame_id == '/fake_cam_right_optical_link':
+            self.__cam_info__['right'] = msg
+            
+    def adjust_ecm_pos(self):
+        joint_angles = {'ecm': self.__ecm_last_jnt__, 'psm1': self.__psm1_last_jnt__, 'psm2': self.__psm2_last_jnt__}
+        
+        if None not in joint_angles.values():
+            self.__autocamera__.set_method(2)
+            jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)
+
     def __ecm_cb__(self, msg):
         """!
         Store the ECM joint angles and 
         end-effector position every time a new message is received
         """
         if self.__mode__ == self.MODE.simulation:
-            self.__last_ecm_jnt__ = msg.position[0:2] + msg.position[-2:]
+            self.__ecm_last_jnt__ = msg.position[0:2] + msg.position[-2:]
         elif self.__mode__ == self.MODE.hardware:
-            self.__last_ecm_jnt__ = msg.position[0:3] + tuple([0])
+            self.__ecm_last_jnt__ = msg.position[0:3] + tuple([0])
         
-        self.__T_ecm__ = self.__ecm_kin__.forward(self.__last_ecm_jnt__)
+        self.__T_ecm__ = self.__ecm_kin__.forward(self.__ecm_last_jnt__)
           
     def __psm1_cb__(self, msg):
         """!
@@ -436,13 +469,14 @@ class ClutchlessSystem:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        if self.__first_psm1_pos__ is None:
-            self.__first_psm1_pos__, _ = self.__psm1_kin__.FK( msg.position[0:-1] )
+        if self.__psm1_first_pos__ is None:
+            self.__psm1_first_pos__, _ = self.__psm1_kin__.FK( msg.position[0:-1] )
             
-        self.__last_psm1_jnt__ = msg.position[0:-1]
+        self.__psm1_last_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm1__.publish(msg)
             
+        self.adjust_ecm_pos()
             
         
     def __psm2_cb__(self, msg):
@@ -455,10 +489,10 @@ class ClutchlessSystem:
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-        if self.__first_psm2_pos__ is None:
-            self.__first_psm2_pos__, _ = self.__psm2_kin__.FK( msg.position[0:-1] )
+        if self.__psm2_first_pos__ is None:
+            self.__psm2_first_pos__, _ = self.__psm2_kin__.FK( msg.position[0:-1] )
             
-        self.__last_psm2_jnt__ = msg.position[0:-1]
+        self.__psm2_last_jnt__ = msg.position[0:-1]
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm2__.publish(msg)
             
@@ -482,7 +516,7 @@ class ClutchlessSystem:
         self.home_arms()
 #         self.__align_mtms_to_psms__()
         
-        if self.__last_ecm_jnt__ == None: return
+        if self.__ecm_last_jnt__ == None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
@@ -492,8 +526,8 @@ class ClutchlessSystem:
 #         msg.position = [.8 * i for i in msg.position]
         
         self.__last_mtml_jnt__ = msg.position
-        if self.__first_mtml_pos__ is None:
-            self.__first_mtml_pos__, _ = self.__mtml_kin__.FK( msg.position)
+        if self.__mtml_first_pos__ is None:
+            self.__mtml_first_pos__, _ = self.__mtml_kin__.FK( msg.position)
             
         if self.__T_mtml_000__ == None :
             self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
@@ -518,22 +552,25 @@ class ClutchlessSystem:
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
-        if self.__last_mtml_pos__ == None or self.__clutch_active__:
-            self.__first_mtml_pos__ = pos
-            self.__last_mtml_pos__ = pos
-            self.__last_mtml_rot__ = rot
+        if self.__mtml_last_pos__ == None or self.__clutch_active__:
+            self.__mtml_first_pos__ = pos
+            self.__mtml_last_pos__ = pos
+            self.__mtml_last_rot__ = rot
             return
         
-        self.__last_mtml_pos__ = pos
-        self.__last_mtml_rot__ = rot
+        # Find the direction of mtml movement
+        self.__mtml_dir__ = pos - self.__mtml_last_pos__
+        
+        self.__mtml_last_pos__ = pos
+        self.__mtml_last_rot__ = rot
         
         if self.__enabled__ == False: return
         if self.__mode__ == self.MODE.hardware:
             self.__mtml_wrist_adjustment__.publish()
         
-        delta = pos - self.__first_mtml_pos__
+        delta = pos - self.__mtml_first_pos__
         delta = np.insert(delta, 3,1).transpose()
-        p0 = np.insert(self.__first_mtml_pos__, 3,1).reshape(4,1)
+        p0 = np.insert(self.__mtml_first_pos__, 3,1).reshape(4,1)
         p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         translation = (p1-p0)
@@ -544,20 +581,20 @@ class ClutchlessSystem:
         T = self.__translate_mtml__(translation)
         T = self.__set_orientation_mtml__( orientation, T)
         
-        q = list(self.__last_psm2_jnt__)
+        q = list(self.__psm2_last_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
         new_psm2_angles = self.__psm2_kin__.inverse(T, q)
         
-        print("T = {} , \nnew_psm2_angles = {}\n\n".format(T, new_psm2_angles))
+#         print("T = {} , \nnew_psm2_angles = {}\n\n".format(T, new_psm2_angles))
         
         if (new_psm2_angles is None): return
         
         
 #         if type(new_psm2_angles) == NoneType:
 #             print("Frozen, Translation = " + translation.__str__())
-# #             self.__first_mtml_pos__ = self.__last_mtml_pos__
+# #             self.__mtml_first_pos__ = self.__mtml_last_pos__
 #             T = self.__set_orientation_mtml__( self.__last_good_psm2_transform__[0:3,0:3] ) 
 #             new_psm2_angles = self.__psm1_kin__.inverse(T, q)
         if self.__mode__ == self.MODE.hardware:    
@@ -593,7 +630,7 @@ class ClutchlessSystem:
     
     def __mtmr_cb__(self, msg):
         # Find mtm end effector position and orientation
-        if self.__last_ecm_jnt__ == None: return
+        if self.__ecm_last_jnt__ == None: return
         
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
@@ -604,8 +641,8 @@ class ClutchlessSystem:
 
 #         msg.position = [.8 * i for i in msg.position]
         self.__last_mtmr_jnt__ = msg.position
-        if self.__first_mtmr_pos__ is None:
-            self.__first_mtmr_pos__, _ = self.__mtml_kin__.FK( msg.position )
+        if self.__mtmr_first_pos__ is None:
+            self.__mtmr_first_pos__, _ = self.__mtml_kin__.FK( msg.position )
             
         if self.__T_mtmr_000__ == None :
             self.__T_mtmr_000__ = self.__T_mtml_000__
@@ -630,23 +667,26 @@ class ClutchlessSystem:
         pos = T[0:3,3]
         
         
-        if self.__last_mtmr_pos__ == None  or self.__clutch_active__:
-            self.__first_mtmr_pos__ = pos
-            self.__last_mtmr_pos__ = pos
-            self.__last_mtmr_rot__ = rot
+        if self.__mtmr_last_pos__ == None  or self.__clutch_active__:
+            self.__mtmr_first_pos__ = pos
+            self.__mtmr_last_pos__ = pos
+            self.__mtmr_last_rot__ = rot
             return
         
-        self.__last_mtmr_pos__ = pos
-        self.__last_mtmr_rot__ = rot
+        # Find the direction of mtmr movement
+        self.__mtmr_dir__ = pos - self.__mtmr_last_pos__
+        
+        self.__mtmr_last_pos__ = pos
+        self.__mtmr_last_rot__ = rot
         
         if self.__enabled__ == False: return
         
         if self.__mode__ == self.MODE.hardware:
             self.__mtmr_wrist_adjustment__.publish()
         
-        delta = pos - self.__first_mtmr_pos__
+        delta = pos - self.__mtmr_first_pos__
         delta = np.insert(delta, 3,1).transpose()
-        p0 = np.insert(self.__first_mtmr_pos__, 3,1).reshape(4,1)
+        p0 = np.insert(self.__mtmr_first_pos__, 3,1).reshape(4,1)
         p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         translation = (p1-p0)
@@ -657,12 +697,12 @@ class ClutchlessSystem:
         T = self.__translate_mtmr__(translation)
         T = self.__set_orientation_mtmr__(orientation, T)
         
-        q = list(self.__last_psm1_jnt__)
+        q = list(self.__psm1_last_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
         new_psm1_angles = self.__psm1_kin__.inverse(T, q)
-        print("T = {} , \nnew_psm1_angles = {}\n\n".format(T, new_psm1_angles))
+#         print("T = {} , \nnew_psm1_angles = {}\n\n".format(T, new_psm1_angles))
         
         if (new_psm1_angles is None): return
         
@@ -702,8 +742,8 @@ class ClutchlessSystem:
         """!
         This function should align the orientations of mtms to the psms. This is not completed yet.
         """
-        T_psm1 = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
-        T_psm2 = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
+        T_psm1 = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
+        T_psm2 = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
         
         T_mtml = self.__mtml_kin__.forward(self.__last_mtml_jnt__)
         T_mtmr = self.__mtmr_kin__.forward(self.__last_mtmr_jnt__)
@@ -724,10 +764,13 @@ class ClutchlessSystem:
     def __translate_mtml__(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
-        translation = translation * self.scale
-        psm2_pos = self.__first_psm2_pos__#self.__psm2_kin__.FK(self.__last_psm2_jnt__)
+        translation[0] = translation[0] * self.__x_scale__
+        translation[1] = translation[1] * self.__y_scale__
+        translation[2] = translation[2] * self.__z_scale__
+        
+        psm2_pos = self.__psm2_first_pos__#self.__psm2_kin__.FK(self.__psm2_last_jnt__)
         if T==None:
-            T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
+            T = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
         new_psm2_pos = psm2_pos + translation
         T[0:3, 3] = new_psm2_pos
 #         self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
@@ -737,10 +780,10 @@ class ClutchlessSystem:
         if self.__enabled__ == False: return
         
         translation = translation * self.scale
-        psm1_pos = self.__first_psm1_pos__ #self.__psm1_kin__.FK(self.__last_psm1_jnt__)
+        psm1_pos = self.__psm1_first_pos__ #self.__psm1_kin__.FK(self.__psm1_last_jnt__)
         
         if T==None:
-            T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
+            T = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
 
         new_psm1_pos = psm1_pos + translation
         T[0:3, 3] = new_psm1_pos
@@ -752,14 +795,14 @@ class ClutchlessSystem:
         if self.__enabled__ == False: return
         
         if T==None:
-            T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
+            T = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
         T[0:3,0:3] = orientation
         return T
         
     def __set_orientation_mtmr__(self,orientation, T = None): # align a psm arm to mtm
         if self.__enabled__ == False: return
         if T == None:
-            T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
+            T = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
         T[0:3,0:3] = orientation
         return T
             
