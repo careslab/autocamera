@@ -241,7 +241,8 @@ class Autocamera:
                 l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
             else:
                 l = m - self.distance_to_midpoint
-        
+                
+            print('self.distance_to_midpoint = {}\n'.format(self.distance_to_midpoint))
         # Equation of the line that passes through the midpoint of the tools and the key hole
         x = lambda t: key_hole[0] + ab_vector[0] * t
         y = lambda t: key_hole[1] + ab_vector[1] * t
@@ -470,13 +471,18 @@ class Autocamera:
                                             tool_point2=l2, radius=self.zoom_innerzone_radius, deadzone_radius=self.zoom_deadzone_radius)
             self.zoom_percentage = zoom_percentage
             print("zoom_percentage = {} ".format(zoom_percentage))
+            
+            # Temporary
+            if self.method_number == 2: 
+                zoom_percentage = 0
+        
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
                 msg.position[2] = 0.00
             elif msg.position[2] > .15: # maximum .23
                 msg.position[2] = .15
                 
-            self.distance_to_midpoint = self.last_midpoint - msg.position[2]
+            self.distance_to_midpoint = self.last_midpoint
         return msg   
     
     

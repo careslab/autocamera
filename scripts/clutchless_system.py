@@ -67,6 +67,13 @@ class ClutchlessSystem:
         self.__reenable_teleop__ = False
         
         
+        self.__mtml_joint_names__ = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+        self.__mtmr_joint_names__ = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+        self.__psm1_joint_names__ =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+        self.__psm2_joint_names__ =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+        self.__ecm_joint_names__ = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+                
+        
     def __init__nodes(self):
         """!
         Initialize the ros publishers and subscribers
@@ -84,6 +91,13 @@ class ClutchlessSystem:
         self.__psm2_kin__ = KDLKinematics(self.__psm2_robot__, self.__psm2_robot__.links[0].name, self.__psm2_robot__.links[-1].name)
         self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
+        # Publish to PSMs simulation
+        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
+        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        
+        # Publish to MTMs simulation
+        self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
+        self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=10)
     
         # Subscribe to MTMs
         self.__sub_mtml__ = None; self.__sub_mtmr__ = None
@@ -116,13 +130,6 @@ class ClutchlessSystem:
         # MTM repositioning clutch
         self.__sub_clutch__ = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.__clutch_cb__, queue_size=1, tcp_nodelay=True)
             
-        # Publish to PSMs simulation
-        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
-        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
-        
-        # Publish to MTMs simulation
-        self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
-        self.__pub_mtmr__ = rospy.Publisher('/dvrk_mtmr/joint_states_robot', JointState, queue_size=10)
         
         # Publish to ECM simulation
         self.__pub_ecm__ = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=10)
@@ -180,23 +187,23 @@ class ClutchlessSystem:
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             if arm_name.lower() == 'mtml':
-                msg.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+                msg.name = self.__mtml_joint_names__
                 msg.position = joints
                 self.__pub_mtml__.publish(msg)
             elif arm_name.lower() == 'mtmr':
                 msg.position = joints
-                msg.name = ['outer_yaw', 'shoulder_pitch', 'elbow_pitch', 'wrist_platform', 'wrist_pitch', 'wrist_yaw', 'wrist_roll']
+                msg.name = self.__mtmr_joint_names__
                 self.__pub_mtmr__.publish(msg)
             elif arm_name.lower() == 'psm1':
-                msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                msg.name =  self.__psm1_joint_names__
                 msg.position = joints
                 self.__pub_psm1__.publish(msg)
             elif arm_name.lower() == 'psm2':
-                msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+                msg.name =  self.__psm2_joint_names__
                 msg.position = joints
                 self.__pub_psm2__.publish(msg)
-            if arm_name.lower() == 'ecm':
-                msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+            elif arm_name.lower() == 'ecm':
+                msg.name = self.__ecm_joint_names__
                 msg.position = joints
                 self.__pub_ecm__.publish(msg)
         
@@ -442,11 +449,13 @@ class ClutchlessSystem:
             self.__cam_info__['right'] = msg
             
     def adjust_ecm_pos(self):
-        joint_angles = {'ecm': self.__ecm_last_jnt__, 'psm1': self.__psm1_last_jnt__, 'psm2': self.__psm2_last_jnt__}
-        
+        self.disable_teleop()
+        j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
+        joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
             self.__autocamera__.set_method(2)
             jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)
+            self.__pub_ecm__.publish(jnt_msg)
 
     def __ecm_cb__(self, msg):
         """!
@@ -513,7 +522,6 @@ class ClutchlessSystem:
         callback function. 
         """
         # Find mtm end effector position and orientation
-        self.home_arms()
 #         self.__align_mtms_to_psms__()
         
         if self.__ecm_last_jnt__ == None: return
