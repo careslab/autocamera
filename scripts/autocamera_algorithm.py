@@ -229,6 +229,7 @@ class Autocamera:
         m = math.sqrt(ab_vector[0]**2 + ab_vector[1]**2 + ab_vector[2]**2) # ab_vector's length
         if self.last_midpoint == None:
             self.last_midpoint = m
+            self.distance_to_midpoint = m
             
         # insertion joint length
         
@@ -241,6 +242,9 @@ class Autocamera:
                 l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
             else:
                 l = m - self.distance_to_midpoint
+                
+            if l < 0.0:
+                l = 0.0
                 
             print('self.distance_to_midpoint = {}\n'.format(self.distance_to_midpoint))
         # Equation of the line that passes through the midpoint of the tools and the key hole
@@ -470,11 +474,11 @@ class Autocamera:
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
                                             tool_point2=l2, radius=self.zoom_innerzone_radius, deadzone_radius=self.zoom_deadzone_radius)
             self.zoom_percentage = zoom_percentage
-            print("zoom_percentage = {} ".format(zoom_percentage))
+#             print("zoom_percentage = {} ".format(zoom_percentage))
             
-            # Temporary
-            if self.method_number == 2: 
-                zoom_percentage = 0
+#             # Temporary
+#             if self.method_number == 2: 
+#                 zoom_percentage = 0
         
             msg.position[2] =  msg.position[2] + zoom_percentage 
             if msg.position[2] < 0 : # minimum 0
@@ -482,7 +486,7 @@ class Autocamera:
             elif msg.position[2] > .15: # maximum .23
                 msg.position[2] = .15
                 
-            self.distance_to_midpoint = self.last_midpoint
+            self.distance_to_midpoint -= zoom_percentage
         return msg   
     
     

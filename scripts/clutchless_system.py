@@ -183,7 +183,12 @@ class ClutchlessSystem:
         wrapper.has_run = False
         return wrapper
     
-    def move_arm_joints(self, arm_name, joints, interpolate = False):
+    
+    def move_arm_joints(self, arm_name, joints, inter = False):
+        
+        # Make sure the format is correct
+        joints = [float(i) for i in joints]
+        
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             if arm_name.lower() == 'mtml':
@@ -209,15 +214,15 @@ class ClutchlessSystem:
         
         if self.__mode__ == self.MODE.hardware:
             if arm_name.lower() == 'mtml':
-                return self.__hw_mtml__.move_joint_list(joints, interpolate)
+                return self.__hw_mtml__.move_joint_list(joints, interpolate=inter)
             elif arm_name.lower() == 'mtmr':
-                return self.__hw_mtmr__.move_joint_list(joints, interpolate)
+                return self.__hw_mtmr__.move_joint_list(joints, interpolate=inter)
             elif arm_name.lower() == 'psm1':
-                return self.__hw_psm1__.move_joint_list(joints, interpolate)
+                return self.__hw_psm1__.move_joint_list(joints, interpolate=inter)
             elif arm_name.lower() == 'psm2':
-                return self.__hw_psm2__.move_joint_list(joints, interpolate)
+                return self.__hw_psm2__.move_joint_list(joints, interpolate=inter)
             elif arm_name.lower() == 'ecm':
-                return self.__hw_ecm__.move_joint_list(joints, interpolate)
+                return self.__hw_ecm__.move_joint_list(joints, interpolate=inter)
             
         return True
         
@@ -241,15 +246,17 @@ class ClutchlessSystem:
         
         q_mtml = [0.086, 0.008, 0.141, -1.498, 0.074, -0.156, 0.005]
         q_mtmr = [0.131, -0.061, 0.165, 1.529, 0.284, 0.142, 0.053]
+        
         if self.__mode__ == self.MODE.hardware:
             q_mtml.append(0.0)
             q_mtmr.append(0.0)
         
         for i in range(20): 
-            r_psm1 = self.move_arm_joints('psm1', q_psm1, interpolate=True)
-            r_psm2 = self.move_arm_joints('psm2', q_psm2, interpolate=True)
-            r_mtml = self.move_arm_joints('mtml',  q_mtml, interpolate=True)
-            r_mtmr = self.move_arm_joints('mtmr', q_mtmr, interpolate=True)
+            r_psm1 = self.move_arm_joints('psm1', q_psm1, inter=True)
+            r_psm2 = self.move_arm_joints('psm2', q_psm2, inter=True)
+            r_mtml = self.move_arm_joints('mtml',  q_mtml, inter=True)
+            r_mtmr = self.move_arm_joints('mtmr', q_mtmr, inter=True)
+            r_ecm = self.move_arm_joints('ecm', [0.0, 0.0, 0.0, 0.0], inter=True)
             if self.__mode__ == self.MODE.hardware:
                 break
         
@@ -449,13 +456,19 @@ class ClutchlessSystem:
             self.__cam_info__['right'] = msg
             
     def adjust_ecm_pos(self):
-        self.disable_teleop()
+#         self.disable_teleop()
+        
+        # No autocamera without teleop
+        if self.__enabled__ == False:
+            return
+        
         j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
             self.__autocamera__.set_method(2)
             jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)
             self.__pub_ecm__.publish(jnt_msg)
+            self.move_arm_joints('ecm', jnt_msg.position) 
 
     def __ecm_cb__(self, msg):
         """!
@@ -524,7 +537,7 @@ class ClutchlessSystem:
         # Find mtm end effector position and orientation
 #         self.__align_mtms_to_psms__()
         
-        if self.__ecm_last_jnt__ == None: return
+        if self.__ecm_last_jnt__ is None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
@@ -622,15 +635,15 @@ class ClutchlessSystem:
             gripper = (self.__mtml_gripper__-.4) * 1.4/.6
             new_psm2_angles = np.append(new_psm2_angles, gripper)
             
-#         if self.__mode__ == self.MODE.hardware:
-#             self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
-#          
-#         if self.__mode__ == self.MODE.simulation:
-#             msg = JointState()
-#             msg.position = new_psm2_angles.tolist()
-#             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-#             self.__pub_psm2__.publish(msg)
-        self.move_arm_joints('psm2', new_psm2_angles.tolist())
+        if self.__mode__ == self.MODE.hardware:
+            self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
+          
+        if self.__mode__ == self.MODE.simulation:
+            msg = JointState()
+            msg.position = new_psm2_angles.tolist()
+            msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            self.__pub_psm2__.publish(msg)
+#         self.move_arm_joints('psm2', new_psm2_angles.tolist())
             
         
         
@@ -638,7 +651,7 @@ class ClutchlessSystem:
     
     def __mtmr_cb__(self, msg):
         # Find mtm end effector position and orientation
-        if self.__ecm_last_jnt__ == None: return
+        if self.__ecm_last_jnt__ is None: return
         
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
@@ -734,15 +747,15 @@ class ClutchlessSystem:
             gripper = (self.__mtmr_gripper__-.4) * 1.2/.4
             new_psm1_angles = np.append(new_psm1_angles, gripper)
                 
-#         if self.__mode__ == self.MODE.hardware:
-#             self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
-#         
-#         if self.__mode__ == self.MODE.simulation:
-#             msg = JointState()
-#             msg.position = new_psm1_angles.tolist()
-#             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
-#             self.__pub_psm1__.publish(msg)
-        self.move_arm_joints('psm1', new_psm1_angles.tolist())
+        if self.__mode__ == self.MODE.hardware:
+            self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
+         
+        if self.__mode__ == self.MODE.simulation:
+            msg = JointState()
+            msg.position = new_psm1_angles.tolist()
+            msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
+            self.__pub_psm1__.publish(msg)
+#         self.move_arm_joints('psm1', new_psm1_angles.tolist())
         
         
     
