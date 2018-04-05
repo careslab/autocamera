@@ -33,7 +33,7 @@ class OculusClass:
 #             self.hw_ecm.home()
             self.hw_ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
             
-        self.sub_oculus = rospy.Subscriber('/oculus', msg.JointState, self.on_oculus_cb)
+        self.sub_oculus = rospy.Subscriber('/oculus', JointState, self.on_oculus_cb)
         
     def shutdown(self):
         print('shutting down oculus control')
@@ -56,10 +56,10 @@ class OculusClass:
         rospy.spin()
         
     def on_oculus_cb(self, message):
-        if self.__mode__ == self.MODE.simulation:
-            message.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
-            self.pub_ecm_sim.publish(message)
-        elif self.__mode__ == self.MODE.hardware:
+#         if self.__mode__ == self.MODE.simulation:
+        message.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
+        self.pub_ecm_sim.publish(message)
+        if self.__mode__ == self.MODE.hardware:
             print(message.__str__())
             self.hw_ecm.move_joint_list( list(message.position), interpolate=False)
             
