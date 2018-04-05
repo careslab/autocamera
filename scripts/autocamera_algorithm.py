@@ -246,7 +246,7 @@ class Autocamera:
             if l < 0.0:
                 l = 0.0
                 
-            print('self.distance_to_midpoint = {}\n'.format(self.distance_to_midpoint))
+#             print('self.distance_to_midpoint = {}\n'.format(self.distance_to_midpoint))
         # Equation of the line that passes through the midpoint of the tools and the key hole
         x = lambda t: key_hole[0] + ab_vector[0] * t
         y = lambda t: key_hole[1] + ab_vector[1] * t

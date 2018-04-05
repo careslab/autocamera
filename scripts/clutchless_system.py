@@ -24,7 +24,7 @@ class ClutchlessSystem:
         self.__cam_info__ = {'left':CameraInfo(), 'right':CameraInfo()}
         
         ## The scale of movements from MTMs to PSMs
-        self.scale = 0.5
+        self.scale = 0.3
         self.__x_scale__ = self.scale
         self.__y_scale__ = self.scale
         self.__z_scale__ = self.scale
@@ -573,6 +573,9 @@ class ClutchlessSystem:
         pos = T[0:3,3]
         rot = T[0:3,0:3]
         
+        if self.__mtml_home_position__ is None:
+            self.__mtml_home_position__ = pos
+        
         if self.__mtml_last_pos__ == None or self.__clutch_active__:
             self.__mtml_first_pos__ = pos
             self.__mtml_last_pos__ = pos
@@ -687,6 +690,8 @@ class ClutchlessSystem:
         rot = T[0:3,0:3]
         pos = T[0:3,3]
         
+        if self.__mtmr_home_position__ is None:
+            self.__mtmr_home_position__ = pos
         
         if self.__mtmr_last_pos__ == None  or self.__clutch_active__:
             self.__mtmr_first_pos__ = pos
@@ -781,13 +786,50 @@ class ClutchlessSystem:
             self.__hw_mtmr__.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolate=True)
             
         
+    
+    def get_dynamic_scale(self, arm_name):
+        if arm_name.lower() == 'mtml':
+            home_position = self.__mtml_home_position__
+            dir = self.__mtml_dir__
+            pos = self.__mtml_last_pos__
+        elif arm_name.lower() == 'mtmr':
+            home_position = self.__mtmr_home_position__
+            dir = self.__mtmr_dir__
+            pos = self.__mtmr_last_pos__
+            
+        if home_position is None:
+            return self.scale, self.scale, self.scale
         
+        dir = [float(i) for i in dir]
+        h = [float(i) for i in (pos-home_position)]
+        
+        dir = [ i/abs(i) if i !=0 else i for i in dir]
+        loc_vec = [ i/abs(i) if i!=0 else i for i in h]
+
+        # positive means moving away from center 
+        # and negative means moving towards it
+        # If it's moving away we want to increase
+        # the scaling and if it's moving closer to center
+        # we want to decrease the scaling
+        signs = [i * j for i,j in zip(dir, loc_vec)]
+        
+        sx = self.scale + h[0] * signs[0]/5.0
+        sy = self.scale + h[1] * signs[1]/5.0
+        sz = self.scale + h[2] * signs[2]/5.0
+        
+        return sx, sy, sz
+        
+        
+            
     def __translate_mtml__(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
-        translation[0] = translation[0] * self.__x_scale__
-        translation[1] = translation[1] * self.__y_scale__
-        translation[2] = translation[2] * self.__z_scale__
+        sx, sy, sz = self.get_dynamic_scale('mtml')
+        print("scales = {}, {}, {}\n".format(sx,sy,sz))
+        
+        translation[0] = translation[0] * sx
+        translation[1] = translation[1] * sy
+        translation[2] = translation[2] * sz
         
         psm2_pos = self.__psm2_first_pos__#self.__psm2_kin__.FK(self.__psm2_last_jnt__)
         if T==None:
