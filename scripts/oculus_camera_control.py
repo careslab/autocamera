@@ -43,7 +43,7 @@ class OculusClass:
             self.pub_ecm_sim.unregister()
             
             print( "Shutting down " + self.__class__.__name__)
-        except e:
+        except Exception:
             print("couldn't unregister all the topics")
 
     def set_mode(self, mode):
