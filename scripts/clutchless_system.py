@@ -183,7 +183,7 @@ class ClutchlessSystem:
         wrapper.has_run = False
         return wrapper
     
-    
+    @run_once
     def move_arm_joints(self, arm_name, joints, inter = False):
         
         # Make sure the format is correct
@@ -251,12 +251,17 @@ class ClutchlessSystem:
             q_mtml.append(0.0)
             q_mtmr.append(0.0)
         
-        for i in range(20): 
+        for i in range(5): 
             r_psm1 = self.move_arm_joints('psm1', q_psm1, inter=True)
+            rospy.sleep(.1)
             r_psm2 = self.move_arm_joints('psm2', q_psm2, inter=True)
+            rospy.sleep(.1)
             r_mtml = self.move_arm_joints('mtml',  q_mtml, inter=True)
+            rospy.sleep(.1)
             r_mtmr = self.move_arm_joints('mtmr', q_mtmr, inter=True)
+            rospy.sleep(.1)
             r_ecm = self.move_arm_joints('ecm', [0.0, 0.0, 0.0, 0.0], inter=True)
+            rospy.sleep(.1)
             if self.__mode__ == self.MODE.hardware:
                 break
         
@@ -787,7 +792,7 @@ class ClutchlessSystem:
             
         
     
-    def get_dynamic_scale(self, arm_name):
+    def __get_dynamic_scale(self, arm_name):
         if arm_name.lower() == 'mtml':
             home_position = self.__mtml_home_position__
             dir = self.__mtml_dir__
@@ -824,7 +829,7 @@ class ClutchlessSystem:
     def __translate_mtml__(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
-        sx, sy, sz = self.get_dynamic_scale('mtml')
+        sx, sy, sz = self.__get_dynamic_scale('mtml')
         print("scales = {}, {}, {}\n".format(sx,sy,sz))
         
         translation[0] = translation[0] * sx
