@@ -29,6 +29,7 @@ class ClutchlessSystem:
         self.__y_scale__ = self.scale
         self.__z_scale__ = self.scale
         
+        self.__mtml_translations__ = None
         # Hand controller's desired position
         self.__mtml_home_position__ = None
         self.__mtmr_home_position__ = None
@@ -92,8 +93,8 @@ class ClutchlessSystem:
         self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
         # Publish to PSMs simulation
-        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=10)
-        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=10)
+        self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
+        self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
         
         # Publish to MTMs simulation
         self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=10)
@@ -541,7 +542,6 @@ class ClutchlessSystem:
         """
         # Find mtm end effector position and orientation
 #         self.__align_mtms_to_psms__()
-        
         if self.__ecm_last_jnt__ is None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
@@ -587,11 +587,7 @@ class ClutchlessSystem:
             self.__mtml_last_rot__ = rot
             return
         
-        # Find the direction of mtml movement
-        self.__mtml_dir__ = pos - self.__mtml_last_pos__
         
-        self.__mtml_last_pos__ = pos
-        self.__mtml_last_rot__ = rot
         
         if self.__enabled__ == False: return
         if self.__mode__ == self.MODE.hardware:
@@ -600,10 +596,22 @@ class ClutchlessSystem:
         delta = pos - self.__mtml_first_pos__
         delta = np.insert(delta, 3,1).transpose()
         p0 = np.insert(self.__mtml_first_pos__, 3,1).reshape(4,1)
-        p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
+        p1 = np.insert(self.__mtml_last_pos__, 3,1,).reshape(4,1)
+        p2 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
-        translation = (p1-p0)
-        translation = ( self.__T_ecm__ * translation)[0:3]
+        movement = p2-p1
+        sx,sy,sz = self.__get_dynamic_scale('mtml')
+        movement[0] *= sx
+        movement[1] *= sy
+        movement[2] *= sz
+        if self.__mtml_translations__ is None:
+            self.__mtml_translations__ = (p1-p0) + movement
+        else:
+            self.__mtml_translations__ += movement
+            
+        new_translation = self.__mtml_translations__
+#         translation = (p1-p0)
+        translation = ( self.__T_ecm__ * new_translation)[0:3]
         
         orientation = self.__T_ecm__[0:3,0:3] * rot
 
@@ -653,6 +661,10 @@ class ClutchlessSystem:
             self.__pub_psm2__.publish(msg)
 #         self.move_arm_joints('psm2', new_psm2_angles.tolist())
             
+        # Find the direction of mtml movement
+        self.__mtml_dir__ = pos - self.__mtml_last_pos__
+        self.__mtml_last_pos__ = pos
+        self.__mtml_last_rot__ = rot
         
         
         
@@ -818,23 +830,48 @@ class ClutchlessSystem:
         # we want to decrease the scaling
         signs = [i * j for i,j in zip(dir, loc_vec)]
         
-        sx = self.scale + h[0] * signs[0]/5.0
-        sy = self.scale + h[1] * signs[1]/5.0
-        sz = self.scale + h[2] * signs[2]/5.0
+#         mult = .2
+#         self.__x_scale__ = self.__x_scale__ + h[0] * signs[0] * mult
+#         self.__y_scale__ = self.__y_scale__ + h[1] * signs[1] * mult
+#         self.__z_scale__ = self.__z_scale__ + h[2] * signs[2] * mult
         
-        return sx, sy, sz
+        if signs[0] > 0: # moving away
+            self.__x_scale__ = .3
+        elif signs[0] <0:
+            self.__x_scale__ = .3
+        
+        if signs[1] > 0: # moving away
+            self.__y_scale__ = .3
+        elif signs[1] <0:
+            self.__y_scale__ = .3
+             
+        if signs[2] > 0: # moving away
+            self.__z_scale__ = .3
+        elif signs[2] <0:
+            self.__z_scale__ = .3
+        def set_max(x):
+            m = .5
+            if x > m:
+                x = m
+            return abs(x)
+        self.__x_scale__ = set_max(self.__x_scale__)
+        self.__y_scale__ = set_max(self.__y_scale__)
+        self.__z_scale__ = set_max(self.__z_scale__)
+        
+        print self.__x_scale__, self.__y_scale__, self.__z_scale__
+        return self.__x_scale__, self.__y_scale__, self.__z_scale__
         
         
             
     def __translate_mtml__(self, translation, T=None): # translate a psm arm
-        if self.__enabled__ == False: return
-        
-        sx, sy, sz = self.__get_dynamic_scale('mtml')
-        print("scales = {}, {}, {}\n".format(sx,sy,sz))
-        
-        translation[0] = translation[0] * sx
-        translation[1] = translation[1] * sy
-        translation[2] = translation[2] * sz
+#         if self.__enabled__ == False: return
+#         
+#         sx, sy, sz = self.__get_dynamic_scale('mtml')
+#         print("scales = {}, {}, {}\n".format(sx,sy,sz))
+#         
+#         translation[0] = translation[0] * sx
+#         translation[1] = translation[1] * sy
+#         translation[2] = translation[2] * sz
         
         psm2_pos = self.__psm2_first_pos__#self.__psm2_kin__.FK(self.__psm2_last_jnt__)
         if T==None:
