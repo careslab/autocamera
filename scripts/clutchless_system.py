@@ -1,6 +1,22 @@
 from __common_imports__ import *
 from autocamera_algorithm import Autocamera
+from rospy.core import rospydebug
 class ClutchlessSystem:
+    """!
+        The ClutchlessSystem class intends to automate the movements 
+        of the camera and MTM repositioning.
+        
+        TO DO:
+            - Create 3D deadzone for autocamera
+                - Display it in RViz [Done]
+                - Compute the correct parameters for the deadzone
+            - Have the autocamera move when a tool hits the edge of the deadzone
+            - Figure out a way to use clutchless system with zooming
+            - Implement clutchless system when the tools are in camera view
+            - Implement the clutchless sytem when the camera is moving
+            - Create a fitness function for MTM and PSM relation
+    """
+    
     class MODE:
         """
             simulation mode: Use the hardware for the master side, 
@@ -79,6 +95,8 @@ class ClutchlessSystem:
         """!
         Initialize the ros publishers and subscribers
         """
+        
+        self.__deadzone_pub__ = rospy.Publisher('/deadzone', PolygonStamped)
         
         self.__mtml_robot__ = URDF.from_parameter_server('/dvrk_mtml/robot_description')
         self.__mtmr_robot__ = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
@@ -280,6 +298,8 @@ class ClutchlessSystem:
         Same as shutdown
         """
         
+        self.__deadzone_pub__.unregister()
+        
         self.__sub_mtml__.unregister()
         self.__sub_mtmr__.unregister()
         self.__sub_psm1__.unregister()
@@ -472,6 +492,10 @@ class ClutchlessSystem:
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
             self.__autocamera__.set_method(2)
+            
+            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__)
+            self.__deadzone_pub__.publish(p)
+            
             jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)
             self.__pub_ecm__.publish(jnt_msg)
             self.move_arm_joints('ecm', jnt_msg.position) 

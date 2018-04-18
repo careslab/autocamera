@@ -1,5 +1,6 @@
 # TO DO: Write interpolation function that returns a list of interpolated data
 from __future__ import division
+from __common_imports__ import *
 
 import sys
 import rospy
@@ -7,7 +8,6 @@ import roslib
 import xacro
 import re
 import math
-import numpy
 import pdb
 import os
 import hrl_geom
@@ -21,14 +21,9 @@ from geometry_msgs.msg import Point
 
 from visualization_msgs.msg import Marker
 
-from sensor_msgs.msg import JointState
-from sensor_msgs.msg import CameraInfo
-
 from math import acos, atan2, cos, pi, sin
 from numpy import array, cross, dot, float64, hypot, zeros, rot90
 from numpy.linalg import norm
-from urdf_parser_py.urdf import URDF
-from pykdl_utils.kdl_kinematics import KDLKinematics
 from visualization_msgs.msg._Marker import Marker
 import image_geometry
 import time
@@ -38,7 +33,7 @@ class Autocamera:
     
     def __init__(self):
         self.method_number = 1
-        
+        self.z = 0.0
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
@@ -84,8 +79,8 @@ class Autocamera:
         return [row[i] for row in matrix]
     
     def find_rotation_matrix_between_two_vectors(self, a,b):
-        a = numpy.array(a).reshape(1,3)[0].tolist()
-        b = numpy.array(b).reshape(1,3)[0].tolist()
+        a = np.array(a).reshape(1,3)[0].tolist()
+        b = np.array(b).reshape(1,3)[0].tolist()
         
         vector_orig = a / norm(a)
         vector_fin = b / norm(b)
@@ -107,7 +102,7 @@ class Autocamera:
         # Trig functions (only need to do this maths once!).
         ca = cos(angle)
         sa = sin(angle)
-        R = numpy.identity(3)
+        R = np.identity(3)
         # Calculate the rotation matrix elements.
         R[0,0] = 1.0 + (1.0 - ca)*(x**2 - 1.0)
         R[0,1] = -z*sa + (1.0 - ca)*x*y
@@ -119,7 +114,7 @@ class Autocamera:
         R[2,1] = x*sa+(1.0 - ca)*y*z
         R[2,2] = 1.0 + (1.0 - ca)*(z**2 - 1.0)
         
-        R = numpy.matrix(R)
+        R = np.matrix(R)
         return R 
         
         
@@ -165,7 +160,7 @@ class Autocamera:
         else:
             r = self.find_rotation_matrix_between_two_vectors([1,0,0], [0,0,1])
             rot = pose[0:3,0:3] * r
-            pose2 = numpy.matrix(numpy.identity(4))
+            pose2 = np.matrix(np.identity(4))
             pose2[0:3,0:3] = rot
             pose2[0:3,3] = pose[0:3,3]
             quat_pose = PoseConv.to_pos_quat(pose2)
@@ -195,9 +190,9 @@ class Autocamera:
         mid_point = (psm1_pos + psm2_pos)/2
 #         diff = clean_joints['psm1'].position[2] - clean_joints['psm2'].position[2]
 #         if diff > 0:
-#             mid_point = (psm1_pos * (1+numpy.abs(diff)/1) + psm2_pos)/2
+#             mid_point = (psm1_pos * (1+np.abs(diff)/1) + psm2_pos)/2
 #         elif diff < 0:
-#             mid_point = (psm1_pos + psm2_pos * (1+numpy.abs(diff)/1) )/2
+#             mid_point = (psm1_pos + psm2_pos * (1+np.abs(diff)/1) )/2
 #         else:
 #             mid_point = (psm1_pos + psm2_pos)/2
 #             
@@ -206,10 +201,10 @@ class Autocamera:
 
 
         
-#         if numpy.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
+#         if np.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
 #             mid_point = self.last_midpoint
-#         self.logerror("Distance is " + numpy.linalg.norm(mid_point-self.last_midpoint).__str__(), debug=True)
-#         mid_point = ecm_pose[0:3,3] - numpy.array([0,0,.01]).reshape(3,1)
+#         self.logerror("Distance is " + np.linalg.norm(mid_point-self.last_midpoint).__str__(), debug=True)
+#         mid_point = ecm_pose[0:3,3] - np.array([0,0,.01]).reshape(3,1)
         self.add_marker(PoseConv.to_homo_mat([mid_point, [0,0,0]]), '/marker_subscriber',color=[1,0,0], scale=[0.047/5,0.047/5,0.047/5])
         self.add_marker(PoseConv.to_homo_mat([key_hole,[0,0,0]]), '/keyhole_subscriber',[0,0,1])
         self.add_marker(ecm_pose, '/current_ecm_pose', [1,0,0], Marker.ARROW, scale=[.1,.005,.005])
@@ -254,7 +249,7 @@ class Autocamera:
         
         t = l/m
         
-        new_ecm_position = numpy.array([x(t), y(t), z(t)]).reshape(3,1)
+        new_ecm_position = np.array([x(t), y(t), z(t)]).reshape(3,1)
         
         ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3]  
         ecm_pose[0:3,3] = new_ecm_position
@@ -283,9 +278,9 @@ class Autocamera:
             T2W = psm2_kin_to_wrist.forward(clean_joints['psm2'].position)
             
             TEW = self.ecm_kin.forward(clean_joints['ecm'].position)
-            TEW_inv = numpy.linalg.inv(TEW)
-            T1W_inv = numpy.linalg.inv(T1W)
-            T2W_inv = numpy.linalg.inv(T2W)
+            TEW_inv = np.linalg.inv(TEW)
+            T1W_inv = np.linalg.inv(T1W)
+            T2W_inv = np.linalg.inv(T2W)
             
             mid_point = (T1W[0:4,3] + T2W[0:4,3])/2
             p1 = T1W[0:4,3]
@@ -301,12 +296,12 @@ class Autocamera:
             # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
             # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
             r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
-            r_inv = numpy.linalg.inv(r);
+            r_inv = np.linalg.inv(r);
             
-#             r = numpy.linalg.inv(r)
+#             r = np.linalg.inv(r)
             self.logerror( r.__str__())
             
-#             rotate_vector = lambda x: (r * numpy.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
+#             rotate_vector = lambda x: (r * np.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
              
             l1, r1 = ig.project3dToPixel( ( r_inv * TEW_inv * T1W )[0:3,3]) # tool1 left and right pixel positions
             l2, r2 = ig.project3dToPixel( ( r_inv * TEW_inv * T2W )[0:3,3]) # tool2 left and right pixel positions
@@ -400,11 +395,11 @@ class Autocamera:
     
     
     def get_2d_point_from_3d_point_relative_to_world_rf(self, cam_info, TEW_inv, point):
-        b = numpy.matrix( [ [-1, 0, 0], [0,1,0], [0,0,-1]])
+        b = np.matrix( [ [-1, 0, 0], [0,1,0], [0,0,-1]])
     #     point[0:3]  = b * point[0:3]
         
         
-        P = numpy.array(cam_info.P).reshape(3,4)
+        P = np.array(cam_info.P).reshape(3,4)
         m = TEW_inv * point
         u,v,w = P * m
         x = u/w
@@ -423,9 +418,9 @@ class Autocamera:
             T2W = psm2_kin_to_wrist.forward(clean_joints['psm2'].position)
             
             TEW = self.ecm_kin.forward(clean_joints['ecm'].position)
-            TEW_inv = numpy.linalg.inv(TEW)
-            T1W_inv = numpy.linalg.inv(T1W)
-            T2W_inv = numpy.linalg.inv(T2W)
+            TEW_inv = np.linalg.inv(TEW)
+            T1W_inv = np.linalg.inv(T1W)
+            T2W_inv = np.linalg.inv(T2W)
             
             mid_point = (T1W[0:4,3] + T2W[0:4,3])/2
             p1 = T1W[0:4,3]
@@ -441,12 +436,12 @@ class Autocamera:
             # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
             # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
             r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
-            r_inv = numpy.linalg.inv(r);
+            r_inv = np.linalg.inv(r);
             
-#             r = numpy.linalg.inv(r)
+#             r = np.linalg.inv(r)
             self.logerror( r.__str__())
             
-#             rotate_vector = lambda x: (r * numpy.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
+#             rotate_vector = lambda x: (r * np.array([ [x[0]], [x[1]], [x[2]], [1] ]) )[0:3,3]
              
             self.add_marker(T2W, '/left_arm', scale=[.002,.002,.002])
             
@@ -489,7 +484,32 @@ class Autocamera:
             self.distance_to_midpoint -= zoom_percentage
         return msg   
     
-    
+    def get_3d_deadzone(self, cam_info):
+        cam = cam_info['left']
+        fx = cam.K[0]
+        fy = cam.K[4]
+        cx = cam.K[2]
+        cy = cam.K[5]
+        fov_x = 2 * np.arctan(cy/fy)
+        fov_y = 2 * np.arctan(cx/fx)
+
+        p = PolygonStamped()
+        self.z = (self.z + .001) % .2
+        if self.distance_to_midpoint is None:
+            Z = self.z
+        else:
+            Z = self.distance_to_midpoint
+        margin = .15
+        mult = 1 - margin
+        p.polygon.points.append( Point32(x=-cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
+        p.polygon.points.append( Point32(x=cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
+        p.polygon.points.append( Point32(x=cx * Z * mult / fx,y=cy * Z * mult/ fy,z=Z))
+        p.polygon.points.append( Point32(x=-cx * Z * mult / fx,y=cy * Z * mult / fy,z=Z))
+        p.header.stamp = rospy.Time.now()
+        p.header.frame_id = '/fake_cam_left_optical_link' 
+        
+        return p
+            
     def track_tool_times(self, joints):
         tool_movement_threshold = 0.001
         if self.zoom_percentage != 0:
@@ -500,7 +520,7 @@ class Autocamera:
             self.tool_timer['psm1_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (numpy.linalg.norm( numpy.array(self.tool_timer['last_psm1_pos'])- numpy.array(joints['psm1'].position)) <tool_movement_threshold):
+            if not (np.linalg.norm( np.array(self.tool_timer['last_psm1_pos'])- np.array(joints['psm1'].position)) <tool_movement_threshold):
                 self.tool_timer['psm1_stay_start_time'] = time.time()
                 self.tool_timer['psm1_stationary_duration'] = 0
             else: # If the tool hasn't moved
@@ -512,7 +532,7 @@ class Autocamera:
             self.tool_timer['psm2_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (numpy.linalg.norm(numpy.array(self.tool_timer['last_psm2_pos'])- numpy.array(joints['psm2'].position)) <tool_movement_threshold):
+            if not (np.linalg.norm(np.array(self.tool_timer['last_psm2_pos'])- np.array(joints['psm2'].position)) <tool_movement_threshold):
                 self.tool_timer['psm2_stay_start_time'] = time.time()
                 self.tool_timer['psm2_stationary_duration'] = 0
             else: # If the tool hasn't moved
@@ -551,7 +571,7 @@ class Autocamera:
         
         if gripper == gripper or gripper != gripper: # luke was here
             output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose, cam_info)
-#             output_msg.position =list( numpy.array(output_msg.position) + ( -numpy.array(output_msg.position)+ numpy.array(goal_joints.position)) *.0001)
+#             output_msg.position =list( np.array(output_msg.position) + ( -np.array(output_msg.position)+ np.array(goal_joints.position)) *.0001)
             output_msg = self.find_zoom_level(output_msg, cam_info, clean_joints)
             pass
         

@@ -16,6 +16,8 @@ from std_msgs.msg._Float32 import Float32
 from geometry_msgs.msg import PoseStamped, Pose
 from geometry_msgs.msg._Wrench import Wrench
 from geometry_msgs.msg import Quaternion
+from geometry_msgs.msg import PolygonStamped
+from geometry_msgs.msg import Point32
 from visualization_msgs.msg import Marker
 from types import NoneType
 from hrl_geom import pose_converter
