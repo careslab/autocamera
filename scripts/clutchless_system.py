@@ -10,11 +10,14 @@ class ClutchlessSystem:
             - Create 3D deadzone for autocamera
                 - Display it in RViz [Done]
                 - Compute the correct parameters for the deadzone
-            - Have the autocamera move when a tool hits the edge of the deadzone
+            - Have the camera move when a tool hits the edge of the deadzone
+                - Detect when a tool is hitting the edge
+                - Determine which tool
+                - Move   the camera with the tool as long as it is touching the edge
             - Figure out a way to use clutchless system with zooming
             - Implement clutchless system when the tools are in camera view
             - Implement the clutchless sytem when the camera is moving
-            - Create a fitness function for MTM and PSM relation
+            - Create a fitness function for MTM and PSM relation in the camera view
     """
     
     class MODE:
@@ -492,8 +495,22 @@ class ClutchlessSystem:
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
             self.__autocamera__.set_method(2)
+
+            # The name of the frame we want to show the deadzone in            
+            frame_name = '/world'
+            # A function to convert from the camera frame to the desired frame
+            def frame_convertor(x,y,z):
+                my_point = np.array([x, y, z, 1]).reshape(4,1)
+                new_point = (self.__T_ecm__ * my_point)
+                x = float(new_point[0])
+                y = float(new_point[1])
+                z = float(new_point[2])
+                P = Point32( x = x, y = y, z = z)
+                
+                return P
             
-            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__)
+            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name, frame_convertor)
+            
             self.__deadzone_pub__.publish(p)
             
             jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)

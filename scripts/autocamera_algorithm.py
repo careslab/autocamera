@@ -233,6 +233,10 @@ class Autocamera:
         elif self.method_number == 2:
             # use the distance_to_midpoint variable to keep the distance to midpoint the same instead of keeping
             # the distance to keyhole consistent
+            
+            # distance_to_midpoint shouldn't be greater than the distance of the keyhole to the midpoint
+            if self.distance_to_midpoint > m:
+                self.distance_to_midpoint = m
             if self.distance_to_midpoint is None:
                 l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
             else:
@@ -482,9 +486,15 @@ class Autocamera:
                 msg.position[2] = .15
                 
             self.distance_to_midpoint -= zoom_percentage
+            
+            # Set the minimum and maximum value for distance_to_midpoint
+            if self.distance_to_midpoint < .05:
+                self.distance_to_midpoint = .05
+            elif self.distance_to_midpoint > .20:
+                self.distance_to_midpoint = .20
         return msg   
     
-    def get_3d_deadzone(self, cam_info):
+    def get_3d_deadzone(self, cam_info, frame_name, frame_convertor):
         cam = cam_info['left']
         fx = cam.K[0]
         fy = cam.K[4]
@@ -501,12 +511,12 @@ class Autocamera:
             Z = self.distance_to_midpoint
         margin = .15
         mult = 1 - margin
-        p.polygon.points.append( Point32(x=-cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
-        p.polygon.points.append( Point32(x=cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
-        p.polygon.points.append( Point32(x=cx * Z * mult / fx,y=cy * Z * mult/ fy,z=Z))
-        p.polygon.points.append( Point32(x=-cx * Z * mult / fx,y=cy * Z * mult / fy,z=Z))
+        p.polygon.points.append( frame_convertor(x=-cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
+        p.polygon.points.append( frame_convertor(x=cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
+        p.polygon.points.append( frame_convertor(x=cx * Z * mult / fx,y=cy * Z * mult/ fy,z=Z))
+        p.polygon.points.append( frame_convertor(x=-cx * Z * mult / fx,y=cy * Z * mult / fy,z=Z))
         p.header.stamp = rospy.Time.now()
-        p.header.frame_id = '/fake_cam_left_optical_link' 
+        p.header.frame_id = frame_name  
         
         return p
             
