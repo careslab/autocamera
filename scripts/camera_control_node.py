@@ -1061,7 +1061,6 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         self.pushButtonPowerOff.setEnabled(True)
         self.pushButtonPowerOn.setEnabled(False)
         self.pushButtonReset.setEnabled(True)
-        
         rospy.Publisher('/dvrk/console/home', Empty, latch=True, queue_size=1).publish()
     
     @pyqtSlot()

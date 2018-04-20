@@ -1,4 +1,8 @@
-# TO DO: Write interpolation function that returns a list of interpolated data
+'''!
+@author : Shahab Eslamian
+@contact: shahab.eslamian@wayne.edu
+'''
+
 from __future__ import division
 from __common_imports__ import *
 
@@ -29,11 +33,21 @@ import image_geometry
 import time
 
 class Autocamera:
+    """!
+        A class for autonomous manipulation of the camera arm in the da Vinci Standard 
+        surgical robot
+    """
     DEBUG = False # Print debug messages?
     
     def __init__(self):
+        """!
+            Class initialization function
+        """
         self.method_number = 1
         self.z = 0.0
+        self.deadzone_margin_3d = .15
+        self.deadzone_3d = [{'x':-1, 'y':-1}, {'x':-1, 'y':1}, {'x':1, 'y':1}, {'x':1, 'y':-1}]
+        
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
@@ -60,6 +74,10 @@ class Autocamera:
         self.logerror("autocamera_initialized")
         
     def set_method(self, n):
+        """!
+            Determines which autonomous camera method will be used
+            @param n : 1 or 2
+        """
         self.method_number = n
         
     def logerror(self, msg, debug = False):
@@ -79,6 +97,12 @@ class Autocamera:
         return [row[i] for row in matrix]
     
     def find_rotation_matrix_between_two_vectors(self, a,b):
+        """!
+            Returns a rotation matrix between vectors a and b
+            @param a : A vector
+            @param b : A vector
+            @return R : A 3x3 rotation matrix
+        """
         a = np.array(a).reshape(1,3)[0].tolist()
         b = np.array(b).reshape(1,3)[0].tolist()
         
@@ -467,7 +491,7 @@ class Autocamera:
             
             msg.position[3] = 0
 #             zoom_percentage = self.zoom_fitness(cam_info=cam_info['left'], mid_point=lm, inner_margin=.20,
-#                                             deadzone_margin= .70, tool_point= l1)
+#                                             deadzone_margin_3d= .70, tool_point= l1)
              
             mp = ( int(l1[0]+l2[0])/2, int(l1[1] + l2[1])/2)
             zoom_percentage = self.zoom_fitness2(cam_info['left'], mid_point=mp, tool_point=l1, 
@@ -495,6 +519,48 @@ class Autocamera:
         return msg   
     
     def get_3d_deadzone(self, cam_info, frame_name, frame_convertor):
+        """!
+            Returns a polygon object to be shown in RViz
+            
+            @param cam_info : The stereo camera parameters object
+            @param frame_name : The name of the frame that the polygon will be shown relative to
+            @param frame_convertor : A function that transforms any point from the camera frame to the desired frame
+            
+            @return p : A polygon object containing the coordinates of the deadzone
+        """
+
+        self.z = (self.z + .001) % .2
+        if self.distance_to_midpoint is None:
+            Z = self.z
+        else:
+            Z = self.distance_to_midpoint
+        self.deadzone_margin_3d = .15
+        
+        p = PolygonStamped()
+        for i in self.deadzone_3d:
+            x_lim = i['x']
+            y_lim = i['y']
+            p.polygon.points.append( frame_convertor( *self.project_to_3d(x_lim, y_lim, Z, cam_info)))
+            
+        p.header.stamp = rospy.Time.now()
+        p.header.frame_id = frame_name  
+        
+        return p
+    
+    def project_to_3d(self, x_lim, y_lim, z, cam_info):
+        """!
+            Returns x,y,z values for a point on the field of view based on the depth
+            
+            @param x_lim : a value between -1 and 1 that determines the horizontal place on the screen
+            @param y_lim : a value between -1 and 1 that determines the vertical place on the screen 
+            @param z : the depth, the distance from the camera end-effector
+            @param cam_info : the stereo camera parameters
+            
+            @return x,y,z
+        """
+        x_lim *= (1-self.deadzone_margin_3d)
+        y_lim *= (1-self.deadzone_margin_3d)
+        
         cam = cam_info['left']
         fx = cam.K[0]
         fy = cam.K[4]
@@ -502,24 +568,25 @@ class Autocamera:
         cy = cam.K[5]
         fov_x = 2 * np.arctan(cy/fy)
         fov_y = 2 * np.arctan(cx/fx)
-
-        p = PolygonStamped()
-        self.z = (self.z + .001) % .2
-        if self.distance_to_midpoint is None:
-            Z = self.z
-        else:
-            Z = self.distance_to_midpoint
-        margin = .15
-        mult = 1 - margin
-        p.polygon.points.append( frame_convertor(x=-cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
-        p.polygon.points.append( frame_convertor(x=cx * Z * mult / fx,y=-cy * Z * mult / fy,z=Z))
-        p.polygon.points.append( frame_convertor(x=cx * Z * mult / fx,y=cy * Z * mult/ fy,z=Z))
-        p.polygon.points.append( frame_convertor(x=-cx * Z * mult / fx,y=cy * Z * mult / fy,z=Z))
-        p.header.stamp = rospy.Time.now()
-        p.header.frame_id = frame_name  
         
-        return p
+        x = cx * z * x_lim / fx
+        y = cy * z * y_lim / fy
+        
+        return x,y,z
+    
+    def find_tool_relation_to_3d_deadzone(self, cam_info, tool_position):
+        """!
+            Returns whether the tool is inside or outside the deadzone, and a vector 
+            that shows the distance between the tool and the deadzone
             
+            @param cam_info : The stereo camera parameter object
+            @tool_position : The 3d coordinates of the tool
+            
+            @return "inside" or "outside"
+            @return v : A vector showing the distance between the deadzone and the tool
+        """
+        pass
+                
     def track_tool_times(self, joints):
         tool_movement_threshold = 0.001
         if self.zoom_percentage != 0:

@@ -15,9 +15,9 @@ class ClutchlessSystem:
                 - Determine which tool
                 - Move   the camera with the tool as long as it is touching the edge
             - Figure out a way to use clutchless system with zooming
+            - Create a fitness function for MTM and PSM relation in the camera view
             - Implement clutchless system when the tools are in camera view
             - Implement the clutchless sytem when the camera is moving
-            - Create a fitness function for MTM and PSM relation in the camera view
     """
     
     class MODE:
