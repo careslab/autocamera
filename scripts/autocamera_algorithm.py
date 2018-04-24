@@ -46,6 +46,8 @@ class Autocamera:
         self.method_number = 1
         self.z = 0.0
         self.deadzone_margin_3d = .15
+        self.tools_in_view = 2
+        
         self.deadzone_3d = [{'x':-1, 'y':-1}, {'x':-1, 'y':1}, {'x':1, 'y':1}, {'x':1, 'y':-1}]
         
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
@@ -585,8 +587,38 @@ class Autocamera:
             @return "inside" or "outside"
             @return v : A vector showing the distance between the deadzone and the tool
         """
-        pass
+        
+        p = lambda n : self.project_to_3d(self.deadzone_3d[n]['x'], self.deadzone_3d[n]['y'], tool_position[2], cam_info)
+
+        bottom_left = p(0)
+        top_left = p(1)
+        top_right = p(2)
+        bottom_right = p(3)
+        
+        # A helper function to make things easier
+        f = lambda p1, p2: self.find_distance_between_point_and_line(tool_position, p1,p2)
+        
+        distances = {'left':f( bottom_left, top_left), 'top': f(top_left, top_right), 'right': f(top_right, bottom_right), 'bottom': f(bottom_right, bottom_left)}
+        
+        print("distances = {}\n".format( distances))
+        
+        return distances
+            
+
+    def find_angle_between_3_points(self, corner, point1, point2):
+        dist = lambda a,b : norm( [float(i)-float(j) for i,j in zip(a,b)] )
+        a = dist(corner, point1)
+        b = dist(corner, point2)
+        c = dist(point1, point2) 
+        return np.arccos( (a**2 + b**2 - c**2)/( 2 *a*b))
                 
+    def find_distance_between_point_and_line(self, point, line_point1, line_point2):
+        dist = lambda a,b : norm( [float(i)-float(j) for i,j in zip(a,b)] )
+        
+        angle = self.find_angle_between_3_points(line_point1, point, line_point2)
+        
+        return np.sin(angle) * dist( point, line_point1 ) 
+                    
     def track_tool_times(self, joints):
         tool_movement_threshold = 0.001
         if self.zoom_percentage != 0:
@@ -637,6 +669,12 @@ class Autocamera:
     #         output_msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
     #         output_msg.position = [joint['ecm'].position[x] for x in [0,1,5,6]]
             return output_msg
+        
+        print("tool 1 : \n")
+        self.find_tool_relation_to_3d_deadzone(cam_info, psm1_pos)
+        
+        print("tool 2 : \n")
+        self.find_tool_relation_to_3d_deadzone(cam_info, psm2_pos)
         
         output_msg = clean_joints['ecm']
         

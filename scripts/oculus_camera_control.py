@@ -31,7 +31,7 @@ class OculusClass:
         elif self.__mode__ == self.MODE.hardware:
             self.__sub_ecm__ = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.__ecm_cb__)
 #             self.hw_ecm.home()
-            self.hw_ecm.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
+            self.hw_ecm.move_joint_list([0.0,0.0,0.07,0.0], interpolate=True)
             
         self.sub_oculus = rospy.Subscriber('/oculus', JointState, self.on_oculus_cb)
         

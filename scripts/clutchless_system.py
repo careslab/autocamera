@@ -510,6 +510,7 @@ class ClutchlessSystem:
                 return P
             
             p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name, frame_convertor)
+            self.__autocamera__.find_tool_relation_to_3d_deadzone(self.__cam_info__, self.__psm1_first_pos__)
             
             self.__deadzone_pub__.publish(p)
             
@@ -899,7 +900,7 @@ class ClutchlessSystem:
         self.__y_scale__ = set_max(self.__y_scale__)
         self.__z_scale__ = set_max(self.__z_scale__)
         
-        print self.__x_scale__, self.__y_scale__, self.__z_scale__
+#         print self.__x_scale__, self.__y_scale__, self.__z_scale__
         return self.__x_scale__, self.__y_scale__, self.__z_scale__
         
         
