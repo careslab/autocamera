@@ -615,7 +615,7 @@ class Autocamera:
     def find_distance_between_point_and_line(self, point, line_point1, line_point2):
         dist = lambda a,b : norm( [float(i)-float(j) for i,j in zip(a,b)] )
         
-        angle = self.find_angle_between_3_points(line_point1, point, line_point2)
+        angle = self.find_angle_between_3_points(line_point2, point, line_point1)
         
         return np.sin(angle) * dist( point, line_point1 ) 
                     
@@ -673,8 +673,8 @@ class Autocamera:
         print("tool 1 : \n")
         self.find_tool_relation_to_3d_deadzone(cam_info, psm1_pos)
         
-        print("tool 2 : \n")
-        self.find_tool_relation_to_3d_deadzone(cam_info, psm2_pos)
+#         print("tool 2 : \n")
+#         self.find_tool_relation_to_3d_deadzone(cam_info, psm2_pos)
         
         output_msg = clean_joints['ecm']
         

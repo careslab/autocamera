@@ -97,7 +97,7 @@ class ClutchControl:
         elif self.__mode__ == self.MODE.hardware:
             self.sub_ecm_cb = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.ecm_cb)
 #             self.ecm_hw.home()
-            self.ecm_hw.move_joint_list([0.0,0.0,0.0,0.0], interpolate=True)
+            self.ecm_hw.move_joint_list([0.0,0.0,0.07,0.0], interpolate=True)
         
         self.camera_clutch_pressed = False
         self.head_sensor_pressed = False
