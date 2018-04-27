@@ -50,6 +50,9 @@ class Autocamera:
         
         self.deadzone_3d = [{'x':-1, 'y':-1}, {'x':-1, 'y':1}, {'x':1, 'y':1}, {'x':1, 'y':-1}]
         
+        # ECM to World transform
+        self.__T_ecm__ = None
+        
         self.ecm_robot = URDF.from_parameter_server('/dvrk_ecm/robot_description')
         self.ecm_kin = KDLKinematics(self.ecm_robot, self.ecm_robot.links[0].name, self.ecm_robot.links[-1].name)
         
@@ -520,7 +523,13 @@ class Autocamera:
                 self.distance_to_midpoint = .20
         return msg   
     
-    def get_3d_deadzone(self, cam_info, frame_name, frame_convertor):
+    def convert_point_to_camera_frame(self):
+        pass
+    
+    def set_ecm_to_world_transform(self, T_ecm):
+        self.__T_ecm__ = T_ecm
+        
+    def get_3d_deadzone(self, cam_info, frame_name):
         """!
             Returns a polygon object to be shown in RViz
             
@@ -530,7 +539,17 @@ class Autocamera:
             
             @return p : A polygon object containing the coordinates of the deadzone
         """
-
+        # A function to convert from the camera frame to the world frame
+        def frame_convertor(x,y,z):
+            my_point = np.array([x, y, z, 1]).reshape(4,1)
+            new_point = (self.__T_ecm__ * my_point)
+            x = float(new_point[0])
+            y = float(new_point[1])
+            z = float(new_point[2])
+            P = Point32( x = x, y = y, z = z)
+            
+            return P
+        
         self.z = (self.z + .001) % .2
         if self.distance_to_midpoint is None:
             Z = self.z

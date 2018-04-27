@@ -494,22 +494,13 @@ class ClutchlessSystem:
         j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
+            self.set_ecm_to_world_transform(self.__T_ecm__)
             self.__autocamera__.set_method(2)
 
             # The name of the frame we want to show the deadzone in            
             frame_name = '/world'
-            # A function to convert from the camera frame to the desired frame
-            def frame_convertor(x,y,z):
-                my_point = np.array([x, y, z, 1]).reshape(4,1)
-                new_point = (self.__T_ecm__ * my_point)
-                x = float(new_point[0])
-                y = float(new_point[1])
-                z = float(new_point[2])
-                P = Point32( x = x, y = y, z = z)
-                
-                return P
             
-            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name, frame_convertor)
+            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name)
             
             self.__deadzone_pub__.publish(p)
             
