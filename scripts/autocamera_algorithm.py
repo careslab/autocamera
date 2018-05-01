@@ -11,7 +11,6 @@ import rospy
 import roslib
 import xacro
 import re
-import math
 import pdb
 import os
 import hrl_geom
@@ -21,14 +20,8 @@ import tf
 
 from hrl_geom.pose_converter import PoseConv
 from hrl_geom import transformations
-from geometry_msgs.msg import Point
 
-from visualization_msgs.msg import Marker
 
-from math import acos, atan2, cos, pi, sin
-from numpy import array, cross, dot, float64, hypot, zeros, rot90
-from numpy.linalg import norm
-from visualization_msgs.msg._Marker import Marker
 import image_geometry
 import time
 

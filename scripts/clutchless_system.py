@@ -70,9 +70,13 @@ class ClutchlessSystem:
         self.__mtmr_gripper__ = None
         
         self.__psm1_last_jnt__ = None
+        self.__psm1_last_pos__ = None
+        
         self.__psm2_last_jnt__ = None
+        self.__psm2_last_pos__ = None
         
         self.__ecm_last_jnt__ = None
+        self.__ecm_last_pos__ = None
         
         self.__mtml_first_pos__ = None
         self.__mtmr_first_pos__ = None
@@ -92,7 +96,15 @@ class ClutchlessSystem:
         self.__psm1_joint_names__ =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
         self.__psm2_joint_names__ =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
         self.__ecm_joint_names__ = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
-                
+
+        # Variables related to camera control                
+        # The point that the camera is pointing towards
+        self.__last_goal_point__ = None
+        
+        # The distance between the camera and the goal point
+        self.__distance_to_point__ = None
+        
+        self.tool_timer = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
         
     def __init__nodes(self):
         """!
@@ -484,29 +496,7 @@ class ClutchlessSystem:
         elif msg.header.frame_id == '/fake_cam_right_optical_link':
             self.__cam_info__['right'] = msg
             
-    def adjust_ecm_pos(self):
-#         self.disable_teleop()
-        
-        # No autocamera without teleop
-        if self.__enabled__ == False:
-            return
-        
-        j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
-        joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
-        if None not in joint_angles.values():
-            self.set_ecm_to_world_transform(self.__T_ecm__)
-            self.__autocamera__.set_method(2)
-
-            # The name of the frame we want to show the deadzone in            
-            frame_name = '/world'
-            
-            p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name)
-            
-            self.__deadzone_pub__.publish(p)
-            
-            jnt_msg = self.__autocamera__.compute_viewangle(joint_angles, self.__cam_info__)
-            self.__pub_ecm__.publish(jnt_msg)
-            self.move_arm_joints('ecm', jnt_msg.position) 
+    
 
     def __ecm_cb__(self, msg):
         """!
@@ -519,6 +509,7 @@ class ClutchlessSystem:
             self.__ecm_last_jnt__ = msg.position[0:3] + tuple([0])
         
         self.__T_ecm__ = self.__ecm_kin__.forward(self.__ecm_last_jnt__)
+        self.__ecm_last_pos__, _ = self.__ecm_kin__.FK( self.__ecm_last_jnt__)
           
     def __psm1_cb__(self, msg):
         """!
@@ -533,6 +524,8 @@ class ClutchlessSystem:
             self.__psm1_first_pos__, _ = self.__psm1_kin__.FK( msg.position[0:-1] )
             
         self.__psm1_last_jnt__ = msg.position[0:-1]
+        self.__psm1_last_pos__, _ = self.__psm1_kin__.FK( msg.position[0:-1] )
+        
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm1__.publish(msg)
             
@@ -553,6 +546,7 @@ class ClutchlessSystem:
             self.__psm2_first_pos__, _ = self.__psm2_kin__.FK( msg.position[0:-1] )
             
         self.__psm2_last_jnt__ = msg.position[0:-1]
+        self.__psm2_last_pos__, _ = self.__psm2_kin__.FK( msg.position[0:-1] )
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm2__.publish(msg)
             
@@ -943,5 +937,129 @@ class ClutchlessSystem:
         T[0:3,0:3] = orientation
         return T
             
-   
-      
+    ###########################
+    ## The camera operations ##
+    ###########################
+    def adjust_ecm_pos(self):
+#         self.disable_teleop()
+        
+        # No autocamera without teleop
+        if self.__enabled__ == False:
+            return
+        
+        j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
+        joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
+        if None not in joint_angles.values():
+#             self.set_ecm_to_world_transform(self.__T_ecm__)
+    
+            # The name of the frame we want to show the deadzone in            
+            frame_name = '/world'
+            
+#             p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name)
+#             
+#             self.__deadzone_pub__.publish(p)
+#             
+            point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+            p = self.point_towards_point(point)
+            jnt_msg = JointState()
+            jnt_msg.name = self.__ecm_joint_names__
+            jnt_msg.position = p
+            self.__pub_ecm__.publish(jnt_msg)
+            self.move_arm_joints('ecm', jnt_msg.position) 
+            
+    def point_towards_point(self, point):
+        key_hole, _ = self.__ecm_kin__.FK([0.0,0.0,0.0,0.0])
+        ecm_pose = self.__ecm_kin__.forward(self.__ecm_last_jnt__)
+        
+        add_marker(PoseConv.to_homo_mat([point, [0,0,0]]), '/marker_subscriber',color=[0,1,0], scale=[0.047/5,0.047/5,0.047/5])
+        add_marker(PoseConv.to_homo_mat([key_hole,[0,0,0]]), '/keyhole_subscriber',[0,0,1])
+        add_marker(ecm_pose, '/current_ecm_pose', [1,0,0], Marker.ARROW, scale=[.1,.005,.005])
+        
+        temp = self.__ecm_last_jnt__
+        b,_ = self.__ecm_kin__.FK([temp[0],temp[1],.14,temp[3]])
+        
+        # find the equation of the line that goes through the key_hole and the point
+        new_direction_vector = (point-key_hole)
+        ecm_current_direction = b-key_hole 
+        add_marker(ecm_pose, '/point_to_keyhole', [0,1,1], type=Marker.LINE_LIST, scale = [0.005, 0.005, 0.005], points=[b, key_hole])
+        
+        add_marker(PoseConv.to_homo_mat([new_direction_vector,[0,0,0]]), '/new_direction_vector',[0,1,0], type=Marker.ARROW)
+        r = find_rotation_matrix_between_two_vectors(ecm_current_direction, new_direction_vector)
+        
+        # Distance from keyhole to point
+        m = math.sqrt(new_direction_vector[0]**2 + new_direction_vector[1]**2 + new_direction_vector[2]**2) # new_direction_vector's length
+
+        if self.__last_goal_point__ == None:
+            self.__last_goal_point__ = m
+            self.__distance_to_point__ = m
+            
+        # insertion joint length
+        
+        # use the __distance_to_point__ variable to keep the distance to midpoint the same instead of keeping
+        # the distance to keyhole consistent
+        
+        # __distance_to_point__ shouldn't be greater than the distance of the keyhole to the desired point
+        if self.__distance_to_point__ > m:
+            self.__distance_to_point__ = m
+        if self.__distance_to_point__ is None:
+            l = math.sqrt( (ecm_pose[0,3]-key_hole[0])**2 + (ecm_pose[1,3]-key_hole[1])**2 + (ecm_pose[2,3]-key_hole[2])**2)
+        else:
+            l = m - self.__distance_to_point__
+            
+        if l < 0.0:
+            l = 0.0
+                
+        # Equation of the line that passes through the midpoint of the tools and the key hole
+        x = lambda t: key_hole[0] + new_direction_vector[0] * t
+        y = lambda t: key_hole[1] + new_direction_vector[1] * t
+        z = lambda t: key_hole[2] + new_direction_vector[2] * t
+        
+        t = l/m
+        
+        new_ecm_position = np.array([x(t), y(t), z(t)]).reshape(3,1)
+        
+        ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3]  
+        ecm_pose[0:3,3] = new_ecm_position
+        add_marker(ecm_pose, '/target_ecm_pose', [0,0,1], Marker.ARROW, scale=[.1,.005,.005])
+        output = self.__ecm_last_jnt__
+        
+        try:
+            p = self.__ecm_kin__.inverse(ecm_pose)
+        except Exception as e:
+            rospy.logerr('error')
+        if p != None:  
+#             p[3] = 0
+            output = p
+        else:
+            print("Clutchless Camera Inverse Failure ")
+        
+        return output
+    
+    def track_tool_times(self, joints):
+        tool_movement_threshold = 0.001
+        if self.zoom_percentage != 0:
+            tool_movement_threshold = 0.005
+            
+        if self.tool_timer['last_psm1_pos'] is None:
+            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+            self.tool_timer['psm1_stay_start_time'] = time.time()
+        else:
+            # If the tool has moved
+            if not (np.linalg.norm( np.array(self.tool_timer['last_psm1_pos'])- np.array(joints['psm1'].position)) <tool_movement_threshold):
+                self.tool_timer['psm1_stay_start_time'] = time.time()
+                self.tool_timer['psm1_stationary_duration'] = 0
+            else: # If the tool hasn't moved
+                self.tool_timer['psm1_stationary_duration'] = time.time() - self.tool_timer['psm1_stay_start_time']
+            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+                
+        if self.tool_timer['last_psm2_pos'] is None:
+            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
+            self.tool_timer['psm2_stay_start_time'] = time.time()
+        else:
+            # If the tool has moved
+            if not (np.linalg.norm(np.array(self.tool_timer['last_psm2_pos'])- np.array(joints['psm2'].position)) <tool_movement_threshold):
+                self.tool_timer['psm2_stay_start_time'] = time.time()
+                self.tool_timer['psm2_stationary_duration'] = 0
+            else: # If the tool hasn't moved
+                self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
+            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
