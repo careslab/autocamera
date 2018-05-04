@@ -23,7 +23,6 @@ from hrl_geom import transformations
 
 
 import image_geometry
-import time
 
 class Autocamera:
     """!

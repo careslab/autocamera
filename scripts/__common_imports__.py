@@ -1,6 +1,7 @@
 import rospy
 import numpy as np
 import math
+import time
 
 from arm import arm as robot
 from urdf_parser_py.urdf import URDF
@@ -120,3 +121,6 @@ def find_rotation_matrix_between_two_vectors(a,b):
         
         R = np.matrix(R)
         return R 
+    
+def distance(a, b):
+    return math.sqrt( sum([ (i-j)**2 for i,j in zip(a,b)]) )

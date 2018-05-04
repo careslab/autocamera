@@ -105,6 +105,9 @@ class ClutchlessSystem:
         self.__distance_to_point__ = None
         
         self.tool_timer = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
+        self.latest_call_to_camera_control = time.time()
+        self.zoom_speed = 0.01 # 5 cm/s
+        self.zoom_time_threshold = 0.3 # Wait 300 ms before adjusting the zoom level
         
     def __init__nodes(self):
         """!
@@ -947,6 +950,8 @@ class ClutchlessSystem:
         if self.__enabled__ == False:
             return
         
+        self.track_tool_times()
+        
         j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
         if None not in joint_angles.values():
@@ -992,12 +997,31 @@ class ClutchlessSystem:
         if self.__last_goal_point__ == None:
             self.__last_goal_point__ = m
             self.__distance_to_point__ = m
-            
-        # insertion joint length
         
+        ######################
+        # Zooming calculations
+        ######################
+    
+        # insertion joint length
         # use the __distance_to_point__ variable to keep the distance to midpoint the same instead of keeping
         # the distance to keyhole consistent
         
+        tool_gap = distance( self.__psm1_last_pos__, self.__psm2_last_pos__)
+        
+        dt = time.time() - self.latest_call_to_camera_control
+        dx = dt * self.zoom_speed
+        self.latest_call_to_camera_control = time.time()
+        
+        if (self.__distance_to_point__ is not None 
+            and self.tool_timer['psm1_stationary_duration'] > self.zoom_time_threshold   
+            and self.tool_timer['psm2_stationary_duration'] > self.zoom_time_threshold ):
+            
+            if tool_gap < .03 : # closer than 3 cm
+                self.__distance_to_point__ -= dx
+            elif tool_gap > .07: # farther than 10 cm
+                self.__distance_to_point__ += dx
+        
+            
         # __distance_to_point__ shouldn't be greater than the distance of the keyhole to the desired point
         if self.__distance_to_point__ > m:
             self.__distance_to_point__ = m
@@ -1033,33 +1057,53 @@ class ClutchlessSystem:
         else:
             print("Clutchless Camera Inverse Failure ")
         
-        return output
+        # Check for collision in case of this movement
+        if not self.collision(ecm_angles = output):
+            return output
+        else:
+            return self.__ecm_last_jnt__
     
-    def track_tool_times(self, joints):
-        tool_movement_threshold = 0.001
-        if self.zoom_percentage != 0:
-            tool_movement_threshold = 0.005
+    def collision(self, ecm_angles = None, psm1_angles = None, psm2_angles = None):
+        if ecm_angles is None:
+            ecm_angles = self.__ecm_last_jnt__
+        if psm1_angles is None:
+            psm1_angles = self.__psm1_last_jnt__
+        if psm2_angles is None:
+            psm2_angles = self.__psm2_last_jnt__
+        
+        safe_ecm_distance = 0.08 # 8 cm
+        
+        p_e, _ = self.__ecm_kin__.FK( ecm_angles)
+        p_1, _ = self.__psm1_kin__.FK( psm1_angles)
+        p_2, _ = self.__psm2_kin__.FK( psm2_angles)
+        
+        if distance( p_e, p_1) <= safe_ecm_distance or distance(p_e, p_2) <= safe_ecm_distance :
+            return True
+        return False
+    
+    def track_tool_times(self):
+        tool_movement_threshold = 0.003
             
         if self.tool_timer['last_psm1_pos'] is None:
-            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+            self.tool_timer['last_psm1_pos'] = self.__psm1_last_jnt__
             self.tool_timer['psm1_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (np.linalg.norm( np.array(self.tool_timer['last_psm1_pos'])- np.array(joints['psm1'].position)) <tool_movement_threshold):
+            if not (np.linalg.norm( np.array(self.tool_timer['last_psm1_pos'])- np.array(self.__psm1_last_jnt__)) <tool_movement_threshold):
                 self.tool_timer['psm1_stay_start_time'] = time.time()
                 self.tool_timer['psm1_stationary_duration'] = 0
             else: # If the tool hasn't moved
                 self.tool_timer['psm1_stationary_duration'] = time.time() - self.tool_timer['psm1_stay_start_time']
-            self.tool_timer['last_psm1_pos'] = joints['psm1'].position
+            self.tool_timer['last_psm1_pos'] = self.__psm1_last_jnt__
                 
         if self.tool_timer['last_psm2_pos'] is None:
-            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
+            self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
             self.tool_timer['psm2_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (np.linalg.norm(np.array(self.tool_timer['last_psm2_pos'])- np.array(joints['psm2'].position)) <tool_movement_threshold):
+            if not (np.linalg.norm(np.array(self.tool_timer['last_psm2_pos'])- np.array(self.__psm2_last_jnt__)) <tool_movement_threshold):
                 self.tool_timer['psm2_stay_start_time'] = time.time()
                 self.tool_timer['psm2_stationary_duration'] = 0
             else: # If the tool hasn't moved
                 self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
-            self.tool_timer['last_psm2_pos'] = joints['psm2'].position
+            self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
