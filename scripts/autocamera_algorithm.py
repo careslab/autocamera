@@ -22,8 +22,6 @@ from hrl_geom.pose_converter import PoseConv
 from hrl_geom import transformations
 
 
-import image_geometry
-
 class Autocamera:
     """!
         A class for autonomous manipulation of the camera arm in the da Vinci Standard 

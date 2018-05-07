@@ -39,8 +39,6 @@ class ClutchlessSystem:
         """
         
         self.__mode__ = mode
-        self.__autocamera__ = Autocamera()
-        self.__cam_info__ = {'left':CameraInfo(), 'right':CameraInfo()}
         
         ## The scale of movements from MTMs to PSMs
         self.scale = 0.3
@@ -85,7 +83,10 @@ class ClutchlessSystem:
         
         self.__T_ecm__ = None
         self.__T_mtml_000__ = None
+        self.__T_mtml__ = None
         self.__T_mtmr_000__ = None
+        self.__T_mtmr__ = None
+        
         self.__arms_homed__ = False
         self.__paused__ = False
         self.__reenable_teleop__ = False
@@ -108,6 +109,10 @@ class ClutchlessSystem:
         self.latest_call_to_camera_control = time.time()
         self.zoom_speed = 0.01 # 5 cm/s
         self.zoom_time_threshold = 0.3 # Wait 300 ms before adjusting the zoom level
+        self.__ig__ = image_geometry.StereoCameraModel()
+        self.__cam_info__ = {'left':CameraInfo(), 'right':CameraInfo()}
+        self.__cam_width__ = None
+        self.__cam_height__= None
         
     def __init__nodes(self):
         """!
@@ -499,7 +504,11 @@ class ClutchlessSystem:
         elif msg.header.frame_id == '/fake_cam_right_optical_link':
             self.__cam_info__['right'] = msg
             
-    
+        self.__ig__.fromCameraInfo(self.__cam_info__['right'], self.__cam_info__['left'])
+        
+        self.__cam_width__ = 2 * self.__cam_info__['left'].K[2]
+        self.__cam_height__= 2 *self.__cam_info__['left'].K[5]
+        
 
     def __ecm_cb__(self, msg):
         """!
@@ -593,6 +602,8 @@ class ClutchlessSystem:
         _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
         T_mtm = self.__mtml_kin__.forward(msg.position)
+        self.__T_mtml__ = T_mtm
+        
         T = ( self.__T_mtml_000__**-1) * T_mtm 
         T =  r_330_z_t * T * r_330_y_t * r_30_x_t
         transform = np.matrix( [ [0,-1,0,0], 
@@ -723,6 +734,7 @@ class ClutchlessSystem:
         _, r_330_x_t = self.rotate('x', -np.pi/6.0)
         
         T_mtm = self.__mtmr_kin__.forward(msg.position)
+        self.__T_mtmr__ = T_mtm
         
         T = ( self.__T_mtmr_000__**-1) * T_mtm 
         T = r_330_z_t * T * r_330_y_t * r_330_x_t
@@ -1006,7 +1018,14 @@ class ClutchlessSystem:
         # use the __distance_to_point__ variable to keep the distance to midpoint the same instead of keeping
         # the distance to keyhole consistent
         
-        tool_gap = distance( self.__psm1_last_pos__, self.__psm2_last_pos__)
+        l1, r1 = self.project_from_3d_to_pixel(self.__psm1_last_pos__)
+        l2, r2 = self.project_from_3d_to_pixel(self.__psm2_last_pos__)
+        
+        new_l1 = [l1[0]/self.__cam_width__, l1[1]/self.__cam_height__]
+        new_l2 = [l2[0]/self.__cam_width__, l2[1]/self.__cam_height__]
+        tool_gap = distance( new_l1, new_l2)
+        
+        print("tool_gap = {}\n\n".format(tool_gap))
         
         dt = time.time() - self.latest_call_to_camera_control
         dx = dt * self.zoom_speed
@@ -1016,9 +1035,9 @@ class ClutchlessSystem:
             and self.tool_timer['psm1_stationary_duration'] > self.zoom_time_threshold   
             and self.tool_timer['psm2_stationary_duration'] > self.zoom_time_threshold ):
             
-            if tool_gap < .03 : # closer than 3 cm
+            if tool_gap < .2 : # closer than 20% of the screen
                 self.__distance_to_point__ -= dx
-            elif tool_gap > .07: # farther than 10 cm
+            elif tool_gap > .7: # farther than 80 percent of the screen
                 self.__distance_to_point__ += dx
         
             
@@ -1107,3 +1126,16 @@ class ClutchlessSystem:
             else: # If the tool hasn't moved
                 self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
             self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
+            
+    def project_from_3d_to_pixel(self, point):
+        # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+        # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
+        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+        r_inv = np.linalg.inv(r);
+        TEW_inv = self.__T_ecm__ ** -1
+        T = np.eye(4)
+        T[0,3] = point[0]; T[1,3] = point[1]; T[2,3] = point[2]
+        
+        l, r = self.__ig__.project3dToPixel( ( r_inv * TEW_inv * T )[0:3,3]) # left and right camera pixel positions
+        
+        return l, r
