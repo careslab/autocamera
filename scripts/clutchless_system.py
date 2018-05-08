@@ -541,7 +541,7 @@ class ClutchlessSystem:
         if self.__mode__ == self.MODE.hardware:
             self.__pub_psm1__.publish(msg)
             
-        self.adjust_ecm_pos()
+        self.__adjust_ecm_pos()
             
         
     def __psm2_cb__(self, msg):
@@ -955,14 +955,17 @@ class ClutchlessSystem:
     ###########################
     ## The camera operations ##
     ###########################
-    def adjust_ecm_pos(self):
+    def __adjust_ecm_pos(self):
+        """!
+            Controls the camera location
+        """
 #         self.disable_teleop()
         
         # No autocamera without teleop
         if self.__enabled__ == False:
             return
         
-        self.track_tool_times()
+        self.__track_tool_times()
         
         j = lambda x, n : JointState(position = x, name = n) # convert to JointState message
         joint_angles = {'ecm': j(self.__ecm_last_jnt__, self.__ecm_joint_names__), 'psm1': j(self.__psm1_last_jnt__, self.__psm1_joint_names__), 'psm2': j(self.__psm2_last_jnt__, self.__psm2_joint_names__)}
@@ -972,19 +975,65 @@ class ClutchlessSystem:
             # The name of the frame we want to show the deadzone in            
             frame_name = '/world'
             
-#             p = self.__autocamera__.get_3d_deadzone(self.__cam_info__, frame_name)
+#             p = self.__autocamera__.__get_3d_deadzone(self.__cam_info__, frame_name)
 #             
 #             self.__deadzone_pub__.publish(p)
 #             
             point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
-            p = self.point_towards_point(point)
+            p = self.__point_towards(point)
             jnt_msg = JointState()
             jnt_msg.name = self.__ecm_joint_names__
             jnt_msg.position = p
             self.__pub_ecm__.publish(jnt_msg)
             self.move_arm_joints('ecm', jnt_msg.position) 
+    
+    def __get_3d_deadzone(self, cam_info, frame_name):
+        """!
+            Returns a polygon object to be shown in RViz
             
-    def point_towards_point(self, point):
+            @param cam_info : The stereo camera parameters object
+            @param frame_name : The name of the frame that the polygon will be shown relative to
+            @param frame_convertor : A function that transforms any point from the camera frame to the desired frame
+            
+            @return p : A polygon object containing the coordinates of the deadzone
+        """
+        # A function to convert from the camera frame to the world frame
+        def frame_convertor(x,y,z):
+            my_point = np.array([x, y, z, 1]).reshape(4,1)
+            new_point = (self.__T_ecm__ * my_point)
+            x = float(new_point[0])
+            y = float(new_point[1])
+            z = float(new_point[2])
+            P = Point32( x = x, y = y, z = z)
+            
+            return P
+        
+        self.z = (self.z + .001) % .2
+        if self.distance_to_midpoint is None:
+            Z = self.z
+        else:
+            Z = self.distance_to_midpoint
+        self.deadzone_margin_3d = .15
+        
+        p = PolygonStamped()
+        for i in self.deadzone_3d:
+            x_lim = i['x']
+            y_lim = i['y']
+            p.polygon.points.append( frame_convertor( *self.__project_from_pixel_to_3d(x_lim, y_lim, Z, cam_info)))
+            
+        p.header.stamp = rospy.Time.now()
+        p.header.frame_id = frame_name  
+        
+        return p
+                
+    def __point_towards(self, point):
+        """!
+            Returns the ECM joint angles necessary for it to point towards a specified point
+            
+            @param point : 3D coordinates of a point
+            
+            @return ECM joint angles
+        """
         key_hole, _ = self.__ecm_kin__.FK([0.0,0.0,0.0,0.0])
         ecm_pose = self.__ecm_kin__.forward(self.__ecm_last_jnt__)
         
@@ -1018,14 +1067,12 @@ class ClutchlessSystem:
         # use the __distance_to_point__ variable to keep the distance to midpoint the same instead of keeping
         # the distance to keyhole consistent
         
-        l1, r1 = self.project_from_3d_to_pixel(self.__psm1_last_pos__)
-        l2, r2 = self.project_from_3d_to_pixel(self.__psm2_last_pos__)
+        l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
+        l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
         
         new_l1 = [l1[0]/self.__cam_width__, l1[1]/self.__cam_height__]
         new_l2 = [l2[0]/self.__cam_width__, l2[1]/self.__cam_height__]
         tool_gap = distance( new_l1, new_l2)
-        
-        print("tool_gap = {}\n\n".format(tool_gap))
         
         dt = time.time() - self.latest_call_to_camera_control
         dx = dt * self.zoom_speed
@@ -1076,13 +1123,23 @@ class ClutchlessSystem:
         else:
             print("Clutchless Camera Inverse Failure ")
         
-        # Check for collision in case of this movement
-        if not self.collision(ecm_angles = output):
+        # Check for __collision in case of this movement
+        if not self.__collision(ecm_angles = output):
             return output
         else:
             return self.__ecm_last_jnt__
     
-    def collision(self, ecm_angles = None, psm1_angles = None, psm2_angles = None):
+    def __collision(self, ecm_angles = None, psm1_angles = None, psm2_angles = None):
+        """!
+            Determines whether or not the ECM is close enough to the PSMs to be close to __collision
+            
+            @param ecm_angles : The joint angles for the ECM
+            @param psm1_angles: The joint angles for the PSM1
+            @param psm2_angles: The joint angles for the PSM2
+            
+            @return True or False: Whether or not it could collide
+        """
+        
         if ecm_angles is None:
             ecm_angles = self.__ecm_last_jnt__
         if psm1_angles is None:
@@ -1100,7 +1157,11 @@ class ClutchlessSystem:
             return True
         return False
     
-    def track_tool_times(self):
+    def __track_tool_times(self):
+        """!
+            This function keeps track of how long the tools (PSM1 and PSM2) have been stationary
+        """
+        
         tool_movement_threshold = 0.003
             
         if self.tool_timer['last_psm1_pos'] is None:
@@ -1127,7 +1188,14 @@ class ClutchlessSystem:
                 self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
             self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
             
-    def project_from_3d_to_pixel(self, point):
+    def __project_from_3d_to_pixel(self, point):
+        """!
+            Converts a 3D point into 2D pixel values for the stereo camera
+            
+            @param point : A point in 3D space
+            
+            @return l, r: 2D pixel values for the left (l) and right (r) cameras
+        """
         # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
         # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
@@ -1139,3 +1207,26 @@ class ClutchlessSystem:
         l, r = self.__ig__.project3dToPixel( ( r_inv * TEW_inv * T )[0:3,3]) # left and right camera pixel positions
         
         return l, r
+    
+    def __project_from_pixel_to_3d(self, j, i, z):
+        """!
+            Returns x,y,z values for a point on the field of view based on the depth
+            
+            @param j : The column number of the pixel 
+            @param i : The row number of the pixel 
+            @param z : the depth, the distance from the camera end-effector
+            
+            @return x,y,z
+        """
+        cam = self.__cam_info__['left']
+        
+        
+        fx = cam.K[0]
+        fy = cam.K[4]
+        cx = cam.K[2]
+        cy = cam.K[5]
+        
+        x = cx * z * (j-cx) / fx
+        y = cy * z * (i-cy) / fy
+        
+        return x,y,z
