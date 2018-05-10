@@ -8,7 +8,7 @@ class ClutchlessSystem:
         
         TO DO:
             - Create 3D deadzone for autocamera
-                - Display it in RViz [Done]
+                - Display it in RViz 
                 - Compute the correct parameters for the deadzone
             - Have the camera move when a tool hits the edge of the deadzone
                 - Detect when a tool is hitting the edge
@@ -105,14 +105,18 @@ class ClutchlessSystem:
         # The distance between the camera and the goal point
         self.__distance_to_point__ = None
         
-        self.tool_timer = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
-        self.latest_call_to_camera_control = time.time()
-        self.zoom_speed = 0.01 # 5 cm/s
-        self.zoom_time_threshold = 0.3 # Wait 300 ms before adjusting the zoom level
+        # Track how long the tools remain stationary
+        self.__tool_timer__ = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
+        
+        # Track the last time the camera control functions were called
+        self.__latest_call_to_camera_control__ = time.time()
+        self.__zoom_speed__ = 0.01 # 5 cm/s
+        self.__zoom_time_threshold__ = 0.3 # Wait 300 ms before adjusting the zoom level
         self.__ig__ = image_geometry.StereoCameraModel()
         self.__cam_info__ = {'left':CameraInfo(), 'right':CameraInfo()}
         self.__cam_width__ = None
         self.__cam_height__= None
+        self.__deadzone_margin__ = .2 # 20% margin
         
     def __init__nodes(self):
         """!
@@ -504,7 +508,7 @@ class ClutchlessSystem:
         elif msg.header.frame_id == '/fake_cam_right_optical_link':
             self.__cam_info__['right'] = msg
             
-        self.__ig__.fromCameraInfo(self.__cam_info__['right'], self.__cam_info__['left'])
+        self.__ig__.fromCameraInfo(self.__cam_info__['left'], self.__cam_info__['right'])
         
         self.__cam_width__ = 2 * self.__cam_info__['left'].K[2]
         self.__cam_height__= 2 *self.__cam_info__['left'].K[5]
@@ -975,9 +979,9 @@ class ClutchlessSystem:
             # The name of the frame we want to show the deadzone in            
             frame_name = '/world'
             
-#             p = self.__autocamera__.__get_3d_deadzone(self.__cam_info__, frame_name)
+            p = self.__get_3d_deadzone(frame_name)
 #             
-#             self.__deadzone_pub__.publish(p)
+            self.__deadzone_pub__.publish(p)
 #             
             point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
             p = self.__point_towards(point)
@@ -987,7 +991,7 @@ class ClutchlessSystem:
             self.__pub_ecm__.publish(jnt_msg)
             self.move_arm_joints('ecm', jnt_msg.position) 
     
-    def __get_3d_deadzone(self, cam_info, frame_name):
+    def __get_3d_deadzone(self, frame_name):
         """!
             Returns a polygon object to be shown in RViz
             
@@ -1008,22 +1012,25 @@ class ClutchlessSystem:
             
             return P
         
-        self.z = (self.z + .001) % .2
-        if self.distance_to_midpoint is None:
-            Z = self.z
+#         self.z = (self.z + .001) % .2
+        if self.__distance_to_point__ is None:
+            Z = .1
         else:
-            Z = self.distance_to_midpoint
-        self.deadzone_margin_3d = .15
+            Z = self.__distance_to_point__
         
         p = PolygonStamped()
-        for i in self.deadzone_3d:
-            x_lim = i['x']
-            y_lim = i['y']
-            p.polygon.points.append( frame_convertor( *self.__project_from_pixel_to_3d(x_lim, y_lim, Z, cam_info)))
+        my_pixels = [ (0,0), (0, self.__cam_width__), (self.__cam_height__, self.__cam_width__), (self.__cam_height__,0)]
+        l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
+        l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
+#         my_pixels = [l1, l2]
+        
+        for i,j in my_pixels:
+            p.polygon.points.append( frame_convertor( *self.__project_from_pixel_to_3d(i,j, Z)))
             
         p.header.stamp = rospy.Time.now()
         p.header.frame_id = frame_name  
         
+        print("p = {}\n".format(p))
         return p
                 
     def __point_towards(self, point):
@@ -1074,13 +1081,13 @@ class ClutchlessSystem:
         new_l2 = [l2[0]/self.__cam_width__, l2[1]/self.__cam_height__]
         tool_gap = distance( new_l1, new_l2)
         
-        dt = time.time() - self.latest_call_to_camera_control
-        dx = dt * self.zoom_speed
-        self.latest_call_to_camera_control = time.time()
+        dt = time.time() - self.__latest_call_to_camera_control__
+        dx = dt * self.__zoom_speed__
+        self.__latest_call_to_camera_control__ = time.time()
         
         if (self.__distance_to_point__ is not None 
-            and self.tool_timer['psm1_stationary_duration'] > self.zoom_time_threshold   
-            and self.tool_timer['psm2_stationary_duration'] > self.zoom_time_threshold ):
+            and self.__tool_timer__['psm1_stationary_duration'] > self.__zoom_time_threshold__   
+            and self.__tool_timer__['psm2_stationary_duration'] > self.__zoom_time_threshold__ ):
             
             if tool_gap < .2 : # closer than 20% of the screen
                 self.__distance_to_point__ -= dx
@@ -1164,29 +1171,29 @@ class ClutchlessSystem:
         
         tool_movement_threshold = 0.003
             
-        if self.tool_timer['last_psm1_pos'] is None:
-            self.tool_timer['last_psm1_pos'] = self.__psm1_last_jnt__
-            self.tool_timer['psm1_stay_start_time'] = time.time()
+        if self.__tool_timer__['last_psm1_pos'] is None:
+            self.__tool_timer__['last_psm1_pos'] = self.__psm1_last_jnt__
+            self.__tool_timer__['psm1_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (np.linalg.norm( np.array(self.tool_timer['last_psm1_pos'])- np.array(self.__psm1_last_jnt__)) <tool_movement_threshold):
-                self.tool_timer['psm1_stay_start_time'] = time.time()
-                self.tool_timer['psm1_stationary_duration'] = 0
+            if not (np.linalg.norm( np.array(self.__tool_timer__['last_psm1_pos'])- np.array(self.__psm1_last_jnt__)) <tool_movement_threshold):
+                self.__tool_timer__['psm1_stay_start_time'] = time.time()
+                self.__tool_timer__['psm1_stationary_duration'] = 0
             else: # If the tool hasn't moved
-                self.tool_timer['psm1_stationary_duration'] = time.time() - self.tool_timer['psm1_stay_start_time']
-            self.tool_timer['last_psm1_pos'] = self.__psm1_last_jnt__
+                self.__tool_timer__['psm1_stationary_duration'] = time.time() - self.__tool_timer__['psm1_stay_start_time']
+            self.__tool_timer__['last_psm1_pos'] = self.__psm1_last_jnt__
                 
-        if self.tool_timer['last_psm2_pos'] is None:
-            self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
-            self.tool_timer['psm2_stay_start_time'] = time.time()
+        if self.__tool_timer__['last_psm2_pos'] is None:
+            self.__tool_timer__['last_psm2_pos'] = self.__psm2_last_jnt__
+            self.__tool_timer__['psm2_stay_start_time'] = time.time()
         else:
             # If the tool has moved
-            if not (np.linalg.norm(np.array(self.tool_timer['last_psm2_pos'])- np.array(self.__psm2_last_jnt__)) <tool_movement_threshold):
-                self.tool_timer['psm2_stay_start_time'] = time.time()
-                self.tool_timer['psm2_stationary_duration'] = 0
+            if not (np.linalg.norm(np.array(self.__tool_timer__['last_psm2_pos'])- np.array(self.__psm2_last_jnt__)) <tool_movement_threshold):
+                self.__tool_timer__['psm2_stay_start_time'] = time.time()
+                self.__tool_timer__['psm2_stationary_duration'] = 0
             else: # If the tool hasn't moved
-                self.tool_timer['psm2_stationary_duration'] = time.time() - self.tool_timer['psm2_stay_start_time']
-            self.tool_timer['last_psm2_pos'] = self.__psm2_last_jnt__
+                self.__tool_timer__['psm2_stationary_duration'] = time.time() - self.__tool_timer__['psm2_stay_start_time']
+            self.__tool_timer__['last_psm2_pos'] = self.__psm2_last_jnt__
             
     def __project_from_3d_to_pixel(self, point):
         """!
@@ -1220,13 +1227,18 @@ class ClutchlessSystem:
         """
         cam = self.__cam_info__['left']
         
-        
         fx = cam.K[0]
         fy = cam.K[4]
-        cx = cam.K[2]
-        cy = cam.K[5]
+        cx = self.__cam_width__ / 2.0
+        cy = self.__cam_height__ / 2.0
         
-        x = cx * z * (j-cx) / fx
-        y = cy * z * (i-cy) / fy
+        x = cx * z * (j-cx)/cx / fx
+        y = cy * z * (i-cy)/cy / fy
+        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+        T = np.eye(4)
+        T[0,3] = x; T[1,3] = y; T[2,3] = z
+        
+        t =  r * T # Apply fake came rotation
+        x = t[0,3]; y = t[1,3]; z = t[2,3]
         
         return x,y,z
