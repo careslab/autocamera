@@ -1019,10 +1019,12 @@ class ClutchlessSystem:
             Z = self.__distance_to_point__
         
         p = PolygonStamped()
-        my_pixels = [ (0,0), (0, self.__cam_width__), (self.__cam_height__, self.__cam_width__), (self.__cam_height__,0)]
+        my_pixels = [ (0,0), (self.__cam_width__, 0), (self.__cam_width__, self.__cam_height__), (0, self.__cam_height__)]
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
-#         my_pixels = [l1, l2]
+        z1 = distance(self.__psm1_last_pos__ , self.__ecm_last_pos__)
+        z2 = distance(self.__psm2_last_pos__ , self.__ecm_last_pos__)
+#         my_pixels = [ (l1[0], l1[1], z1),(l2[0],l2[1],z2)]
         
         for i,j in my_pixels:
             p.polygon.points.append( frame_convertor( *self.__project_from_pixel_to_3d(i,j, Z)))
@@ -1037,8 +1039,7 @@ class ClutchlessSystem:
         """!
             Returns the ECM joint angles necessary for it to point towards a specified point
             
-            @param point : 3D coordinates of a point
-            
+            @param point : 3D coordinates of a point            
             @return ECM joint angles
         """
         key_hole, _ = self.__ecm_kin__.FK([0.0,0.0,0.0,0.0])
@@ -1215,12 +1216,12 @@ class ClutchlessSystem:
         
         return l, r
     
-    def __project_from_pixel_to_3d(self, j, i, z):
+    def __project_from_pixel_to_3d(self, j,i, z):
         """!
             Returns x,y,z values for a point on the field of view based on the depth
             
-            @param j : The column number of the pixel 
             @param i : The row number of the pixel 
+            @param j : The column number of the pixel 
             @param z : the depth, the distance from the camera end-effector
             
             @return x,y,z
@@ -1235,10 +1236,11 @@ class ClutchlessSystem:
         x = cx * z * (j-cx)/cx / fx
         y = cy * z * (i-cy)/cy / fy
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+#         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
         T = np.eye(4)
         T[0,3] = x; T[1,3] = y; T[2,3] = z
         
-        t =  r * T # Apply fake came rotation
+        t =  r*T # Apply fake came rotation
         x = t[0,3]; y = t[1,3]; z = t[2,3]
         
         return x,y,z
