@@ -510,8 +510,8 @@ class ClutchlessSystem:
             
         self.__ig__.fromCameraInfo(self.__cam_info__['left'], self.__cam_info__['right'])
         
-        self.__cam_width__ = 2 * self.__cam_info__['left'].K[2]
-        self.__cam_height__= 2 *self.__cam_info__['left'].K[5]
+        self.__cam_width__ = self.__cam_info__['left'].width
+        self.__cam_height__= self.__cam_info__['left'].height
         
 
     def __ecm_cb__(self, msg):
@@ -1013,7 +1013,7 @@ class ClutchlessSystem:
             return P
         
 #         self.z = (self.z + .001) % .2
-        if self.__distance_to_point__ is None:
+        if self.__distance_to_point__ is None or self.__distance_to_point__ < 0:
             Z = .1
         else:
             Z = self.__distance_to_point__
@@ -1212,7 +1212,7 @@ class ClutchlessSystem:
         T = np.eye(4)
         T[0,3] = point[0]; T[1,3] = point[1]; T[2,3] = point[2]
         
-        l, r = self.__ig__.project3dToPixel( ( r_inv * TEW_inv * T )[0:3,3]) # left and right camera pixel positions
+        l, r = self.__ig__.project3dToPixel( ( TEW_inv * T )[0:3,3]) # left and right camera pixel positions
         
         return l, r
     
@@ -1236,11 +1236,11 @@ class ClutchlessSystem:
         x = cx * z * (j-cx)/cx / fx
         y = cy * z * (i-cy)/cy / fy
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
-#         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
+        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
         T = np.eye(4)
         T[0,3] = x; T[1,3] = y; T[2,3] = z
         
-        t =  r*T # Apply fake came rotation
+        t = T # Apply fake came rotation
         x = t[0,3]; y = t[1,3]; z = t[2,3]
         
         return x,y,z
