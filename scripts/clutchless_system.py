@@ -1,6 +1,9 @@
 from __common_imports__ import *
 from autocamera_algorithm import Autocamera
 from rospy.core import rospydebug
+from tf import TransformListener
+from hrl_geom.pose_converter import PoseConv
+
 class ClutchlessSystem:
     """!
         The ClutchlessSystem class intends to automate the movements 
@@ -86,6 +89,7 @@ class ClutchlessSystem:
         self.__T_mtml__ = None
         self.__T_mtmr_000__ = None
         self.__T_mtmr__ = None
+        self.__tf__ = TransformListener()
         
         self.__arms_homed__ = False
         self.__paused__ = False
@@ -117,6 +121,7 @@ class ClutchlessSystem:
         self.__cam_width__ = None
         self.__cam_height__= None
         self.__deadzone_margin__ = .2 # 20% margin
+        self.__left_lens_transform__ = None
         
     def __init__nodes(self):
         """!
@@ -1001,10 +1006,17 @@ class ClutchlessSystem:
             
             @return p : A polygon object containing the coordinates of the deadzone
         """
+        if self.__left_lens_transform__ == None:
+            self.__left_lens_transform__ = 0
+        if self.__tf__.frameExists('fake_cam_left_optical_link'):
+            t = self.__tf__.getLatestCommonTime('world', 'fake_cam_left_optical_link')
+            p,q = self.__tf__.lookupTransform('world', 'fake_cam_left_optical_link', t)
+            self.__left_lens_transform__ = PoseConv.to_homo_mat(p,q)
+            
         # A function to convert from the camera frame to the world frame
         def frame_convertor(x,y,z):
             my_point = np.array([x, y, z, 1]).reshape(4,1)
-            new_point = (self.__T_ecm__ * my_point)
+            new_point = ( my_point)
             x = float(new_point[0])
             y = float(new_point[1])
             z = float(new_point[2])
@@ -1032,7 +1044,6 @@ class ClutchlessSystem:
         p.header.stamp = rospy.Time.now()
         p.header.frame_id = frame_name  
         
-        print("p = {}\n".format(p))
         return p
                 
     def __point_towards(self, point):
@@ -1077,6 +1088,8 @@ class ClutchlessSystem:
         
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
+        
+        print('l1 = {}, r1 = {}\n'.format(l1,r1))
         
         new_l1 = [l1[0]/self.__cam_width__, l1[1]/self.__cam_height__]
         new_l2 = [l2[0]/self.__cam_width__, l2[1]/self.__cam_height__]
@@ -1206,13 +1219,16 @@ class ClutchlessSystem:
         """
         # Format in fakecam.launch:  x y z  yaw pitch roll [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
         # Format for PoseConv.to_homo_mat:  (x,y,z)  (roll, pitch, yaw) [fixed-axis rotations: x(roll),y(pitch),z(yaw)]
-        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
-        r_inv = np.linalg.inv(r);
-        TEW_inv = self.__T_ecm__ ** -1
+        B = self.__cam_info__['right'].P[3]/ self.__cam_info__['right'].P[0]
+        T_ecm_left_to_ee = PoseConv.to_homo_mat( [ (0.00449585, 0.0082469, 0.003321), (0.0, 0.0, 1.57079632679) ])
+        T_ecm_left_to_ee_inv = np.linalg.inv(T_ecm_left_to_ee)
+        
+        TEW_inv = self.__left_lens_transform__ ** -1
         T = np.eye(4)
         T[0,3] = point[0]; T[1,3] = point[1]; T[2,3] = point[2]
+        T = TEW_inv * T
         
-        l, r = self.__ig__.project3dToPixel( ( TEW_inv * T )[0:3,3]) # left and right camera pixel positions
+        l, r = self.__ig__.project3dToPixel( T[0:3,3]) # left and right camera pixel positions
         
         return l, r
     
@@ -1235,11 +1251,17 @@ class ClutchlessSystem:
         
         x = cx * z * (j-cx)/cx / fx
         y = cy * z * (i-cy)/cy / fy
-        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+        B = self.__cam_info__['right'].P[3]/ self.__cam_info__['right'].P[0]
+        T_ecm_left_to_ee = PoseConv.to_homo_mat( [ (0.00449585, 0.0082469, 0.003321), (0.0, 0.0, -1.57079632679) ])
+        T_ecm_left_to_ee_inv = np.linalg.inv(T_ecm_left_to_ee)
+        
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
         T = np.eye(4)
+#         T[0,3] = x; T[1,3] = y; T[2,3] = z
         T[0,3] = x; T[1,3] = y; T[2,3] = z
-        
+#         T = self.__left_lens_transform__ + T
+#         T[0:3,0:3] = self.__left_lens_transform__[0:3,0:3]
+        T =  self.__left_lens_transform__ * T
         t = T # Apply fake came rotation
         x = t[0,3]; y = t[1,3]; z = t[2,3]
         
