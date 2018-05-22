@@ -984,15 +984,20 @@ class ClutchlessSystem:
             # The name of the frame we want to show the deadzone in            
             frame_name = '/world'
             
-            p = self.__get_3d_deadzone(frame_name)
+            p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
 #             
-            self.__deadzone_pub__.publish(p)
+            self.__deadzone_pub__.publish(p_deadzone)
+            
+            self.__boundaries_pub__ = rospy.Publisher('/boundaries', PolygonStamped)
+            self.__boundaries_pub__.publish(p_boundaries)
 #             
             point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
             p = self.__point_towards(point)
             jnt_msg = JointState()
             jnt_msg.name = self.__ecm_joint_names__
             jnt_msg.position = p
+            print(self.find_tool_relation_to_3d_deadzone())
+            
             self.__pub_ecm__.publish(jnt_msg)
             self.move_arm_joints('ecm', jnt_msg.position) 
     
@@ -1030,8 +1035,10 @@ class ClutchlessSystem:
         else:
             Z = self.__distance_to_point__
         
+        w_margin = self.__deadzone_margin__ * self.__cam_width__
+        h_margin = self.__deadzone_margin__ * self.__cam_height__
         p = PolygonStamped()
-        my_pixels = [ (0,0), (self.__cam_width__, 0), (self.__cam_width__, self.__cam_height__), (0, self.__cam_height__)]
+        my_pixels = [ (0 + w_margin ,0 + h_margin), (self.__cam_width__ - w_margin, 0 + h_margin), (self.__cam_width__ - w_margin, self.__cam_height__  - h_margin), (0 + w_margin, self.__cam_height__ - h_margin)]
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
         z1 = distance(self.__psm1_last_pos__ , self.__ecm_last_pos__)
@@ -1043,8 +1050,18 @@ class ClutchlessSystem:
             
         p.header.stamp = rospy.Time.now()
         p.header.frame_id = frame_name  
+
+        p2 = PolygonStamped()
+        my_pixels = [ (0 ,0), (self.__cam_width__ , 0 ), (self.__cam_width__, self.__cam_height__ ), (0, self.__cam_height__)]
         
-        return p
+        for i,j in my_pixels:
+            p2.polygon.points.append( frame_convertor( *self.__project_from_pixel_to_3d(i,j, Z)))
+            
+        p2.header.stamp = rospy.Time.now()
+        p2.header.frame_id = frame_name  
+
+        
+        return p , p2
                 
     def __point_towards(self, point):
         """!
@@ -1251,9 +1268,17 @@ class ClutchlessSystem:
         
         x = cx * z * (j-cx)/cx / fx
         y = cy * z * (i-cy)/cy / fy
+        
+        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
+        
         B = self.__cam_info__['right'].P[3]/ self.__cam_info__['right'].P[0]
         T_ecm_left_to_ee = PoseConv.to_homo_mat( [ (0.00449585, 0.0082469, 0.003321), (0.0, 0.0, -1.57079632679) ])
         T_ecm_left_to_ee_inv = np.linalg.inv(T_ecm_left_to_ee)
+        
+        disparity = self.__ig__.getDisparity(z)
+        x,y,z = self.__ig__.projectPixelTo3d( [i,j], disparity)
+
+        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
         
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
         T = np.eye(4)
@@ -1261,8 +1286,36 @@ class ClutchlessSystem:
         T[0,3] = x; T[1,3] = y; T[2,3] = z
 #         T = self.__left_lens_transform__ + T
 #         T[0:3,0:3] = self.__left_lens_transform__[0:3,0:3]
-        T =  self.__left_lens_transform__ * T
+        T =  self.__T_ecm__ * T
         t = T # Apply fake came rotation
         x = t[0,3]; y = t[1,3]; z = t[2,3]
         
+        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
+        
+        print('disparity = {}\n'.format(disparity))
+        
         return x,y,z
+    
+    def find_tool_relation_to_3d_deadzone(self):
+        """!
+            Returns whether the tool is inside or outside the deadzone, and a vector 
+            that shows the distance between the tool and the deadzone
+            
+            @return "inside" or "outside" for both tools
+            @return v : A vector showing the distance between the deadzone and the tool
+        """
+        l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
+        l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
+        
+        def in_or_out(p):
+            if  (p[0] > self.__cam_width__ * (1-self.__deadzone_margin__) 
+                or p[1] > self.__cam_height__ * (1-self.__deadzone_margin__) 
+                or p[0] < self.__cam_width__ * self.__deadzone_margin__ 
+                or p[1] < self.__cam_height__ * self.__deadzone_margin__ ):
+                return "outside"
+            else:
+                return "inside"
+            
+            
+        
+        return in_or_out(l1), in_or_out(l2)
