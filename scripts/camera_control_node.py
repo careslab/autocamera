@@ -16,8 +16,6 @@ from autocamera_algorithm import Autocamera
 import os
 import tf
 
-import cv2
-import cv_bridge
 import threading
 
 
@@ -878,7 +876,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.home()
             
         def home(self):
-            r = self.ecm.move_joint_list([0.0,0.0,0.07,0.0],[0,1,2,3], interpolate=True)
+            r = self.ecm.move_joint_list([0.0,0.0,0.0,0.0],[0,1,2,3], interpolate=True)
             
             
         def kill(self):

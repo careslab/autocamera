@@ -178,6 +178,14 @@ class ClutchlessSystem:
             self.__sub_mtml_gripper__ = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.__mtml_gripper_cb__, queue_size=1, tcp_nodelay=True)
             self.__sub_mtmr_gripper__ = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.__mtmr_gripper_cb__, queue_size=1, tcp_nodelay=True)
             
+        
+        self.__sub_fake_image_left__ = rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb, queue_size=1)
+        self.__sub_fake_image_right__ = rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb, queue_size=1)
+         
+        # Publish images
+        self.__pub_image_left__ = rospy.Publisher('clutchless_image_left', Image, queue_size=1)
+        self.__pub_image_right__ = rospy.Publisher('clutchless_image_right', Image, queue_size=1)
+        
         # MTM repositioning clutch
         self.__sub_clutch__ = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.__clutch_cb__, queue_size=1, tcp_nodelay=True)
             
@@ -986,10 +994,10 @@ class ClutchlessSystem:
             
             p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
 #             
-            self.__deadzone_pub__.publish(p_deadzone)
-            
-            self.__boundaries_pub__ = rospy.Publisher('/boundaries', PolygonStamped)
-            self.__boundaries_pub__.publish(p_boundaries)
+#             self.__deadzone_pub__.publish(p_deadzone)
+#             
+#             self.__boundaries_pub__ = rospy.Publisher('/boundaries', PolygonStamped)
+#             self.__boundaries_pub__.publish(p_boundaries)
 #             
             point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
             p = self.__point_towards(point)
@@ -998,8 +1006,8 @@ class ClutchlessSystem:
             jnt_msg.position = p
             print(self.find_tool_relation_to_3d_deadzone())
             
-            self.__pub_ecm__.publish(jnt_msg)
-            self.move_arm_joints('ecm', jnt_msg.position) 
+#             self.__pub_ecm__.publish(jnt_msg)
+#             self.move_arm_joints('ecm', jnt_msg.position) 
     
     def __get_3d_deadzone(self, frame_name):
         """!
@@ -1319,3 +1327,35 @@ class ClutchlessSystem:
             
         
         return in_or_out(l1), in_or_out(l2)
+    
+    def left_image_cb(self, image_msg):
+        self.image_cb(image_msg, 'left')    
+        
+    def right_image_cb(self, image_msg):
+        self.image_cb(image_msg, 'right')
+    
+    def image_cb(self, image_msg, camera_name):
+        image_pub = {'left':self.__pub_image_left__, 'right':self.__pub_image_right__}[camera_name]
+        
+        bridge = cv_bridge.CvBridge()
+        
+        im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
+        
+        
+        rotate_180 = lambda  p : (640-p[0], 480-p[2])
+        w = 640 ; h = 480;
+        
+        dw = int(self.__cam_width__ * self.__deadzone_margin__)
+        dh = int(self.__cam_height__ * self.__deadzone_margin__)
+        
+        cv2.rectangle(im, (dw,dh), (self.__cam_width__ -dw, self.__cam_height__ -dh), (0, 255, 0), 2)
+        cv2.rectangle(im, (0,0), (self.__cam_width__, self.__cam_height__), (255,0,0), 2)
+        
+        new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
+    
+        new_image.header.seq = image_msg.header.seq
+        new_image.header.stamp = image_msg.header.stamp
+        new_image.header.frame_id = image_msg.header.frame_id
+        
+        image_pub.publish(new_image)
+            

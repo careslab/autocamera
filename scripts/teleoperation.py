@@ -455,7 +455,7 @@ class TeleopClass:
         self.__last_mtml_rot__ = rot
         
         if self.__enabled__ == False: return
-        self.__mtml_wrist_adjustment__.publish()
+        #self.__mtml_wrist_adjustment__.publish()
         
         delta = pos - self.__first_mtml_pos__
         delta = np.insert(delta, 3,1).transpose()
@@ -497,6 +497,8 @@ class TeleopClass:
         
         if self.__mode__ == self.MODE.hardware:
             gripper = (self.__mtml_gripper__-.4) * 1.4/.6
+            if (self.__mtml_gripper__ < -.4):
+                gripper = -15.0
             new_psm2_angles = np.append(new_psm2_angles, gripper)
             
         if self.__mode__ == self.MODE.hardware:
@@ -560,7 +562,7 @@ class TeleopClass:
         
         if self.__enabled__ == False: return
         
-        self.__mtmr_wrist_adjustment__.publish()
+#         self.__mtmr_wrist_adjustment__.publish()
         
         delta = pos - self.__first_mtmr_pos__
         delta = np.insert(delta, 3,1).transpose()
@@ -599,6 +601,8 @@ class TeleopClass:
         
         if self.__mode__ == self.MODE.hardware:
             gripper = (self.__mtmr_gripper__-.4) * 1.2/.4
+            if (self.__mtmr_gripper__ < -.4):
+                gripper = -17.0
             new_psm1_angles = np.append(new_psm1_angles, gripper)
                 
         if self.__mode__ == self.MODE.hardware:
