@@ -431,19 +431,20 @@ class TeleopClass:
         _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
         T_mtm = self.__mtml_kin__.forward(msg.position)
-        T = ( self.__T_mtml_000__**-1) * T_mtm 
+        T = ( self.__T_mtml_000__**-1) * T_mtm
+        T_rot = T 
         T =  r_330_z_t * T * r_330_y_t * r_30_x_t
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
         T = transform * T
-        
+        T_rot = transform * T_rot
 
         
   
         pos = T[0:3,3]
-        rot = T[0:3,0:3]
+        rot = T_rot[0:3,0:3]
         
         if self.__last_mtml_pos__ == None or self.__clutch_active__:
             self.__first_mtml_pos__ = pos
@@ -500,6 +501,30 @@ class TeleopClass:
             if (self.__mtml_gripper__ < -.4):
                 gripper = -15.0
             new_psm2_angles = np.append(new_psm2_angles, gripper)
+            roll_diff = new_psm2_angles[3] - self.__last_psm2_jnt__[3]
+            new_roll = self.__last_psm2_jnt__[3]
+            if abs(roll_diff) >= np.pi:
+                print('psm2 roll_diff = {}\n'.format(roll_diff))
+                new_roll_diff = 0.0
+                
+                if roll_diff > 0 :
+#                     new_roll_diff = (2*np.pi - roll_diff % (2 * np.pi))
+                     while not (roll_diff <= np.pi and roll_diff >= -np.pi):
+                         roll_diff -= 2*np.pi
+                     new_roll_diff = roll_diff
+                elif roll_diff < 0:
+#                     new_roll_diff = (roll_diff % (2 * np.pi))
+                    while not (roll_diff >= -np.pi and roll_diff <= np.pi):
+                         roll_diff += 2*np.pi 
+                    new_roll_diff = roll_diff
+                    
+                new_roll = new_roll_diff + self.__last_psm2_jnt__[3]
+                print('new_roll_diff = {}, psm2 new_roll = {}, old_roll = {}\n'.format(new_roll_diff, new_roll, self.__last_psm2_jnt__[3]))
+                temp = list(self.__last_psm2_jnt__)
+                temp[3] = new_roll
+                self.__last_psm2_jnt__ = temp 
+                new_psm2_angles[3] = new_roll
+                print("new_psm2_angles = {}\n".format(new_psm2_angles))
             
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
@@ -539,6 +564,7 @@ class TeleopClass:
         T_mtm = self.__mtmr_kin__.forward(msg.position)
         
         T = ( self.__T_mtmr_000__**-1) * T_mtm 
+        T_rot = T
         T = r_330_z_t * T * r_330_y_t * r_330_x_t
         
         transform = np.matrix( [ [0,-1,0,0], 
@@ -546,8 +572,9 @@ class TeleopClass:
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
         T = transform * T
+        T_rot = transform * T_rot
         
-        rot = T[0:3,0:3]
+        rot = T_rot[0:3,0:3] 
         pos = T[0:3,3]
         
         
@@ -604,6 +631,14 @@ class TeleopClass:
             if (self.__mtmr_gripper__ < -.4):
                 gripper = -17.0
             new_psm1_angles = np.append(new_psm1_angles, gripper)
+#             roll_diff = new_psm1_angles[3] - self.__last_psm1_jnt__[3]
+#             new_roll = self.__last_psm1_jnt__[3]
+#             if abs(roll_diff) >= 2 * np.pi:
+#                 if roll_diff > 0 :
+#                     new_roll = (roll_diff % (2*np.pi) ) + self.__last_psm1_jnt__[3]
+#                 elif roll_diff < 0:
+#                     new_roll = (2*np.pi - roll_diff % (2*np.pi)) + self.__last_psm1_jnt__[3]
+#                 new_psm1_angles[3] = new_roll
                 
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
