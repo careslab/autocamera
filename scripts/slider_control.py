@@ -1,6 +1,6 @@
 from __common_imports__ import *
 
-class TeleopClass:
+class SliderClass:
     class MODE:
         """
             simulation mode: Use the hardware for the master side, 
@@ -34,9 +34,6 @@ class TeleopClass:
     
         self.__last_good_psm1_transform__ = None
         self.__last_good_psm2_transform__ = None
-        
-        self.__last_psm2_T__ = None
-        self.__last_q_2__ = None
         
         self.__mtml_gripper__ = None
         self.__mtmr_gripper__ = None
@@ -84,9 +81,9 @@ class TeleopClass:
         # Subscribe to MTMs
         self.__sub_mtml__ = None; self.__sub_mtmr__ = None
         if self.__mode__ == self.MODE.simulation:
-            self.__sub_mtml__ = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.__mtml_cb__, queue_size=1, tcp_nodelay=True)
-            self.__sub_mtmr__ = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.__mtmr_cb__, queue_size=1, tcp_nodelay=True)
-        elif self.__mode__ == self.MODE.hardware:
+#             self.__sub_mtml__ = rospy.Subscriber('/dvrk_mtml/joint_states', JointState, self.__mtml_cb__, queue_size=1, tcp_nodelay=True)
+#             self.__sub_mtmr__ = rospy.Subscriber('/dvrk_mtmr/joint_states', JointState, self.__mtmr_cb__, queue_size=1, tcp_nodelay=True)
+#         elif self.__mode__ == self.MODE.hardware:
             self.__sub_mtml__ = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.__mtml_cb__, queue_size=1, tcp_nodelay=True)
             self.__sub_mtmr__ = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.__mtmr_cb__, queue_size=1, tcp_nodelay=True)
         
@@ -388,6 +385,7 @@ class TeleopClass:
         if self.__mode__ == self.MODE.simulation:
             p = msg.position
             msg.position = [p[0], p[1], p[7], p[8], p[9], p[10], p[11]]
+            self.__hw_psm2__.move_joint_list( msg.position, range(0,len(msg.position)), interpolate=False)
             
         msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
         self.__last_psm2_jnt__ = msg.position[0:-1]
@@ -474,11 +472,11 @@ class TeleopClass:
 
         T = self.__translate_mtml__(translation)
         T = self.__set_orientation_mtml__( orientation, T)
+        
         q = list(self.__last_psm2_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
-        
         new_psm2_angles = self.__psm2_kin__.inverse(T, q)
             
         
@@ -492,7 +490,6 @@ class TeleopClass:
             self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
             self.__hw_mtml__.set_gravity_compensation(False)
             self.__pub_unlock_mtml_orientation__.publish()
-            print("Inverse no solution\n\n")
             return
         else:
             self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
@@ -509,33 +506,27 @@ class TeleopClass:
             roll_diff = new_psm2_angles[3] - self.__last_psm2_jnt__[3]
             new_roll = self.__last_psm2_jnt__[3]
             if abs(roll_diff) >= np.pi:
-#                 print('psm2 roll_diff = {}\n'.format(roll_diff))
-                print("passed to inverse:\n")
-                print("T = {:.16f}\n".format(T))
-                print("last T = {:.16f}\n".format(self.__last_psm2_T__))
-                print("previous joints = {:.16f}\n".format(self.__last_psm2_jnt))
-                print("current_joints = {:.16f}\n".format(new_psm2_angles))
-                print("last_q = {}\ncurrent_q = {}\n".format(self.__last_q_2__, q))
-#                 new_roll_diff = 0.0
-#                 
-#                 if roll_diff > 0 :
-# #                     new_roll_diff = (2*np.pi - roll_diff % (2 * np.pi))
-#                      while not (roll_diff <= np.pi and roll_diff >= -np.pi):
-#                          roll_diff -= 2*np.pi
-#                      new_roll_diff = roll_diff
-#                 elif roll_diff < 0:
-# #                     new_roll_diff = (roll_diff % (2 * np.pi))
-#                     while not (roll_diff >= -np.pi and roll_diff <= np.pi):
-#                          roll_diff += 2*np.pi 
-#                     new_roll_diff = roll_diff
-#                     
-#                 new_roll = new_roll_diff + self.__last_psm2_jnt__[3]
-#                 print('new_roll_diff = {}, psm2 new_roll = {}, old_roll = {}\n'.format(new_roll_diff, new_roll, self.__last_psm2_jnt__[3]))
-#                 temp = list(self.__last_psm2_jnt__)
-#                 temp[3] = new_roll
-#                 self.__last_psm2_jnt__ = temp 
-#                 new_psm2_angles[3] = new_roll
-#                 print("new_psm2_angles = {}\n".format(new_psm2_angles))
+                print('psm2 roll_diff = {}\n'.format(roll_diff))
+                new_roll_diff = 0.0
+                
+                if roll_diff > 0 :
+#                     new_roll_diff = (2*np.pi - roll_diff % (2 * np.pi))
+                     while not (roll_diff <= np.pi and roll_diff >= -np.pi):
+                         roll_diff -= 2*np.pi
+                     new_roll_diff = roll_diff
+                elif roll_diff < 0:
+#                     new_roll_diff = (roll_diff % (2 * np.pi))
+                    while not (roll_diff >= -np.pi and roll_diff <= np.pi):
+                         roll_diff += 2*np.pi 
+                    new_roll_diff = roll_diff
+                    
+                new_roll = new_roll_diff + self.__last_psm2_jnt__[3]
+                print('new_roll_diff = {}, psm2 new_roll = {}, old_roll = {}\n'.format(new_roll_diff, new_roll, self.__last_psm2_jnt__[3]))
+                temp = list(self.__last_psm2_jnt__)
+                temp[3] = new_roll
+                self.__last_psm2_jnt__ = temp 
+                new_psm2_angles[3] = new_roll
+                print("new_psm2_angles = {}\n".format(new_psm2_angles))
             
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
@@ -546,8 +537,7 @@ class TeleopClass:
             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
             self.__pub_psm2__.publish(msg)
             
-        self.__last_psm2_T__ = T
-        self.__last_q_2__ = q
+        
         
         
     

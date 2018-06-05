@@ -954,8 +954,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
                 self.spinBoxSubjectNumber.setValue(subject_number)
         except Exception:
             pass
-    
-    
+
         
     @pyqtSlot()
     def on_record(self):
