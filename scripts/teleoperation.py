@@ -41,6 +41,9 @@ class TeleopClass:
         self.__mtml_gripper__ = None
         self.__mtmr_gripper__ = None
         
+        self.__mtml_jnt__ = None
+        self.__mtmr_jnt__ = None
+        
         self.__last_psm1_jnt__ = None
         self.__last_psm2_jnt__ = None
         
@@ -105,6 +108,8 @@ class TeleopClass:
             self.__sub_ecm__ = rospy.Subscriber('/dvrk/ECM/state_joint_current', JointState, self.__ecm_cb__, queue_size=1, tcp_nodelay=True)
             self.__sub_mtml_gripper__ = rospy.Subscriber('/dvrk/MTML/gripper_position_current', Float32, self.__mtml_gripper_cb__, queue_size=1, tcp_nodelay=True)
             self.__sub_mtmr_gripper__ = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.__mtmr_gripper_cb__, queue_size=1, tcp_nodelay=True)
+            self.__sub_mtml_jnt__ = rospy.Subscriber('/dvrk/MTML/state_joint_current', JointState, self.__mtml_jnt_cb, queue_size=1)
+            self.__sub_mtmr_jnt__ = rospy.Subscriber('/dvrk/MTMR/state_joint_current', JointState, self.__mtmr_jnt_cb, queue_size=1)
             
         # MTM repositioning clutch
         self.__sub_clutch__ = rospy.Subscriber('/dvrk/footpedals/clutch', Joy, self.__clutch_cb__, queue_size=1, tcp_nodelay=True)
@@ -401,10 +406,17 @@ class TeleopClass:
         """
         self.__mtml_gripper__ = msg.data
         
-                
+     
     def __mtmr_gripper_cb__(self, msg):
         self.__mtmr_gripper__ = msg.data
                 
+    
+    def __mtml_jnt_cb(self, msg):
+        self.__mtml_jnt__ = msg.position
+    
+    def __mtmr_jnt_cb(self, msg):
+        self.__mtmr_jnt__ = msg.position
+    
     def __mtml_cb__(self, msg):
         """!
         The main part of the teleoperation is performed in this
@@ -488,11 +500,11 @@ class TeleopClass:
 #             T = self.__set_orientation_mtml__( self.__last_good_psm2_transform__[0:3,0:3] ) 
 #             new_psm2_angles = self.__psm1_kin__.inverse(T, q)
             
-        if type(new_psm2_angles) == NoneType:
+        if type(new_psm2_angles) == NoneType or self.__mtml_jnt__[6] > 1.5 * np.pi or self.__mtml_jnt__[6] < -1.5 * np.pi:
             self.__hw_mtml__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
             self.__hw_mtml__.set_gravity_compensation(False)
             self.__pub_unlock_mtml_orientation__.publish()
-            print("Inverse no solution\n\n")
+#             print("Inverse no solution\n\n")
             return
         else:
             self.__hw_mtml__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
@@ -507,35 +519,52 @@ class TeleopClass:
                 gripper = -15.0
             new_psm2_angles = np.append(new_psm2_angles, gripper)
             roll_diff = new_psm2_angles[3] - self.__last_psm2_jnt__[3]
-            new_roll = self.__last_psm2_jnt__[3]
+#             new_roll = self.__mtml_jnt__[6] * ( 3.0/5.0)
+            
+#             my_roll = new_psm2_angles[3]
+#             if self.__mtml_jnt__[6] <= 0 :
+#                 if my_roll > 0:
+#                     while my_roll >0:
+#                         my_roll = my_roll - 2 * np.pi
+#             elif self.__mtml_jnt__[6] > 0:
+#                 if my_roll <= 0:
+#                     while my_roll <= 0:
+#                         my_roll = my_roll + 2 * np.pi
+#             new_psm2_angles[3] = my_roll
+#             print('target psm2 roll = {}, psm2 roll = {}, mtml roll = {}\n'.format(new_psm2_angles[3], self.__last_psm2_jnt__[3], self.__mtml_jnt__[6]))
+#             
             if abs(roll_diff) >= np.pi:
 #                 print('psm2 roll_diff = {}\n'.format(roll_diff))
-                print("passed to inverse:\n")
-                print("T = {:.16f}\n".format(T))
-                print("last T = {:.16f}\n".format(self.__last_psm2_T__))
-                print("previous joints = {:.16f}\n".format(self.__last_psm2_jnt))
-                print("current_joints = {:.16f}\n".format(new_psm2_angles))
-                print("last_q = {}\ncurrent_q = {}\n".format(self.__last_q_2__, q))
-#                 new_roll_diff = 0.0
-#                 
-#                 if roll_diff > 0 :
-# #                     new_roll_diff = (2*np.pi - roll_diff % (2 * np.pi))
-#                      while not (roll_diff <= np.pi and roll_diff >= -np.pi):
-#                          roll_diff -= 2*np.pi
-#                      new_roll_diff = roll_diff
-#                 elif roll_diff < 0:
-# #                     new_roll_diff = (roll_diff % (2 * np.pi))
-#                     while not (roll_diff >= -np.pi and roll_diff <= np.pi):
-#                          roll_diff += 2*np.pi 
-#                     new_roll_diff = roll_diff
-#                     
-#                 new_roll = new_roll_diff + self.__last_psm2_jnt__[3]
+#                 print("passed to inverse:\n")
+#                 print("last T = {}\n".format(self.__last_psm2_T__))
+#                 print("T = {}\n".format(T))
+#                 print("previous joints = {}\n".format(self.__last_psm2_jnt__))
+#                 print("current_joints = {}\n".format(new_psm2_angles))
+#                 print("last_q = {}\ncurrent_q = {}\n".format(self.__last_q_2__, q))
+                new_roll_diff = 0.0
+                    
+                if roll_diff > 0 :
+#                     new_roll_diff = (2*np.pi - roll_diff % (2 * np.pi))
+                     while not (roll_diff <= np.pi and roll_diff >= -np.pi):
+                         roll_diff -= 2*np.pi
+                     new_roll_diff = roll_diff
+                elif roll_diff < 0:
+#                     new_roll_diff = (roll_diff % (2 * np.pi))
+                    while not (roll_diff >= -np.pi and roll_diff <= np.pi):
+                         roll_diff += 2*np.pi 
+                    new_roll_diff = roll_diff
+                        
+                new_roll = new_roll_diff + self.__last_psm2_jnt__[3]
 #                 print('new_roll_diff = {}, psm2 new_roll = {}, old_roll = {}\n'.format(new_roll_diff, new_roll, self.__last_psm2_jnt__[3]))
-#                 temp = list(self.__last_psm2_jnt__)
-#                 temp[3] = new_roll
+                temp = list(self.__last_psm2_jnt__)
+                temp[3] = new_roll
 #                 self.__last_psm2_jnt__ = temp 
-#                 new_psm2_angles[3] = new_roll
-#                 print("new_psm2_angles = {}\n".format(new_psm2_angles))
+                new_psm2_angles[3] = new_roll
+                print('target psm2 roll = {}, psm2 roll = {}, mtml roll = {}\n'.format(new_psm2_angles[3], self.__last_psm2_jnt__[3], self.__mtml_jnt__[6]))
+                 
+                
+#                 print("revised new_psm2_angles = {}\n".format(new_psm2_angles))
+                
             
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm2__.move_joint_list( new_psm2_angles.tolist(), range(0,len(new_psm2_angles)), interpolate=False)
@@ -626,7 +655,7 @@ class TeleopClass:
 #             T[0:3, 0:3] = self.__last_good_psm1_transform__[0:3,0:3] 
 #             new_psm1_angles = self.__psm1_kin__.inverse(T, q)
             
-        if type(new_psm1_angles) == NoneType:
+        if type(new_psm1_angles) == NoneType or self.__mtmr_jnt__[6] > 1.5 * np.pi or self.__mtmr_jnt__[6] < -1.5 * np.pi:
             self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
             self.__hw_mtmr__.set_gravity_compensation(False)
             self.__pub_unlock_mtmr_orientation__.publish()
@@ -643,14 +672,21 @@ class TeleopClass:
             if (self.__mtmr_gripper__ < -.4):
                 gripper = -17.0
             new_psm1_angles = np.append(new_psm1_angles, gripper)
-#             roll_diff = new_psm1_angles[3] - self.__last_psm1_jnt__[3]
-#             new_roll = self.__last_psm1_jnt__[3]
-#             if abs(roll_diff) >= 2 * np.pi:
-#                 if roll_diff > 0 :
-#                     new_roll = (roll_diff % (2*np.pi) ) + self.__last_psm1_jnt__[3]
-#                 elif roll_diff < 0:
-#                     new_roll = (2*np.pi - roll_diff % (2*np.pi)) + self.__last_psm1_jnt__[3]
-#                 new_psm1_angles[3] = new_roll
+            roll_diff = new_psm1_angles[3] - self.__last_psm1_jnt__[3]
+#             new_roll_diff = 0.0
+        if abs(roll_diff) > np.pi:                    
+            if roll_diff > 0 :
+                     while not (roll_diff <= np.pi and roll_diff >= -np.pi):
+                         roll_diff -= 2*np.pi
+                     new_roll_diff = roll_diff
+            elif roll_diff < 0:
+#                     new_roll_diff = (roll_diff % (2 * np.pi))
+                    while not (roll_diff >= -np.pi and roll_diff <= np.pi):
+                         roll_diff += 2*np.pi 
+                    new_roll_diff = roll_diff
+                        
+            new_roll = new_roll_diff + self.__last_psm1_jnt__[3]
+            new_psm1_angles[3] = new_roll
                 
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
