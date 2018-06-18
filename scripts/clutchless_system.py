@@ -1114,6 +1114,11 @@ class ClutchlessSystem:
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
         
+#         l1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
+#         r1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
+#         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
+#         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
+        
         print('l1 = {}, r1 = {}\n'.format(l1,r1))
         
         new_l1 = [l1[0]/self.__cam_width__, l1[1]/self.__cam_height__]
@@ -1248,14 +1253,16 @@ class ClutchlessSystem:
         T_ecm_left_to_ee = PoseConv.to_homo_mat( [ (0.00449585, 0.0082469, 0.003321), (0.0, 0.0, 1.57079632679) ])
         T_ecm_left_to_ee_inv = np.linalg.inv(T_ecm_left_to_ee)
         
+        r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (0.0, 0.0, 1.57079632679) ])
+        r_inv = np.linalg.inv(r);
+        
         TEW_inv = self.__left_lens_transform__ ** -1
         T = np.eye(4)
         T[0,3] = point[0]; T[1,3] = point[1]; T[2,3] = point[2]
         T = TEW_inv * T
         
         l, r = self.__ig__.project3dToPixel( T[0:3,3]) # left and right camera pixel positions
-        
-        return l, r
+        return tuple(map(int,l)), tuple(map(int,r))
     
     def __project_from_pixel_to_3d(self, j,i, z):
         """!
@@ -1304,6 +1311,24 @@ class ClutchlessSystem:
         
         return x,y,z
     
+    def world_to_pixel(self, point, cam_info):
+        return tuple( map(int, self.__project_from_3d_to_pixel(point)[0] ) )
+        
+        K = [[0.0] * 3] * 3
+        K[0][0] = cam_info.K[0]
+        K[0][2] = cam_info.K[2]
+        K[1][1] = cam_info.K[4]
+        K[1][2] = cam_info.K[5]
+        K[2][2] = 1
+        x = point[0]
+        y = point[1]
+        z = point[2]
+        px = x * K[0][0]/z + K[0][2]
+        py = y * K[1][1]/z + K[1][2]
+        
+        return int(px), int(py) 
+
+
     def find_tool_relation_to_3d_deadzone(self):
         """!
             Returns whether the tool is inside or outside the deadzone, and a vector 
@@ -1314,6 +1339,10 @@ class ClutchlessSystem:
         """
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
+#         l1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
+#         r1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
+#         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
+#         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
         
         def in_or_out(p):
             if  (p[0] > self.__cam_width__ * (1-self.__deadzone_margin__) 
@@ -1337,6 +1366,16 @@ class ClutchlessSystem:
     def image_cb(self, image_msg, camera_name):
         image_pub = {'left':self.__pub_image_left__, 'right':self.__pub_image_right__}[camera_name]
         
+        l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
+        l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
+        
+        if camera_name is "left":
+            t1 = l1
+            t2 = l2
+        elif camera_name is "right":
+            t1 = r1
+            t2 = r2
+            
         bridge = cv_bridge.CvBridge()
         
         im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
@@ -1350,6 +1389,9 @@ class ClutchlessSystem:
         
         cv2.rectangle(im, (dw,dh), (self.__cam_width__ -dw, self.__cam_height__ -dh), (0, 255, 0), 2)
         cv2.rectangle(im, (0,0), (self.__cam_width__, self.__cam_height__), (255,0,0), 2)
+        
+        cv2.circle(im, t1, 10, (50,50,255), thickness=-1, lineType=8, shift=0)
+        cv2.circle(im, t2, 10, (255,50,255), thickness=-1, lineType=8, shift=0)
         
         new_image = bridge.cv2_to_imgmsg(im, 'rgb8')
     
