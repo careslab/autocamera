@@ -11,15 +11,15 @@ class ClutchlessSystem:
         
         TO DO:
             - Create 3D deadzone for autocamera
-                - Display it in RViz 
-                - Compute the correct parameters for the deadzone
-            - Have the camera move when a tool hits the edge of the deadzone
-                - Detect when a tool is hitting the edge
-                - Determine which tool
-                - Move   the camera with the tool as long as it is touching the edge
-            - Figure out a way to use clutchless system with zooming
+                - Display it in RViz [Done]
+                - Compute the correct parameters for the deadzone [Done]
+            - Have the camera move when a tool hits the edge of the deadzone [Done]
+                - Detect when a tool is hitting the edge [Done]
+                - Determine which tool and which edge
+                - Move the camera with the tool as long as it is touching the edge
             - Create a fitness function for MTM and PSM relation in the camera view
             - Implement clutchless system when the tools are in camera view
+            - Figure out a way to use clutchless system with zooming
             - Implement the clutchless sytem when the camera is moving
     """
     
@@ -1119,7 +1119,7 @@ class ClutchlessSystem:
 #         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
 #         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
         
-        print('l1 = {}, r1 = {}\n'.format(l1,r1))
+#         print('l1 = {}, r1 = {}\n'.format(l1,r1))
         
         new_l1 = [l1[0]/self.__cam_width__, l1[1]/self.__cam_height__]
         new_l2 = [l2[0]/self.__cam_width__, l2[1]/self.__cam_height__]
@@ -1284,7 +1284,7 @@ class ClutchlessSystem:
         x = cx * z * (j-cx)/cx / fx
         y = cy * z * (i-cy)/cy / fy
         
-        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
+#         print('x = {}, y = {}, z = {}\n'.format(x,y,z))
         
         B = self.__cam_info__['right'].P[3]/ self.__cam_info__['right'].P[0]
         T_ecm_left_to_ee = PoseConv.to_homo_mat( [ (0.00449585, 0.0082469, 0.003321), (0.0, 0.0, -1.57079632679) ])
@@ -1293,7 +1293,7 @@ class ClutchlessSystem:
         disparity = self.__ig__.getDisparity(z)
         x,y,z = self.__ig__.projectPixelTo3d( [i,j], disparity)
 
-        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
+#         print('x = {}, y = {}, z = {}\n'.format(x,y,z))
         
         r = PoseConv.to_homo_mat( [ (0.0, 0.0, 0.0), (3.14, 0.0, 0.0) ])
         T = np.eye(4)
@@ -1305,9 +1305,9 @@ class ClutchlessSystem:
         t = T # Apply fake came rotation
         x = t[0,3]; y = t[1,3]; z = t[2,3]
         
-        print('x = {}, y = {}, z = {}\n'.format(x,y,z))
+#         print('x = {}, y = {}, z = {}\n'.format(x,y,z))
         
-        print('disparity = {}\n'.format(disparity))
+#         print('disparity = {}\n'.format(disparity))
         
         return x,y,z
     
@@ -1344,18 +1344,22 @@ class ClutchlessSystem:
 #         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
 #         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
         
-        def in_or_out(p):
-            if  (p[0] > self.__cam_width__ * (1-self.__deadzone_margin__) 
-                or p[1] > self.__cam_height__ * (1-self.__deadzone_margin__) 
-                or p[0] < self.__cam_width__ * self.__deadzone_margin__ 
-                or p[1] < self.__cam_height__ * self.__deadzone_margin__ ):
-                return "outside"
-            else:
-                return "inside"
-            
-            
+        def contact_edges(p):
+            """!
+                Find which edges are in contact with the tool
+            """
+            edges = []
+            if  p[0] > self.__cam_width__ * (1-self.__deadzone_margin__):
+                edges.append('right')
+            if p[1] > self.__cam_height__ * (1-self.__deadzone_margin__):
+                edges.append('bottom')
+            if p[0] < self.__cam_width__ * self.__deadzone_margin__ :
+                edges.append('left') 
+            if p[1] < self.__cam_height__ * self.__deadzone_margin__ :
+                edges.append('top')
+            return edges
         
-        return in_or_out(l1), in_or_out(l2)
+        return contact_edges(l1), contact_edges(l2)
     
     def left_image_cb(self, image_msg):
         self.image_cb(image_msg, 'left')    
@@ -1368,14 +1372,16 @@ class ClutchlessSystem:
         
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
-        
+        t1 = []; t2 = [];
         if camera_name is "left":
             t1 = l1
             t2 = l2
         elif camera_name is "right":
             t1 = r1
             t2 = r2
-            
+        
+#         print('t1 = {}, t2 = {}\n'.format(t1,t2))
+        
         bridge = cv_bridge.CvBridge()
         
         im = bridge.imgmsg_to_cv2(image_msg, 'rgb8')
