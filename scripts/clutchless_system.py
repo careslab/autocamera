@@ -15,12 +15,14 @@ class ClutchlessSystem:
                 - Compute the correct parameters for the deadzone [Done]
             - Have the camera move when a tool hits the edge of the deadzone [Done]
                 - Detect when a tool is hitting the edge [Done]
-                - Determine which tool and which edge
+                - Determine which tool and which edge [Done]
                 - Move the camera with the tool as long as it is touching the edge
             - Create a fitness function for MTM and PSM relation in the camera view
             - Implement clutchless system when the tools are in camera view
             - Figure out a way to use clutchless system with zooming
             - Implement the clutchless sytem when the camera is moving
+            
+            - Fix the axis discrepency between ecm and mtm in simulation
     """
     
     class MODE:
@@ -108,6 +110,9 @@ class ClutchlessSystem:
         
         # The distance between the camera and the goal point
         self.__distance_to_point__ = None
+        
+        # Track any given point
+        self.__tracked_points__ = {}
         
         # Track how long the tools remain stationary
         self.__tool_timer__ = {'last_psm1_pos':None, 'last_psm2_pos':None, 'psm1_stay_start_time':0, 'psm2_stay_start_time':0, 'psm1_stationary_duration':0, 'psm2_stationary_duration':0}
@@ -999,16 +1004,76 @@ class ClutchlessSystem:
 #             self.__boundaries_pub__ = rospy.Publisher('/boundaries', PolygonStamped)
 #             self.__boundaries_pub__.publish(p_boundaries)
 #             
-            point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
-            p = self.__point_towards(point)
-            jnt_msg = JointState()
-            jnt_msg.name = self.__ecm_joint_names__
-            jnt_msg.position = p
-            print(self.find_tool_relation_to_3d_deadzone())
+            point = None
+            if self.__last_goal_point__ is not None:
+                l_edges, r_edges = self.find_tool_relation_to_3d_deadzone()
+                
+                if len(l_edges) > 0 and len(r_edges) == 0:
+                    # Remove psm1 from tracked points
+                    self.__tracked_points__.pop('psm1', None)
+                    
+                    # follow the left tool
+                    t = self.__psm2_last_pos__ # Tool position
+                    delta = self.__track_point(t, 'psm2')
+                    
+                    print('delta = {}\n'.format(delta))
+                    point = self.__last_goal_point__
+                    if 'top' in l_edges or 'bottom' in l_edges:
+                        point[1] = point[1] + delta[1]
+                    if 'left' in l_edges or 'right' in l_edges:
+                        point[0] = point[0] + delta[0]
+                    
+                elif len(l_edges) == 0 and len(r_edges) > 0:
+                    # Remove psm2 from tracked points
+                    self.__tracked_points__.pop('psm2', None)
+                    
+                    # follow the right tool
+                    t = self.__psm2_last_pos__ # Tool position
+                    delta = self.__track_point(t, 'psm1')
+                    point = self.__last_goal_point__
+                    if 'top' in l_edges or 'bottom' in l_edges:
+                        point[1] = point[1] + delta[1]
+                    if 'left' in l_edges or 'right' in l_edges:
+                        point[0] = point[0] + delta[0]
+                        
+                elif len(l_edges) > 0 and len(r_edges) > 0: # Both tools out of the deadzone
+                    # Follow the centroid
+                    point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+                else: # Both tools are inside
+                    # Follow neither
+                    point = None
+            else:
+                self.__last_goal_point__ = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+            print("point is {}\n".format(point))
+            if point is not None:
+                self.__last_goal_point__ = point
+                p = self.__point_towards(point)
+                jnt_msg = JointState()
+                jnt_msg.name = self.__ecm_joint_names__
+                jnt_msg.position = p
+                
+                self.__pub_ecm__.publish(jnt_msg)
+                self.move_arm_joints('ecm', jnt_msg.position) 
+                    
+                
+    def __track_point(self, point, name):
+        """!
+            Track changes in a given point
             
-#             self.__pub_ecm__.publish(jnt_msg)
-#             self.move_arm_joints('ecm', jnt_msg.position) 
+            @param point : The point to keep track of
+            @param name : Name of the point to keep track of
+            @return most recent change in the tracked point
+        """
+        if name not in self.__tracked_points__:
+            self.__tracked_points__[name] = [point]
+            return 0
     
+        self.__tracked_points__[name].append(point)
+        
+        # Return the changes in the last two points
+        return self.__tracked_points__[name][-1] - self.__tracked_points__[name][-2]
+        
+        
     def __get_3d_deadzone(self, frame_name):
         """!
             Returns a polygon object to be shown in RViz
