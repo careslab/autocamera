@@ -1003,57 +1003,76 @@ class ClutchlessSystem:
 #             
 #             self.__boundaries_pub__ = rospy.Publisher('/boundaries', PolygonStamped)
 #             self.__boundaries_pub__.publish(p_boundaries)
-#             
+#           
+
+            def reduce(x):
+                if x > 0:
+                    return x-1
+                if x < 0:
+                    return x+1
+                return 0
+              
             point = None
             if self.__last_goal_point__ is not None:
-                l_edges, r_edges = self.find_tool_relation_to_3d_deadzone()
+                r_edges, l_edges = self.find_tool_relation_to_3d_deadzone()
+                
+                if len(l_edges) > 0: print('l_edges = {}\n'.format(l_edges))
+                if len(r_edges) > 0: print('r_edges = {}\n'.format(r_edges))
+                
+                center,_ = self.__project_from_3d_to_pixel(self.__last_goal_point__)
+                point = self.__last_goal_point__
+                
+                T = np.eye(4)
+                T[0,3] = point[0]
+                T[1,3] = point[1]
+                T[2,3] = point[2]
+                T = (self.__T_ecm__**-1) * T
                 
                 if len(l_edges) > 0 and len(r_edges) == 0:
-                    # Remove psm1 from tracked points
-                    self.__tracked_points__.pop('psm1', None)
-                    
                     # follow the left tool
-                    t = self.__psm2_last_pos__ # Tool position
-                    delta = self.__track_point(t, 'psm2')
-                    
-                    print('delta = {}\n'.format(delta))
-                    point = self.__last_goal_point__
-                    if 'top' in l_edges or 'bottom' in l_edges:
-                        point[1] = point[1] + delta[1]
-                    if 'left' in l_edges or 'right' in l_edges:
-                        point[0] = point[0] + delta[0]
-                    
+                    if 'left' in l_edges.keys():
+                        T[1,3] -= 0.005 # move left
+                    if 'right' in l_edges.keys():
+                        T[1,3] += 0.005 # move right
+                    if 'bottom' in l_edges.keys():
+                        T[0,3] -= 0.005 # move up
+                    if 'top' in l_edges.keys():
+                        T[0,3] += 0.005 # move down
                 elif len(l_edges) == 0 and len(r_edges) > 0:
-                    # Remove psm2 from tracked points
-                    self.__tracked_points__.pop('psm2', None)
+#                     # follow the right tool
+                    if 'left' in r_edges.keys():
+                        T[1,3] -= 0.005 # move left
+                    if 'right' in r_edges.keys():
+                        T[1,3] += 0.005 # move right
+                    if 'bottom' in r_edges.keys():
+                        T[0,3] -= 0.005 # move up
+                    if 'top' in r_edges.keys():
+                        T[0,3] += 0.005 # move down
                     
-                    # follow the right tool
-                    t = self.__psm2_last_pos__ # Tool position
-                    delta = self.__track_point(t, 'psm1')
-                    point = self.__last_goal_point__
-                    if 'top' in l_edges or 'bottom' in l_edges:
-                        point[1] = point[1] + delta[1]
-                    if 'left' in l_edges or 'right' in l_edges:
-                        point[0] = point[0] + delta[0]
-                        
                 elif len(l_edges) > 0 and len(r_edges) > 0: # Both tools out of the deadzone
                     # Follow the centroid
-                    point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+#                     point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+                    pass
                 else: # Both tools are inside
                     # Follow neither
                     point = None
+                T = self.__T_ecm__ * T
+                point = np.array( T[0:3,3]).reshape(3,1)
             else:
                 self.__last_goal_point__ = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
-            print("point is {}\n".format(point))
+                
+            
             if point is not None:
-                self.__last_goal_point__ = point
+                point = np.array(point).reshape(3,1)
+                print("point is {}\n".format(point))
                 p = self.__point_towards(point)
                 jnt_msg = JointState()
                 jnt_msg.name = self.__ecm_joint_names__
                 jnt_msg.position = p
                 
                 self.__pub_ecm__.publish(jnt_msg)
-                self.move_arm_joints('ecm', jnt_msg.position) 
+                self.move_arm_joints('ecm', jnt_msg.position)
+#                 time.sleep(1) 
                     
                 
     def __track_point(self, point, name):
@@ -1167,7 +1186,8 @@ class ClutchlessSystem:
         if self.__last_goal_point__ == None:
             self.__last_goal_point__ = m
             self.__distance_to_point__ = m
-        
+        else:
+            self.__last_goal_point__ = point
         ######################
         # Zooming calculations
         ######################
@@ -1413,15 +1433,15 @@ class ClutchlessSystem:
             """!
                 Find which edges are in contact with the tool
             """
-            edges = []
+            edges = {}
             if  p[0] > self.__cam_width__ * (1-self.__deadzone_margin__):
-                edges.append('right')
+                edges['right'] = p[0] - self.__cam_width__ * (1-self.__deadzone_margin__)
             if p[1] > self.__cam_height__ * (1-self.__deadzone_margin__):
-                edges.append('bottom')
+                edges['bottom'] = p[1] - self.__cam_height__ * (1-self.__deadzone_margin__)
             if p[0] < self.__cam_width__ * self.__deadzone_margin__ :
-                edges.append('left') 
+                edges['left'] = p[0] - self.__cam_width__ * self.__deadzone_margin__ 
             if p[1] < self.__cam_height__ * self.__deadzone_margin__ :
-                edges.append('top')
+                edges['top'] = p[1] - self.__cam_height__ * self.__deadzone_margin__ 
             return edges
         
         return contact_edges(l1), contact_edges(l2)
