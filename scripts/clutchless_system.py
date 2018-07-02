@@ -16,7 +16,7 @@ class ClutchlessSystem:
             - Have the camera move when a tool hits the edge of the deadzone [Done]
                 - Detect when a tool is hitting the edge [Done]
                 - Determine which tool and which edge [Done]
-                - Move the camera with the tool as long as it is touching the edge
+                - Move the camera with the tool as long as it is touching the edge [Done]
             - Create a fitness function for MTM and PSM relation in the camera view
             - Implement clutchless system when the tools are in camera view
             - Figure out a way to use clutchless system with zooming
@@ -108,6 +108,9 @@ class ClutchlessSystem:
         # The point that the camera is pointing towards
         self.__last_goal_point__ = None
         
+        # Offset from the midpoint of the tools to the goal point
+        self.__midpoint_offset__ = None
+        
         # The distance between the camera and the goal point
         self.__distance_to_point__ = None
         
@@ -184,8 +187,8 @@ class ClutchlessSystem:
             self.__sub_mtmr_gripper__ = rospy.Subscriber('/dvrk/MTMR/gripper_position_current', Float32, self.__mtmr_gripper_cb__, queue_size=1, tcp_nodelay=True)
             
         
-        self.__sub_fake_image_left__ = rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.left_image_cb, queue_size=1)
-        self.__sub_fake_image_right__ = rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.right_image_cb, queue_size=1)
+        self.__sub_fake_image_left__ = rospy.Subscriber('/fakecam_node/fake_image_left', Image, self.__left_image_cb, queue_size=1)
+        self.__sub_fake_image_right__ = rospy.Subscriber('/fakecam_node/fake_image_right', Image, self.__right_image_cb, queue_size=1)
          
         # Publish images
         self.__pub_image_left__ = rospy.Publisher('clutchless_image_left', Image, queue_size=1)
@@ -1014,7 +1017,7 @@ class ClutchlessSystem:
               
             point = None
             if self.__last_goal_point__ is not None:
-                r_edges, l_edges = self.find_tool_relation_to_3d_deadzone()
+                r_edges, l_edges = self.__find_tool_relation_to_3d_deadzone()
                 
                 if len(l_edges) > 0: print('l_edges = {}\n'.format(l_edges))
                 if len(r_edges) > 0: print('r_edges = {}\n'.format(r_edges))
@@ -1051,13 +1054,24 @@ class ClutchlessSystem:
                     
                 elif len(l_edges) > 0 and len(r_edges) > 0: # Both tools out of the deadzone
                     # Follow the centroid
-#                     point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
-                    pass
+                    mid_point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+                    if self.__midpoint_offset__ is None:
+                        self.__midpoint_offset__ = self.__last_goal_point__ - mid_point
+                        point = self.__last_goal_point__ 
+                    else:
+                        point = mid_point+ self.__midpoint_offset__
+                    
+                    print('midpoint = {}\n'.format(mid_point))
+                    print('midpoint_offset = {}\n'.format(self.__midpoint_offset__))
                 else: # Both tools are inside
                     # Follow neither
                     point = None
-                T = self.__T_ecm__ * T
-                point = np.array( T[0:3,3]).reshape(3,1)
+                
+                if not(len(r_edges) > 0 and len(l_edges)) > 0:
+                    T = self.__T_ecm__ * T
+                    point = np.array( T[0:3,3]).reshape(3,1)
+                    self.__midpoint_offset__ = None
+                    
             else:
                 self.__last_goal_point__ = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
                 
@@ -1199,10 +1213,10 @@ class ClutchlessSystem:
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
         
-#         l1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
-#         r1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
-#         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
-#         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
+#         l1 = self.__world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
+#         r1 = self.__world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
+#         l2 = self.__world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
+#         r2 = self.__world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
         
 #         print('l1 = {}, r1 = {}\n'.format(l1,r1))
         
@@ -1396,7 +1410,7 @@ class ClutchlessSystem:
         
         return x,y,z
     
-    def world_to_pixel(self, point, cam_info):
+    def __world_to_pixel(self, point, cam_info):
         return tuple( map(int, self.__project_from_3d_to_pixel(point)[0] ) )
         
         K = [[0.0] * 3] * 3
@@ -1413,8 +1427,7 @@ class ClutchlessSystem:
         
         return int(px), int(py) 
 
-
-    def find_tool_relation_to_3d_deadzone(self):
+    def __find_tool_relation_to_3d_deadzone(self):
         """!
             Returns whether the tool is inside or outside the deadzone, and a vector 
             that shows the distance between the tool and the deadzone
@@ -1424,10 +1437,10 @@ class ClutchlessSystem:
         """
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
         l2, r2 = self.__project_from_3d_to_pixel(self.__psm2_last_pos__)
-#         l1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
-#         r1 = self.world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
-#         l2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
-#         r2 = self.world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
+#         l1 = self.__world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['left'])
+#         r1 = self.__world_to_pixel(self.__psm1_last_pos__, self.__cam_info__['right'])
+#         l2 = self.__world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['left'])
+#         r2 = self.__world_to_pixel(self.__psm2_last_pos__, self.__cam_info__['right'])
         
         def contact_edges(p):
             """!
@@ -1446,13 +1459,13 @@ class ClutchlessSystem:
         
         return contact_edges(l1), contact_edges(l2)
     
-    def left_image_cb(self, image_msg):
-        self.image_cb(image_msg, 'left')    
+    def __left_image_cb(self, image_msg):
+        self.__image_cb(image_msg, 'left')    
         
-    def right_image_cb(self, image_msg):
-        self.image_cb(image_msg, 'right')
+    def __right_image_cb(self, image_msg):
+        self.__image_cb(image_msg, 'right')
     
-    def image_cb(self, image_msg, camera_name):
+    def __image_cb(self, image_msg, camera_name):
         image_pub = {'left':self.__pub_image_left__, 'right':self.__pub_image_right__}[camera_name]
         
         l1, r1 = self.__project_from_3d_to_pixel(self.__psm1_last_pos__)
