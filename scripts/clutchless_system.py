@@ -20,7 +20,7 @@ class ClutchlessSystem:
             - Create a fitness function for MTM and PSM relation in the camera view
             - Implement clutchless system when the tools are in camera view
             - Figure out a way to use clutchless system with zooming
-            - Implement the clutchless sytem when the camera is moving
+            - Implement the clutchless sytem (change in scaling) when the camera is moving
             
             - Fix the axis discrepency between ecm and mtm in simulation
     """
@@ -598,35 +598,33 @@ class ClutchlessSystem:
     def __mtmr_gripper_cb__(self, msg):
         self.__mtmr_gripper__ = msg.data
                 
-    def __mtml_cb__(self, msg):
+    
+    def __psm2_mtml_predict(self, psm2_pos):
         """!
-        The main part of the teleoperation is performed in this
-        callback function. 
-        """
-        # Find mtm end effector position and orientation
-#         self.__align_mtms_to_psms__()
-        if self.__ecm_last_jnt__ is None: return
-        if self.__mode__ == self.MODE.simulation:
-            msg.position = msg.position[0:2] + msg.position[3:] 
-            msg.name = msg.name[0:2] + msg.name[3:]
-        else:
-            msg.position = msg.position[0:-1]
-            msg.name = msg.name[0:-1]
-#         msg.position = [.8 * i for i in msg.position]
-        
-        self.__last_mtml_jnt__ = msg.position
-        if self.__mtml_first_pos__ is None:
-            self.__mtml_first_pos__, _ = self.__mtml_kin__.FK( msg.position)
+            Predict where the mtm will end up based on a given psm position
             
-        if self.__T_mtml_000__ == None :
-            self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
-
+            @param psm2_pos : The position of the psm
+            @return T: The transformation matrix for the mtm
+        """
+        # Find the distance between the current psm position and the desired one
+        # divide that by the scaling factor
+        # Add it to the current mtm position to compute the final mtm position
+        pass
+    def __mtml_psm2_predict(self, mtml_pos):
+        """!
+            Predict where the psm will end up based on a given mtm position.
+            
+            @param mtml_pos : The position of the mtm
+            @return T : The transformation matrix for the psm
+            @return new_psm2_angles : The joint angles for the psm
+        """
+        
         # These rotations help the robot move better
         _, r_330_y_t = self.rotate('y', -np.pi/6.0)
         _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
         _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
-        T_mtm = self.__mtml_kin__.forward(msg.position)
+        T_mtm = self.__mtml_kin__.forward(mtml_pos)
         self.__T_mtml__ = T_mtm
         
         T = ( self.__T_mtml_000__**-1) * T_mtm 
@@ -688,6 +686,27 @@ class ClutchlessSystem:
         q[4] = 0
         q[3] = 0
         new_psm2_angles = self.__psm2_kin__.inverse(T, q)
+        
+        return T, new_psm2_angles
+    
+    
+    def __mtml_cb__(self, msg):
+        """!
+        The main part of the teleoperation is performed in this
+        callback function. 
+        """
+        # Find mtm end effector position and orientation
+#         self.__align_mtms_to_psms__()
+        if self.__ecm_last_jnt__ is None: return
+        if self.__mode__ == self.MODE.simulation:
+            msg.position = msg.position[0:2] + msg.position[3:] 
+            msg.name = msg.name[0:2] + msg.name[3:]
+        else:
+            msg.position = msg.position[0:-1]
+            msg.name = msg.name[0:-1]
+#         msg.position = [.8 * i for i in msg.position]
+        
+        T, new_psm2_angles = self.__mtml_psm2_predict(msg.position)
         
 #         print("T = {} , \nnew_psm2_angles = {}\n\n".format(T, new_psm2_angles))
         
