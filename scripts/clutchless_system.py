@@ -601,15 +601,22 @@ class ClutchlessSystem:
     
     def __psm2_mtml_predict(self, psm2_pos):
         """!
-            Predict where the mtm will end up based on a given psm position
+            Predict where the mtm needs to be if we wanted to use 
+            teleop to move the psm to a desired position
             
             @param psm2_pos : The position of the psm
-            @return T: The transformation matrix for the mtm
+            @return new_mtml_pos : The predicted postion of mtml
         """
         # Find the distance between the current psm position and the desired one
         # divide that by the scaling factor
         # Add it to the current mtm position to compute the final mtm position
-        pass
+
+        d = psm2_pos - self.__psm2_last_pos__
+        descaled_d = np.array( [ d[0]/self.__x_scale__, d[1]/self.__y_scale__, d[2]/self.__z_scale__])
+        new_mtml_pos = self.__mtml_last_pos__ + descaled_d
+        
+        return new_mtml_pos
+    
     def __mtml_psm2_predict(self, mtml_pos):
         """!
             Predict where the psm will end up based on a given mtm position.
@@ -692,8 +699,10 @@ class ClutchlessSystem:
     
     def __mtml_cb__(self, msg):
         """!
-        The main part of the teleoperation is performed in this
-        callback function. 
+            The main part of the teleoperation is performed in this
+            callback function. 
+        
+            @param msg : The mtml joint angles of type JointState
         """
         # Find mtm end effector position and orientation
 #         self.__align_mtms_to_psms__()
