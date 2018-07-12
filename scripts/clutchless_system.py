@@ -17,7 +17,7 @@ class ClutchlessSystem:
                 - Detect when a tool is hitting the edge [Done]
                 - Determine which tool and which edge [Done]
                 - Move the camera with the tool as long as it is touching the edge [Done]
-            - Create a fitness function for MTM and PSM relation in the camera view
+            - Create a fitness function for MTM and PSM relation in the camera view [Done]
             - Implement clutchless system when the tools are in camera view
             - Figure out a way to use clutchless system with zooming
             - Implement the clutchless sytem (change in scaling) when the camera is moving
@@ -130,6 +130,21 @@ class ClutchlessSystem:
         self.__cam_height__= None
         self.__deadzone_margin__ = .2 # 20% margin
         self.__left_lens_transform__ = None
+        
+        # Keep track of whether the camera is moving or not
+        self.__camera_moving__ = False
+        
+        # The most comfortable position of the MTM's 
+        self.__mtml_comfortable_pos__ = None
+        self.__mtmr_comfortable_pos__ = None
+        
+        # Where we want the tools to be when the MTMs are in their
+        # most comfortable position
+        self.__psm1_pixel_desired_pos__ = None
+        self.__psm2_pixel_desired_pos__ = None
+        
+        self.__mtml_teleop_error__ = None
+        self.__mtmr_teleop_error__ = None
         
     def __init__nodes(self):
         """!
@@ -599,20 +614,24 @@ class ClutchlessSystem:
         self.__mtmr_gripper__ = msg.data
                 
     
-    def __psm2_mtml_predict(self, psm2_pos):
+    def __psm2_mtml_predict(self, psm2_pos, scale = None):
         """!
             Predict where the mtm needs to be if we wanted to use 
             teleop to move the psm to a desired position
             
             @param psm2_pos : The position of the psm
+            @param scale : The scaling factor used for our prediction
             @return new_mtml_pos : The predicted postion of mtml
         """
         # Find the distance between the current psm position and the desired one
         # divide that by the scaling factor
         # Add it to the current mtm position to compute the final mtm position
 
+        if scale is None:
+            scale = self.scale
+            
         d = psm2_pos - self.__psm2_last_pos__
-        descaled_d = np.array( [ d[0]/self.__x_scale__, d[1]/self.__y_scale__, d[2]/self.__z_scale__])
+        descaled_d = d / scale 
         new_mtml_pos = self.__mtml_last_pos__ + descaled_d
         
         return new_mtml_pos
@@ -899,6 +918,12 @@ class ClutchlessSystem:
         
     
     def __get_dynamic_scale(self, arm_name):
+        """!
+            Adjust the teleoperation scaling factor for each axis dynamically.
+            
+            @param arm_name : mtml or mtmr
+            @return sx, sy, sz : The scaling factors for each axis
+        """
         if arm_name.lower() == 'mtml':
             home_position = self.__mtml_home_position__
             dir = self.__mtml_dir__
@@ -929,6 +954,11 @@ class ClutchlessSystem:
 #         self.__y_scale__ = self.__y_scale__ + h[1] * signs[1] * mult
 #         self.__z_scale__ = self.__z_scale__ + h[2] * signs[2] * mult
         
+        # Compute the error that needs to be compensated
+        # 1. Find the desired psm position 
+        # 2. Find the mtm error
+#         e = self.__psm2_mtml_predict(self.__psm2_last_pos__)
+
         if signs[0] > 0: # moving away
             self.__x_scale__ = .3
         elif signs[0] <0:
@@ -1026,9 +1056,9 @@ class ClutchlessSystem:
 #             self.set_ecm_to_world_transform(self.__T_ecm__)
     
             # The name of the frame we want to show the deadzone in            
-            frame_name = '/world'
+#             frame_name = '/world'
             
-            p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
+#             p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
 #             
 #             self.__deadzone_pub__.publish(p_deadzone)
 #             
@@ -1036,12 +1066,6 @@ class ClutchlessSystem:
 #             self.__boundaries_pub__.publish(p_boundaries)
 #           
 
-            def reduce(x):
-                if x > 0:
-                    return x-1
-                if x < 0:
-                    return x+1
-                return 0
               
             point = None
             if self.__last_goal_point__ is not None:
@@ -1103,8 +1127,9 @@ class ClutchlessSystem:
             else:
                 self.__last_goal_point__ = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
                 
-            
+            self.__camera_moving__ = False
             if point is not None:
+                self.__camera_moving__ = True
                 point = np.array(point).reshape(3,1)
                 print("point is {}\n".format(point))
                 p = self.__point_towards(point)
