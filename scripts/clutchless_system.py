@@ -650,6 +650,8 @@ class ClutchlessSystem:
         _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
         _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
+        if self.__T_mtml_000__ is None:
+            self.__T_mtml_000__ = self.__mtml_kin__.forward([0,0,0,0,0,0,0])
         T_mtm = self.__mtml_kin__.forward(mtml_pos)
         self.__T_mtml__ = T_mtm
         
@@ -734,7 +736,80 @@ class ClutchlessSystem:
             msg.name = msg.name[0:-1]
 #         msg.position = [.8 * i for i in msg.position]
         
-        T, new_psm2_angles = self.__mtml_psm2_predict(msg.position)
+        self.__last_mtml_jnt__ = msg.position
+        if self.__mtml_first_pos__ is None:
+            self.__mtml_first_pos__, _ = self.__mtml_kin__.FK( msg.position)
+            
+        if self.__T_mtml_000__ == None :
+            self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
+
+        # These rotations help the robot move better
+        _, r_330_y_t = self.rotate('y', -np.pi/6.0)
+        _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
+        _, r_30_x_t = self.rotate('x', np.pi/6.0)
+        
+        T_mtm = self.__mtml_kin__.forward(msg.position)
+        self.__T_mtml__ = T_mtm
+        
+        T = ( self.__T_mtml_000__**-1) * T_mtm 
+        T =  r_330_z_t * T * r_330_y_t * r_30_x_t
+        transform = np.matrix( [ [0,-1,0,0], 
+                                [0,0,1,0], 
+                                [-1,0,0,0], 
+                                [0,0,0,1]])
+        T = transform * T
+        
+
+        
+  
+        pos = T[0:3,3]
+        rot = T[0:3,0:3]
+        
+        if self.__mtml_home_position__ is None:
+            self.__mtml_home_position__ = pos
+        
+        if self.__mtml_last_pos__ == None or self.__clutch_active__:
+            self.__mtml_first_pos__ = pos
+            self.__mtml_last_pos__ = pos
+            self.__mtml_last_rot__ = rot
+            return
+        
+        
+        
+        if self.__enabled__ == False: return
+        if self.__mode__ == self.MODE.hardware:
+            self.__mtml_wrist_adjustment__.publish()
+        
+        delta = pos - self.__mtml_first_pos__
+        delta = np.insert(delta, 3,1).transpose()
+        p0 = np.insert(self.__mtml_first_pos__, 3,1).reshape(4,1)
+        p1 = np.insert(self.__mtml_last_pos__, 3,1,).reshape(4,1)
+        p2 = np.insert(pos, 3,1).transpose().reshape(4,1)
+        
+        movement = p2-p1
+        sx,sy,sz = self.__get_dynamic_scale('mtml')
+        movement[0] *= sx
+        movement[1] *= sy
+        movement[2] *= sz
+        if self.__mtml_translations__ is None:
+            self.__mtml_translations__ = (p1-p0) + movement
+        else:
+            self.__mtml_translations__ += movement
+            
+        new_translation = self.__mtml_translations__
+#         translation = (p1-p0)
+        translation = ( self.__T_ecm__ * new_translation)[0:3]
+        
+        orientation = self.__T_ecm__[0:3,0:3] * rot
+
+        T = self.__translate_mtml__(translation)
+        T = self.__set_orientation_mtml__( orientation, T)
+        
+        q = list(self.__psm2_last_jnt__)
+        q[5] = 0
+        q[4] = 0
+        q[3] = 0
+        new_psm2_angles = self.__psm2_kin__.inverse(T, q)
         
 #         print("T = {} , \nnew_psm2_angles = {}\n\n".format(T, new_psm2_angles))
         
@@ -924,14 +999,54 @@ class ClutchlessSystem:
             @param arm_name : mtml or mtmr
             @return sx, sy, sz : The scaling factors for each axis
         """
+        e = 0.0
         if arm_name.lower() == 'mtml':
+            if self.__psm2_pixel_desired_pos__ is None:
+                self.__psm2_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
+                    
             home_position = self.__mtml_home_position__
             dir = self.__mtml_dir__
             pos = self.__mtml_last_pos__
+            
+            # Compute the error that needs to be compensated
+            # 1. Find the desired psm position 
+            # 2. Find the mtm error
+            T_psm2 = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
+            psm2_ecm =  (self.__T_ecm__**-1) * T_psm2
+            x,y,z = self.__project_from_pixel_to_3d(self.__psm2_pixel_desired_pos__[1], self.__psm2_pixel_desired_pos__[0], psm2_ecm[2,3])
+            temp = psm2_ecm
+            temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
+            psm2_preferred_position = (self.__T_ecm__ * temp)[0:3,3]
+            
+            mtml_predicted_position = self.__psm2_mtml_predict(psm2_preferred_position)
+            
+            # error
+            e = abs(mtml_predicted_position - self.__mtml_home_position__)
+            
+            print('mtml clutchless error = {}\n'.format(e))
+            
         elif arm_name.lower() == 'mtmr':
+            if self.__psm1_pixel_desired_pos__ is None:
+                self.__psm1_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
+
             home_position = self.__mtmr_home_position__
             dir = self.__mtmr_dir__
             pos = self.__mtmr_last_pos__
+            
+            # Compute the error that needs to be compensated
+            # 1. Find the desired psm position 
+            # 2. Find the mtm error
+            T_psm1 = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
+            psm1_ecm =  (self.__T_ecm__**-1) * T_psm1
+            x,y,z = self.__project_from_pixel_to_3d(self.__psm1_pixel_desired_pos__[1], self.__psm1_pixel_desired_pos__[0], psm1_ecm[2,3])
+            temp = psm1_ecm
+            temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
+            psm1_preferred_position = (self.__T_ecm__ * temp)[0:3,3]
+            
+            mtmr_predicted_position = self.__psm1_mtmr_predict(psm1_preferred_position)
+            
+            # error
+            e = mtmr_predicted_position - self.__mtmr_home_position__
             
         if home_position is None:
             return self.scale, self.scale, self.scale
@@ -949,30 +1064,35 @@ class ClutchlessSystem:
         # we want to decrease the scaling
         signs = [i * j for i,j in zip(dir, loc_vec)]
         
+        
+        
+        
 #         mult = .2
 #         self.__x_scale__ = self.__x_scale__ + h[0] * signs[0] * mult
 #         self.__y_scale__ = self.__y_scale__ + h[1] * signs[1] * mult
 #         self.__z_scale__ = self.__z_scale__ + h[2] * signs[2] * mult
         
-        # Compute the error that needs to be compensated
-        # 1. Find the desired psm position 
-        # 2. Find the mtm error
-#         e = self.__psm2_mtml_predict(self.__psm2_last_pos__)
-
+        
+        
+        # The compensation quotient
+        c = 10 * e
+        
+        
         if signs[0] > 0: # moving away
-            self.__x_scale__ = .3
+            self.__x_scale__ = (self.scale * c[0])/( c[0] + e[0]) 
         elif signs[0] <0:
-            self.__x_scale__ = .3
+            self.__x_scale__ = (self.scale * c[0])/( c[0] - e[0])
         
         if signs[1] > 0: # moving away
-            self.__y_scale__ = .3
+            self.__y_scale__ = (self.scale * c[1])/( c[1] + e[1])
         elif signs[1] <0:
-            self.__y_scale__ = .3
+            self.__y_scale__ = (self.scale * c[1])/( c[1] - e[1])
              
         if signs[2] > 0: # moving away
-            self.__z_scale__ = .3
+            self.__z_scale__ = (self.scale * c[2])/( c[2] + e[2])
         elif signs[2] <0:
-            self.__z_scale__ = .3
+            self.__z_scale__ = (self.scale * c[2])/( c[2] - e[2])
+            
         def set_max(x):
             m = .5
             if x > m:
@@ -1056,9 +1176,9 @@ class ClutchlessSystem:
 #             self.set_ecm_to_world_transform(self.__T_ecm__)
     
             # The name of the frame we want to show the deadzone in            
-#             frame_name = '/world'
+            frame_name = '/world'
             
-#             p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
+            p_deadzone, p_boundaries = self.__get_3d_deadzone(frame_name)
 #             
 #             self.__deadzone_pub__.publish(p_deadzone)
 #             
