@@ -1021,7 +1021,7 @@ class ClutchlessSystem:
             mtml_predicted_position = self.__psm2_mtml_predict(psm2_preferred_position)
             
             # error
-            e = abs(mtml_predicted_position - self.__mtml_home_position__)
+            e = mtml_predicted_position - self.__mtml_home_position__
             
             print('mtml clutchless error = {}\n'.format(e))
             
@@ -1057,12 +1057,7 @@ class ClutchlessSystem:
         dir = [ i/abs(i) if i !=0 else i for i in dir]
         loc_vec = [ i/abs(i) if i!=0 else i for i in h]
 
-        # positive means moving away from center 
-        # and negative means moving towards it
-        # If it's moving away we want to increase
-        # the scaling and if it's moving closer to center
-        # we want to decrease the scaling
-        signs = [i * j for i,j in zip(dir, loc_vec)]
+        signs = [i * j for i,j in zip(dir, e)]
         
         
         
@@ -1075,32 +1070,38 @@ class ClutchlessSystem:
         
         
         # The compensation quotient
-        c = 10 * e
+        c = 10.0
         
         
         if signs[0] > 0: # moving away
-            self.__x_scale__ = (self.scale * c[0])/( c[0] + e[0]) 
-        elif signs[0] <0:
-            self.__x_scale__ = (self.scale * c[0])/( c[0] - e[0])
-        
-        if signs[1] > 0: # moving away
-            self.__y_scale__ = (self.scale * c[1])/( c[1] + e[1])
-        elif signs[1] <0:
-            self.__y_scale__ = (self.scale * c[1])/( c[1] - e[1])
-             
-        if signs[2] > 0: # moving away
-            self.__z_scale__ = (self.scale * c[2])/( c[2] + e[2])
-        elif signs[2] <0:
-            self.__z_scale__ = (self.scale * c[2])/( c[2] - e[2])
+            self.__x_scale__ = self.scale*(1+1/c) 
+        elif signs[0] <     0: # moving towards
+            self.__x_scale__ = self.scale*(1-1/c)
+        else:
+            self.__x_scale__ = self.scale
             
+        if signs[1] > 0: # moving away
+            self.__y_scale__ = self.scale*(1+1/c)
+        elif signs[1] < 0:
+            self.__y_scale__ = self.scale*(1-1/c)
+        else:
+            self.__y_scale__ = self.scale
+                 
+        if signs[2] > 0: # moving away
+            self.__z_scale__ = self.scale*(1+1/c)
+        elif signs[2] < 0:
+            self.__z_scale__ = self.scale*(1-1/c)
+        else:
+            self.__z_scale__ = self.scale
+                
         def set_max(x):
             m = .5
             if x > m:
                 x = m
             return abs(x)
-        self.__x_scale__ = set_max(self.__x_scale__)
-        self.__y_scale__ = set_max(self.__y_scale__)
-        self.__z_scale__ = set_max(self.__z_scale__)
+#         self.__x_scale__ = set_max(self.__x_scale__)
+#         self.__y_scale__ = set_max(self.__y_scale__)
+#         self.__z_scale__ = set_max(self.__z_scale__)
         
 #         print self.__x_scale__, self.__y_scale__, self.__z_scale__
         return self.__x_scale__, self.__y_scale__, self.__z_scale__
