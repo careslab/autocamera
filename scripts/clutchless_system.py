@@ -52,6 +52,8 @@ class ClutchlessSystem:
         self.__z_scale__ = self.scale
         
         self.__mtml_translations__ = None
+        self.__mtmr_translations__ = None
+        
         # Hand controller's desired position
         self.__mtml_home_position__ = None
         self.__mtmr_home_position__ = None
@@ -614,6 +616,28 @@ class ClutchlessSystem:
         self.__mtmr_gripper__ = msg.data
                 
     
+    def __psm1_mtmr_predict(self, psm1_pos, scale = None):
+        """!
+            Predict where the mtm needs to be if we wanted to use 
+            teleop to move the psm to a desired position
+            
+            @param psm1_pos : The position of the psm
+            @param scale : The scaling factor used for our prediction
+            @return new_mtmr_pos : The predicted postion of mtmr
+        """
+        # Find the distance between the current psm position and the desired one
+        # divide that by the scaling factor
+        # Add it to the current mtm position to compute the final mtm position
+
+        if scale is None:
+            scale = self.scale
+            
+        d = psm1_pos - self.__psm1_last_pos__
+        descaled_d = d / scale 
+        new_mtmr_pos = self.__mtmr_last_pos__ + descaled_d
+        
+        return new_mtmr_pos
+    
     def __psm2_mtml_predict(self, psm2_pos, scale = None):
         """!
             Predict where the mtm needs to be if we wanted to use 
@@ -857,90 +881,109 @@ class ClutchlessSystem:
         
     
     def __mtmr_cb__(self, msg):
-        # Find mtm end effector position and orientation
-        if self.__ecm_last_jnt__ is None: return
+        """!
+            The main part of the teleoperation is performed in this
+            callback function. 
         
+            @param msg : The mtmr joint angles of type JointState
+        """
+        # Find mtm end effector position and orientation
+#         self.__align_mtms_to_psms__()
+        if self.__ecm_last_jnt__ is None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
         else:
             msg.position = msg.position[0:-1]
             msg.name = msg.name[0:-1]
-
 #         msg.position = [.8 * i for i in msg.position]
+        
         self.__last_mtmr_jnt__ = msg.position
         if self.__mtmr_first_pos__ is None:
-            self.__mtmr_first_pos__, _ = self.__mtml_kin__.FK( msg.position )
+            self.__mtmr_first_pos__, _ = self.__mtmr_kin__.FK( msg.position)
             
         if self.__T_mtmr_000__ == None :
             self.__T_mtmr_000__ = self.__T_mtml_000__
-        
+
         # These rotations help the robot move better
         _, r_330_y_t = self.rotate('y', -np.pi/6.0)
-        _, r_330_z_t = self.rotate('z', -np.pi/6.0)
-        _, r_330_x_t = self.rotate('x', -np.pi/6.0)
+        _, r_330_z_t = self.rotate('z', -np.pi/6.0) 
+        _, r_30_x_t = self.rotate('x', np.pi/6.0)
         
         T_mtm = self.__mtmr_kin__.forward(msg.position)
         self.__T_mtmr__ = T_mtm
         
         T = ( self.__T_mtmr_000__**-1) * T_mtm 
-        T = r_330_z_t * T * r_330_y_t * r_330_x_t
-        
+        T =  r_330_z_t * T * r_330_y_t * r_30_x_t
         transform = np.matrix( [ [0,-1,0,0], 
                                 [0,0,1,0], 
                                 [-1,0,0,0], 
                                 [0,0,0,1]])
         T = transform * T
         
-        rot = T[0:3,0:3]
+
+        
+  
         pos = T[0:3,3]
+        rot = T[0:3,0:3]
         
         if self.__mtmr_home_position__ is None:
             self.__mtmr_home_position__ = pos
         
-        if self.__mtmr_last_pos__ == None  or self.__clutch_active__:
+        if self.__mtmr_last_pos__ == None or self.__clutch_active__:
             self.__mtmr_first_pos__ = pos
             self.__mtmr_last_pos__ = pos
             self.__mtmr_last_rot__ = rot
             return
         
-        # Find the direction of mtmr movement
-        self.__mtmr_dir__ = pos - self.__mtmr_last_pos__
         
-        self.__mtmr_last_pos__ = pos
-        self.__mtmr_last_rot__ = rot
         
         if self.__enabled__ == False: return
-        
         if self.__mode__ == self.MODE.hardware:
             self.__mtmr_wrist_adjustment__.publish()
         
         delta = pos - self.__mtmr_first_pos__
         delta = np.insert(delta, 3,1).transpose()
         p0 = np.insert(self.__mtmr_first_pos__, 3,1).reshape(4,1)
-        p1 = np.insert(pos, 3,1).transpose().reshape(4,1)
+        p1 = np.insert(self.__mtmr_last_pos__, 3,1,).reshape(4,1)
+        p2 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
-        translation = (p1-p0)
-        translation = ( self.__T_ecm__ * translation)[0:3]
+        movement = p2-p1
+        sx,sy,sz = self.__get_dynamic_scale('mtmr')
+        movement[0] *= sx
+        movement[1] *= sy
+        movement[2] *= sz
+        if self.__mtmr_translations__ is None:
+            self.__mtmr_translations__ = (p1-p0) + movement
+        else:
+            self.__mtmr_translations__ += movement
+            
+        new_translation = self.__mtmr_translations__
+#         translation = (p1-p0)
+        translation = ( self.__T_ecm__ * new_translation)[0:3]
         
         orientation = self.__T_ecm__[0:3,0:3] * rot
-        
+
         T = self.__translate_mtmr__(translation)
-        T = self.__set_orientation_mtmr__(orientation, T)
+        T = self.__set_orientation_mtmr__( orientation, T)
         
         q = list(self.__psm1_last_jnt__)
         q[5] = 0
         q[4] = 0
         q[3] = 0
         new_psm1_angles = self.__psm1_kin__.inverse(T, q)
+        
 #         print("T = {} , \nnew_psm1_angles = {}\n\n".format(T, new_psm1_angles))
         
         if (new_psm1_angles is None): return
         
+        
 #         if type(new_psm1_angles) == NoneType:
-#             T[0:3, 0:3] = self.__last_good_psm1_transform__[0:3,0:3] 
+#             print("Frozen, Translation = " + translation.__str__())
+# #             self.__mtmr_first_pos__ = self.__mtmr_last_pos__
+#             T = self.__set_orientation_mtmr__( self.__last_good_psm1_transform__[0:3,0:3] ) 
 #             new_psm1_angles = self.__psm1_kin__.inverse(T, q)
-        if self.__mode__ == self.MODE.hardware:            
+        if self.__mode__ == self.MODE.hardware:    
             if type(new_psm1_angles) == NoneType:
                 self.__hw_mtmr__.dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')
                 self.__hw_mtmr__.set_gravity_compensation(False)
@@ -950,22 +993,27 @@ class ClutchlessSystem:
                 self.__hw_mtmr__.dvrk_set_state('DVRK_EFFORT_CARTESIAN')
                 self.__hw_mtmr__.set_wrench_body_force([0, 0, 0])
                 self.__hw_mtmr__.set_gravity_compensation(True)
-        
-#         self.__last_good_psm1_transform__ = T
+            
+        self.__last_good_psm1_transform__ = T
         
         if self.__mode__ == self.MODE.hardware:
-            gripper = (self.__mtmr_gripper__-.4) * 1.2/.4
+            gripper = (self.__mtmr_gripper__-.4) * 1.4/.6
             new_psm1_angles = np.append(new_psm1_angles, gripper)
-                
+            
         if self.__mode__ == self.MODE.hardware:
             self.__hw_psm1__.move_joint_list( new_psm1_angles.tolist(), range(0,len(new_psm1_angles)), interpolate=False)
-         
+          
         if self.__mode__ == self.MODE.simulation:
             msg = JointState()
             msg.position = new_psm1_angles.tolist()
             msg.name =  ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
             self.__pub_psm1__.publish(msg)
 #         self.move_arm_joints('psm1', new_psm1_angles.tolist())
+            
+        # Find the direction of mtmr movement
+        self.__mtmr_dir__ = pos - self.__mtmr_last_pos__
+        self.__mtmr_last_pos__ = pos
+        self.__mtmr_last_rot__ = rot
         
         
     
@@ -1016,9 +1064,9 @@ class ClutchlessSystem:
             x,y,z = self.__project_from_pixel_to_3d(self.__psm2_pixel_desired_pos__[1], self.__psm2_pixel_desired_pos__[0], psm2_ecm[2,3])
             temp = psm2_ecm
             temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
-            psm2_preferred_position = (self.__T_ecm__ * temp)[0:3,3]
-            
-            mtml_predicted_position = self.__psm2_mtml_predict(psm2_preferred_position)
+            T_psm2_preferred = self.__T_ecm__ * temp
+            add_marker(temp, 'psm2_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
+            mtml_predicted_position = self.__psm2_mtml_predict(temp[0:3,3])
             
             # error
             e = mtml_predicted_position - self.__mtml_home_position__
@@ -1041,9 +1089,8 @@ class ClutchlessSystem:
             x,y,z = self.__project_from_pixel_to_3d(self.__psm1_pixel_desired_pos__[1], self.__psm1_pixel_desired_pos__[0], psm1_ecm[2,3])
             temp = psm1_ecm
             temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
-            psm1_preferred_position = (self.__T_ecm__ * temp)[0:3,3]
-            
-            mtmr_predicted_position = self.__psm1_mtmr_predict(psm1_preferred_position)
+            add_marker(temp, 'psm1_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
+            mtmr_predicted_position = self.__psm1_mtmr_predict(temp[0:3,3])
             
             # error
             e = mtmr_predicted_position - self.__mtmr_home_position__
@@ -1072,24 +1119,25 @@ class ClutchlessSystem:
         # The compensation quotient
         c = 10.0
         
+        tolerance = 0.01 # 1 cm
         
-        if signs[0] > 0: # moving away
+        if signs[0] > tolerance: # moving away from error. Move mtm slower and psm faster
             self.__x_scale__ = self.scale*(1+1/c) 
-        elif signs[0] <     0: # moving towards
+        elif signs[0] < -tolerance: # moving towards error. Move mtm faster and psm slower
             self.__x_scale__ = self.scale*(1-1/c)
         else:
             self.__x_scale__ = self.scale
             
-        if signs[1] > 0: # moving away
+        if signs[1] > tolerance: # moving away
             self.__y_scale__ = self.scale*(1+1/c)
-        elif signs[1] < 0:
+        elif signs[1] < -tolerance:
             self.__y_scale__ = self.scale*(1-1/c)
         else:
             self.__y_scale__ = self.scale
                  
-        if signs[2] > 0: # moving away
+        if signs[2] > tolerance: # moving away
             self.__z_scale__ = self.scale*(1+1/c)
-        elif signs[2] < 0:
+        elif signs[2] < -tolerance:
             self.__z_scale__ = self.scale*(1-1/c)
         else:
             self.__z_scale__ = self.scale
