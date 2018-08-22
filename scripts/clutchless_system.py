@@ -715,7 +715,7 @@ class ClutchlessSystem:
         p2 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         movement = p2-p1
-        sx,sy,sz = self.__get_dynamic_scale('mtml')
+        sx,sy,sz = self.__get_dynamic_scale_mtml()
         movement[0] *= sx
         movement[1] *= sy
         movement[2] *= sz
@@ -811,7 +811,7 @@ class ClutchlessSystem:
         p2 = np.insert(pos, 3,1).transpose().reshape(4,1)
         
         movement = p2-p1
-        sx,sy,sz = self.__get_dynamic_scale('mtml')
+        sx,sy,sz = self.__get_dynamic_scale_mtml()
         movement[0] *= sx
         movement[1] *= sy
         movement[2] *= sz
@@ -1039,8 +1039,7 @@ class ClutchlessSystem:
             self.__hw_mtmr__.move_joint_list( jnt_mtmr.tolist(), range(0, len(jnt_mtmr)), interpolate=True)
             
         
-    
-    def __get_dynamic_scale(self, arm_name):
+    def __get_dynamic_scale_mtml(self):
         """!
             Adjust the teleoperation scaling factor for each axis dynamically.
             
@@ -1048,53 +1047,30 @@ class ClutchlessSystem:
             @return sx, sy, sz : The scaling factors for each axis
         """
         e = 0.0
-        if arm_name.lower() == 'mtml':
-            if self.__psm2_pixel_desired_pos__ is None:
-                self.__psm2_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
-                    
-            home_position = self.__mtml_home_position__
-            dir = self.__mtml_dir__
-            pos = self.__mtml_last_pos__
-            
-            # Compute the error that needs to be compensated
-            # 1. Find the desired psm position 
-            # 2. Find the mtm error
-            T_psm2 = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
-            psm2_ecm =  (self.__T_ecm__**-1) * T_psm2
-            x,y,z = self.__project_from_pixel_to_3d(self.__psm2_pixel_desired_pos__[1], self.__psm2_pixel_desired_pos__[0], psm2_ecm[2,3])
-            temp = psm2_ecm
-            temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
-            T_psm2_preferred = self.__T_ecm__ * temp
-            add_marker(temp, 'psm2_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
-            mtml_predicted_position = self.__psm2_mtml_predict(temp[0:3,3])
-            
-            # error
-            e = mtml_predicted_position - self.__mtml_home_position__
-            
-            print('mtml clutchless error = {}\n'.format(e))
-            
-        elif arm_name.lower() == 'mtmr':
-            if self.__psm1_pixel_desired_pos__ is None:
-                self.__psm1_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
-
-            home_position = self.__mtmr_home_position__
-            dir = self.__mtmr_dir__
-            pos = self.__mtmr_last_pos__
-            
-            # Compute the error that needs to be compensated
-            # 1. Find the desired psm position 
-            # 2. Find the mtm error
-            T_psm1 = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
-            psm1_ecm =  (self.__T_ecm__**-1) * T_psm1
-            x,y,z = self.__project_from_pixel_to_3d(self.__psm1_pixel_desired_pos__[1], self.__psm1_pixel_desired_pos__[0], psm1_ecm[2,3])
-            temp = psm1_ecm
-            temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
-            add_marker(temp, 'psm1_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
-            mtmr_predicted_position = self.__psm1_mtmr_predict(temp[0:3,3])
-            
-            # error
-            e = mtmr_predicted_position - self.__mtmr_home_position__
-            
+        if self.__psm2_pixel_desired_pos__ is None:
+            self.__psm2_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
+                
+        home_position = (self.__mtmr_home_position__ + self.__mtml_home_position__)/2.0
+        dir = self.__mtml_dir__
+        pos = self.__mtml_last_pos__
+        
+        # Compute the error that needs to be compensated
+        # 1. Find the desired psm position 
+        # 2. Find the mtm error
+        T_psm2 = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
+        psm2_ecm =  (self.__T_ecm__**-1) * T_psm2
+        x,y,z = self.__project_from_pixel_to_3d(self.__psm2_pixel_desired_pos__[1], self.__psm2_pixel_desired_pos__[0], psm2_ecm[2,3])
+        temp = psm2_ecm
+        temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
+        T_psm2_preferred = self.__T_ecm__ * temp
+        add_marker(temp, 'psm2_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
+        mtml_predicted_position = self.__psm2_mtml_predict(temp[0:3,3])
+        
+        # error
+        e = mtml_predicted_position - home_position
+        
+        print('mtml clutchless error = {}\n'.format(e))
+        
         if home_position is None:
             return self.scale, self.scale, self.scale
         
@@ -1105,16 +1081,6 @@ class ClutchlessSystem:
         loc_vec = [ i/abs(i) if i!=0 else i for i in h]
 
         signs = [i * j for i,j in zip(dir, e)]
-        
-        
-        
-        
-#         mult = .2
-#         self.__x_scale__ = self.__x_scale__ + h[0] * signs[0] * mult
-#         self.__y_scale__ = self.__y_scale__ + h[1] * signs[1] * mult
-#         self.__z_scale__ = self.__z_scale__ + h[2] * signs[2] * mult
-        
-        
         
         # The compensation quotient
         c = 10.0
@@ -1154,6 +1120,83 @@ class ClutchlessSystem:
 #         print self.__x_scale__, self.__y_scale__, self.__z_scale__
         return self.__x_scale__, self.__y_scale__, self.__z_scale__
         
+    def __get_dynamic_scale_mtmr(self):
+        """!
+            Adjust the teleoperation scaling factor for each axis dynamically.
+            
+            @param arm_name : mtml or mtmr
+            @return sx, sy, sz : The scaling factors for each axis
+        """
+        e = 0.0
+        if self.__psm1_pixel_desired_pos__ is None:
+            self.__psm1_pixel_desired_pos__ = [self.__cam_height__/2, self.__cam_width__/2]
+
+        home_position = (self.__mtmr_home_position__ + self.__mtml_home_position__)/2.0
+        dir = self.__mtmr_dir__
+        pos = self.__mtmr_last_pos__
+        
+        # Compute the error that needs to be compensated
+        # 1. Find the desired psm position 
+        # 2. Find the mtm error
+        T_psm1 = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
+        psm1_ecm =  (self.__T_ecm__**-1) * T_psm1
+        x,y,z = self.__project_from_pixel_to_3d(self.__psm1_pixel_desired_pos__[1], self.__psm1_pixel_desired_pos__[0], psm1_ecm[2,3])
+        temp = psm1_ecm
+        temp[0,3] = x; temp[1,3] = y; temp[2,3] = z
+        add_marker(temp, 'psm1_preferred_position', color=[1,0,0], type=Marker.SPHERE, scale = [.005,.005,.005], points=None, frame = "world")
+        mtmr_predicted_position = self.__psm1_mtmr_predict(temp[0:3,3])
+        
+        # error
+        e = mtmr_predicted_position - home_position
+            
+        if home_position is None:
+            return self.scale, self.scale, self.scale
+        
+        dir = [float(i) for i in dir]
+        h = [float(i) for i in (pos-home_position)]
+        
+        dir = [ i/abs(i) if i !=0 else i for i in dir]
+        loc_vec = [ i/abs(i) if i!=0 else i for i in h]
+
+        signs = [i * j for i,j in zip(dir, e)]
+        
+        # The compensation quotient
+        c = 10.0
+        
+        tolerance = 0.01 # 1 cm
+        
+        if signs[0] > tolerance: # moving away from error. Move mtm slower and psm faster
+            self.__x_scale__ = self.scale*(1+1/c) 
+        elif signs[0] < -tolerance: # moving towards error. Move mtm faster and psm slower
+            self.__x_scale__ = self.scale*(1-1/c)
+        else:
+            self.__x_scale__ = self.scale
+            
+        if signs[1] > tolerance: # moving away
+            self.__y_scale__ = self.scale*(1+1/c)
+        elif signs[1] < -tolerance:
+            self.__y_scale__ = self.scale*(1-1/c)
+        else:
+            self.__y_scale__ = self.scale
+                 
+        if signs[2] > tolerance: # moving away
+            self.__z_scale__ = self.scale*(1+1/c)
+        elif signs[2] < -tolerance:
+            self.__z_scale__ = self.scale*(1-1/c)
+        else:
+            self.__z_scale__ = self.scale
+                
+        def set_max(x):
+            m = .5
+            if x > m:
+                x = m
+            return abs(x)
+#         self.__x_scale__ = set_max(self.__x_scale__)
+#         self.__y_scale__ = set_max(self.__y_scale__)
+#         self.__z_scale__ = set_max(self.__z_scale__)
+        
+#         print self.__x_scale__, self.__y_scale__, self.__z_scale__
+        return self.__x_scale__, self.__y_scale__, self.__z_scale__
         
             
     def __translate_mtml__(self, translation, T=None): # translate a psm arm
@@ -1177,21 +1220,17 @@ class ClutchlessSystem:
     def __translate_mtmr__(self, translation, T=None): # translate a psm arm
         if self.__enabled__ == False: return
         
-        translation = translation * self.scale
-        psm1_pos = self.__psm1_first_pos__ #self.__psm1_kin__.FK(self.__psm1_last_jnt__)
-        
+        psm1_pos = self.__psm1_first_pos__#self.__psm2_kin__.FK(self.__psm2_last_jnt__)
         if T==None:
             T = self.__psm1_kin__.forward(self.__psm1_last_jnt__)
-
         new_psm1_pos = psm1_pos + translation
         T[0:3, 3] = new_psm1_pos
-        
+#         self.autocamera.add_marker(T, 'psm2_delta', color = [1,1,0], scale= [.02,0,0], type=Marker.LINE_LIST, points=[psm2_pos,new_psm2_pos], frame="world")
         return T
         
     
     def __set_orientation_mtml__(self,orientation, T=None): # align a psm arm to mtm
         if self.__enabled__ == False: return
-        
         if T==None:
             T = self.__psm2_kin__.forward(self.__psm2_last_jnt__)
         T[0:3,0:3] = orientation
@@ -1251,7 +1290,6 @@ class ClutchlessSystem:
                 T[1,3] = point[1]
                 T[2,3] = point[2]
                 T = (self.__T_ecm__**-1) * T
-                
                 if len(l_edges) > 0 and len(r_edges) == 0:
                     # follow the left tool
                     if 'left' in l_edges.keys():
@@ -1282,16 +1320,17 @@ class ClutchlessSystem:
                     else:
                         point = mid_point+ self.__midpoint_offset__
                     
-                    print('midpoint = {}\n'.format(mid_point))
-                    print('midpoint_offset = {}\n'.format(self.__midpoint_offset__))
                 else: # Both tools are inside
                     # Follow neither
-                    point = None
-                
+                    point = self.__last_goal_point__
+                    mid_point = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
+                    point[2] = mid_point[2]
+                    self.__last_goal_point__[2] = mid_point[2]
                 if not(len(r_edges) > 0 and len(l_edges)) > 0:
                     T = self.__T_ecm__ * T
                     point = np.array( T[0:3,3]).reshape(3,1)
                     self.__midpoint_offset__ = None
+                
                     
             else:
                 self.__last_goal_point__ = ( self.__psm1_last_pos__ + self.__psm2_last_pos__)/2.0
