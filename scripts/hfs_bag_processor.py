@@ -30,10 +30,15 @@ class hfs_bag_processor:
         self.__mtmr_kin__ = KDLKinematics(self.__mtmr_robot__, self.__mtmr_robot__.links[0].name, self.__mtmr_robot__.links[-1].name)
         
         self.topics = {'mtml': '/dvrk/MTML/state_joint_current',
+                       'mtml_pose':'/dvrk/MTML/pose_current',
                        'mtmr': '/dvrk/MTMR/state_joint_current',
+                       'mtmr_pose':'/dvrk/MTMR/pose_current',
                        'psm1': '/dvrk/PSM1/state_joint_current',
+                       'psm1_pose':'/dvrk/PSM1/pose_current',
                        'psm2': '/dvrk/PSM2/state_joint_current',
+                       'psm2_pose':'/dvrk/PSM2/pose_current',
                        'ecm' : '/dvrk/ECM/state_joint_current',
+                       'ecm_pose':'/dvrk/ECM/pose_current',
                        'camera':'/dvrk/footpedals/camera',
                        'clutch':'/dvrk/footpedals/clutch',
                        'headsensor':'/dvrk/footpedals/coag'}
@@ -94,11 +99,31 @@ class hfs_bag_processor:
         [topic, messages, times] = self.compute_fkine(bag_file, 'ecm')
         self.save_to_bag(output_bag_file, topic, messages, times)
         
-        # TODO : Write the clutches to the new bag file without modification
+        # Save the unchanged topics to the new file as well
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['clutch'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['camera'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['headsensor'])
+        
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['mtml'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['mtmr'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['psm1'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['psm2'])
+        self.save_topic_to_bag(output_bag_file, topic=self.topics['ecm'])
         
         bag_file.close()
         output_bag_file.close()
-        
+    
+    def save_topic_to_bag(self, output_bag_file, topic):
+        """!
+            Saves the messages from a topic to a new file without change.
+            
+            @param output_bag_file : The bag file to write the messages to.
+            @param topic : The topic to use
+        """    
+        bag_messages = bag_file.read_messages( topics=topic)
+        for topic, msg, time_current_message in bag_messages:
+            output_bag_file.write(topic, msg, t=time_current_message)
+            
     def save_to_bag(self, output_bag_file, topic, messages, times):
         """!
             This function saves the data to a bag file.
@@ -135,8 +160,6 @@ class hfs_bag_processor:
             if arm_name.lower() != 'ecm':
                 T = self.kin[arm_name].forward(msg.position[0:-1])
             else:
-                print(arm_name)
-                print(msg.position)
                 T = self.kin[arm_name].forward(msg.position)
                 
             q = PoseConv.to_pos_quat(T)
@@ -152,7 +175,7 @@ class hfs_bag_processor:
             messages.append(p)
             times.append(time_current_message)
             
-        return self.topics[arm_name], messages, times
+        return self.topics[arm_name+'_pose'], messages, times
     
 if __name__ == "__main__":
     hfs = hfs_bag_processor()
