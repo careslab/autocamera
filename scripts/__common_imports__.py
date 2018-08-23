@@ -4,6 +4,7 @@ import cv2
 import math
 import time
 import rospy
+import rosbag
 import cv_bridge
 import numpy as np
 import image_geometry
