@@ -11,22 +11,24 @@ class hfs_bag_processor:
         """!
             The initialization function for the hfs_bag_processor class.
         """
-        rospy.init_node('bag_processor')
         
         # Defining the kinematic computation variables
-        self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        path_to_xml_file = '/home/dvrk/Downloads/hfs_recordings/urdf files/'
+#         self.__ecm_robot__ = URDF.from_parameter_server('/dvrk_ecm/robot_description')
+        self.__ecm_robot__ = URDF.from_xml_file(path_to_xml_file + 'hfs_ecm.urdf')
         self.__ecm_kin__ = KDLKinematics(self.__ecm_robot__, self.__ecm_robot__.links[0].name, self.__ecm_robot__.links[-1].name)
         
-        self.__psm1_robot__ = URDF.from_parameter_server('/dvrk_psm1/robot_description')
+        print('ecm parsed, all good \n')
+        self.__psm1_robot__ = URDF.from_xml_file(path_to_xml_file + 'hfs_psm1.urdf')
         self.__psm1_kin__ = KDLKinematics(self.__psm1_robot__, self.__psm1_robot__.links[0].name, self.__psm1_robot__.links[-1].name)
         
-        self.__psm2_robot__ = URDF.from_parameter_server('/dvrk_psm2/robot_description')
+        self.__psm2_robot__ = URDF.from_xml_file(path_to_xml_file + 'hfs_psm2.urdf')
         self.__psm2_kin__ = KDLKinematics(self.__psm2_robot__, self.__psm2_robot__.links[0].name, self.__psm2_robot__.links[-1].name)
         
-        self.__mtml_robot__ = URDF.from_parameter_server('/dvrk_mtml/robot_description')
+        self.__mtml_robot__ = URDF.from_xml_file(path_to_xml_file + 'hfs_mtml.urdf')
         self.__mtml_kin__ = KDLKinematics(self.__mtml_robot__, self.__mtml_robot__.links[0].name, self.__mtml_robot__.links[-1].name)
         
-        self.__mtmr_robot__ = URDF.from_parameter_server('/dvrk_mtmr/robot_description')
+        self.__mtmr_robot__ = URDF.from_xml_file(path_to_xml_file + 'hfs_mtmr.urdf')
         self.__mtmr_kin__ = KDLKinematics(self.__mtmr_robot__, self.__mtmr_robot__.links[0].name, self.__mtmr_robot__.links[-1].name)
         
         self.topics = {'mtml': '/dvrk/MTML/state_joint_current',
@@ -48,8 +50,6 @@ class hfs_bag_processor:
                     'psm2':self.__psm2_kin__,
                     'mtml':self.__mtml_kin__,
                     'mtmr':self.__mtmr_kin__}
-    def spin(self):
-        rospy.spin()
                 
     def process_folder(self, folder_with_bag_files):
         """!
@@ -82,6 +82,9 @@ class hfs_bag_processor:
         print('input bag file name = {}\noutput bag file name = {}\n\n'.format(bag_file_name, output_file_name))
 
         bag_file = rosbag.Bag(folder + '/'+bag_file_name)
+        if not os.path.exists(folder + '/processed'):
+            os.mkdir(folder + '/processed')
+            
         output_bag_file = rosbag.Bag(folder+'/processed/'+output_file_name, 'w')
          
         [topic, messages, times] = self.compute_fkine(bag_file, 'mtml')
@@ -100,20 +103,20 @@ class hfs_bag_processor:
         self.save_to_bag(output_bag_file, topic, messages, times)
         
         # Save the unchanged topics to the new file as well
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['clutch'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['camera'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['headsensor'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['clutch'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['camera'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['headsensor'])
         
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['mtml'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['mtmr'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['psm1'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['psm2'])
-        self.save_topic_to_bag(output_bag_file, topic=self.topics['ecm'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['mtml'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['mtmr'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['psm1'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['psm2'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['ecm'])
         
         bag_file.close()
         output_bag_file.close()
     
-    def save_topic_to_bag(self, output_bag_file, topic):
+    def save_topic_to_bag(self, bag_file, output_bag_file, topic):
         """!
             Saves the messages from a topic to a new file without change.
             
@@ -180,5 +183,4 @@ class hfs_bag_processor:
 if __name__ == "__main__":
     hfs = hfs_bag_processor()
     hfs.process_folder('/home/dvrk/Downloads/hfs_recordings/subject1')
-    hfs.spin()
     
