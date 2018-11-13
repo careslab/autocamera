@@ -43,7 +43,9 @@ class hfs_bag_processor:
                        'ecm_pose':'/dvrk/ECM/pose_current',
                        'camera':'/dvrk/footpedals/camera',
                        'clutch':'/dvrk/footpedals/clutch',
-                       'headsensor':'/dvrk/footpedals/coag'}
+                       'headsensor':'/dvrk/footpedals/coag',
+                       'video_left': '/camera1/usb_cam_left/image_raw/compressed',
+                       'video_right': '/camera2/usb_cam_right/image_raw/compressed'}
         
         self.kin = {'ecm':self.__ecm_kin__,
                     'psm1':self.__psm1_kin__,
@@ -112,6 +114,8 @@ class hfs_bag_processor:
         self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['psm1'])
         self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['psm2'])
         self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['ecm'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['video_left'])
+        self.save_topic_to_bag(bag_file, output_bag_file, topic=self.topics['video_right'])
         
         bag_file.close()
         output_bag_file.close()
@@ -181,6 +185,7 @@ class hfs_bag_processor:
         return self.topics[arm_name+'_pose'], messages, times
     
 if __name__ == "__main__":
+    folder = '/home/dvrk/Documents/hfs_data/camera_in_view_test'
     hfs = hfs_bag_processor()
-    hfs.process_folder('/home/dvrk/Downloads/hfs_recordings/subject1')
+    hfs.process_folder( folder)
     

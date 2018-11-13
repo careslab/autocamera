@@ -117,6 +117,7 @@ class TeleopClass:
         # Publish to PSMs simulation
         self.__pub_psm1__ = rospy.Publisher('/dvrk_psm1/joint_states_robot', JointState, queue_size=1)
         self.__pub_psm2__ = rospy.Publisher('/dvrk_psm2/joint_states_robot', JointState, queue_size=1)
+        self.__pub_ecm__ = rospy.Publisher('/dvrk_ecm/joint_states_robot', JointState, queue_size=1)
         
         # Publish to MTMs simulation
         self.__pub_mtml__ = rospy.Publisher('/dvrk_mtml/joint_states_robot', JointState, queue_size=1)
@@ -369,6 +370,9 @@ class TeleopClass:
             self.__last_ecm_jnt__ = msg.position[0:3] + tuple([0])
         
         self.__T_ecm__ = self.__ecm_kin__.forward(self.__last_ecm_jnt__)
+        if self.__mode__ == self.MODE.hardware:
+            self.__pub_ecm__.publish(msg)
+        
           
     def __psm1_cb__(self, msg):
         """!
