@@ -1,4 +1,5 @@
 from __common_imports__ import *
+from functools import update_wrapper, wraps
 
 class TeleopClass:
     class MODE:
@@ -60,6 +61,10 @@ class TeleopClass:
         self.__arms_homed__ = False
         self.__paused__ = False
         self.__reenable_teleop__ = False
+        
+        # A dict that buffers the messages based on a delay value
+        self.__delay_buffer__ = {}
+        self.__delay__ = 2
         
 #         from autocamera_algorithm import Autocamera
 #         from visualization_msgs.msg import Marker
@@ -141,8 +146,8 @@ class TeleopClass:
         self.__pub_mtml_psm2_teleop__ = rospy.Publisher('/dvrk/MTML_PSM2/set_desired_state', String, latch=True, queue_size=1)
         
         # Wrist Adjustments
-        self.__mtml_wrist_adjustment__ = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True)
-        self.__mtmr_wrist_adjustment__ = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True)
+        self.__mtml_wrist_adjustment__ = rospy.Publisher('/dvrk/MTML/run_wrist_adjustment', Empty, latch=True, queue_size=1)
+        self.__mtmr_wrist_adjustment__ = rospy.Publisher('/dvrk/MTMR/run_wrist_adjustment', Empty, latch=True, queue_size=1)
         
         # Access psm hardware
         self.__hw_psm1__ = robot('PSM1')
@@ -157,6 +162,33 @@ class TeleopClass:
 
     
     
+    class decorators:
+        @classmethod
+        def delay(f, name):
+            @wraps(f)        
+            def _f(*args, **kwargs):
+                print(name)
+                 
+                return
+            return _f
+                
+    def __delay_queue(self, name, msg):
+        """!
+            Adds messages to a queue. It returns the oldest message that exceeds the delay time. 
+            This is used to create a delayed teleoperation.
+            
+            @param name: The name of the parameter
+            @param msg: The message to be stored
+        """
+        if name not in self.__delay_buffer__.keys():
+            self.__delay_buffer__[name] = []
+        t = time.time()
+        self.__delay_buffer__[name].append( (t,msg))
+        if self.__delay_buffer__[name][-1][0]-self.__delay_buffer__[name][0][0] >= self.__delay__:
+            return self.__delay_buffer__[name].pop(0)[1]
+        else:
+            return None
+        
     def rehome(self):
         """!
         Home all the arms again
@@ -421,11 +453,18 @@ class TeleopClass:
     def __mtmr_jnt_cb(self, msg):
         self.__mtmr_jnt__ = msg.position
     
+#     @decorators.delay('mtml')
     def __mtml_cb__(self, msg):
         """!
         The main part of the teleoperation is performed in this
         callback function. 
         """
+       
+#         msg = self.__delay_queue('mtml', msg)
+#         if msg is None:return
+        
+        print(len(self.__delay_buffer__))
+        print(msg)
         # Find mtm end effector position and orientation
         self.home_arms()
 #         self.__align_mtms_to_psms__()
@@ -441,7 +480,7 @@ class TeleopClass:
         
         self.__last_mtml_jnt__ = msg.position
         
-        if self.__T_mtml_000__ == None :
+        if self.__T_mtml_000__ is None:
             self.__T_mtml_000__ = self.__mtml_kin__.forward(msg.position)
 
         # These rotations help the robot move better
@@ -583,7 +622,7 @@ class TeleopClass:
         self.__last_q_2__ = q
         
         
-    
+#     @decorators.delay('mtmr')
     def __mtmr_cb__(self, msg):
         # Find mtm end effector position and orientation
         if self.__last_ecm_jnt__ == None: return
@@ -598,7 +637,7 @@ class TeleopClass:
 #         msg.position = [.8 * i for i in msg.position]
         self.__last_mtmr_jnt__ = msg.position
         
-        if self.__T_mtmr_000__ == None :
+        if self.__T_mtmr_000__  is None:
             self.__T_mtmr_000__ = self.__T_mtml_000__
         
         # These rotations help the robot move better
