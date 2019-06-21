@@ -241,7 +241,7 @@ class Autocamera:
         
         # Distance from keyhole to midpoint
         m = math.sqrt(ab_vector[0]**2 + ab_vector[1]**2 + ab_vector[2]**2) # ab_vector's length
-        if self.last_midpoint == None:
+        if self.last_midpoint is None:
             self.last_midpoint = m
             self.distance_to_midpoint = m
             
@@ -283,7 +283,7 @@ class Autocamera:
             p = self.ecm_kin.inverse(ecm_pose)
         except Exception as e:
             rospy.logerr('error')
-        if p != None:  
+        if p is not None:  
             p[3] = 0
             output_msg.position = p
         else:
@@ -293,7 +293,7 @@ class Autocamera:
         return output_msg
     
     def find_2d_tool_coordinates_in_3d(self, cam_info, clean_joints):
-        if cam_info != None:
+        if cam_info is not None:
             psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-5].name)
             T1W = psm1_kin_to_wrist.forward(clean_joints['psm1'].position)
             
@@ -433,7 +433,7 @@ class Autocamera:
         return ( x,y )
                  
     def find_zoom_level(self, msg, cam_info, clean_joints):
-        if cam_info != None:
+        if cam_info is not None:
             psm1_kin_to_wrist = KDLKinematics(self.psm1_robot, self.psm1_robot.links[0].name, self.psm1_robot.links[-1].name)
             T1W = psm1_kin_to_wrist.forward(clean_joints['psm1'].position)
             
