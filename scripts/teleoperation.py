@@ -469,7 +469,7 @@ class TeleopClass:
         self.home_arms()
 #         self.__align_mtms_to_psms__()
         
-        if self.__last_ecm_jnt__ == None: return
+        if self.__last_ecm_jnt__ is None: return
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
             msg.name = msg.name[0:2] + msg.name[3:]
@@ -505,7 +505,7 @@ class TeleopClass:
         pos = T[0:3,3]
         rot = T_rot[0:3,0:3]
         
-        if self.__last_mtml_pos__ == None or self.__clutch_active__:
+        if self.__last_mtml_pos__ is None or self.__clutch_active__:
             self.__first_mtml_pos__ = pos
             self.__last_mtml_pos__ = pos
             self.__last_mtml_rot__ = rot
@@ -625,7 +625,7 @@ class TeleopClass:
 #     @decorators.delay('mtmr')
     def __mtmr_cb__(self, msg):
         # Find mtm end effector position and orientation
-        if self.__last_ecm_jnt__ == None: return
+        if self.__last_ecm_jnt__ is None: return
         
         if self.__mode__ == self.MODE.simulation:
             msg.position = msg.position[0:2] + msg.position[3:] 
@@ -662,7 +662,7 @@ class TeleopClass:
         pos = T[0:3,3]
         
         
-        if self.__last_mtmr_pos__ == None  or self.__clutch_active__:
+        if self.__last_mtmr_pos__ is None  or self.__clutch_active__:
             self.__first_mtmr_pos__ = pos
             self.__last_mtmr_pos__ = pos
             self.__last_mtmr_rot__ = rot
@@ -771,7 +771,7 @@ class TeleopClass:
         
         translation = translation * self.scale
         psm2_pos = self.__first_psm2_pos__#self.__psm2_kin__.FK(self.__last_psm2_jnt__)
-        if T==None:
+        if T is None:
             T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
         new_psm2_pos = psm2_pos + translation
         T[0:3, 3] = new_psm2_pos
@@ -784,7 +784,7 @@ class TeleopClass:
         translation = translation * self.scale
         psm1_pos = self.__first_psm1_pos__ #self.__psm1_kin__.FK(self.__last_psm1_jnt__)
         
-        if T==None:
+        if T is None:
             T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
             
         new_psm1_pos = psm1_pos + translation
@@ -796,14 +796,14 @@ class TeleopClass:
     def __set_orientation_mtml__(self,orientation, T=None): # align a psm arm to mtm
         if self.__enabled__ == False: return
         
-        if T==None:
+        if T is None:
             T = self.__psm2_kin__.forward(self.__last_psm2_jnt__)
         T[0:3,0:3] = orientation
         return T
         
     def __set_orientation_mtmr__(self,orientation, T = None): # align a psm arm to mtm
         if self.__enabled__ == False: return
-        if T == None:
+        if T is None:
             T = self.__psm1_kin__.forward(self.__last_psm1_jnt__)
         T[0:3,0:3] = orientation
         return T
