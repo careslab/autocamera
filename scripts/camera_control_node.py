@@ -504,7 +504,7 @@ class Autocamera_node_handler:
     
     def __mtml_cb__(self, msg):
         if self.camera_clutch_pressed :
-            if self.mtml_start_position == None:
+            if self.mtml_start_position is  None:
                 self.mtml_start_position = msg
             self.mtml_end_position = msg
             
@@ -542,7 +542,7 @@ class Autocamera_node_handler:
         self.pub_ecm.publish(msg)
         
     def add_ecm_jnt(self, msg):
-        if self.camera_clutch_pressed == False and msg != None:
+        if self.camera_clutch_pressed == False and msg is not None:
             if self.__MOVE_ECM_WITH_SLIDERS__ == False:
 #                 if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
 #                     msg.name = ['outer_yaw', 'outer_pitch', 'insertion', 'outer_roll']
@@ -557,20 +557,20 @@ class Autocamera_node_handler:
        
     
     def add_psm1_jnt_from_hw(self, msg):
-        if self.camera_clutch_pressed == False and msg != None:
+        if self.camera_clutch_pressed == False and msg is not None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
                 self.__pub_psm1__.publish(msg)
 
     def add_psm2_jnt_from_hw(self, msg):
-        if self.camera_clutch_pressed == False and msg != None:
+        if self.camera_clutch_pressed == False and msg is not None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.simulation:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
                 self.__pub_psm2__.publish(msg)
                 
     # psm1 callback    
     def add_psm1_jnt(self, msg):
-        if self.camera_clutch_pressed == False and msg != None:
+        if self.camera_clutch_pressed == False and msg is not None:
             # We need to set the names, otherwise the simulation won't move
             if self.__AUTOCAMERA_MODE__ == self.MODE.hardware:
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
@@ -580,7 +580,7 @@ class Autocamera_node_handler:
          
     # psm2 callback    
     def add_psm2_jnt(self, msg):
-        if self.camera_clutch_pressed == False and msg != None:
+        if self.camera_clutch_pressed == False and msg is not None:
             if self.__AUTOCAMERA_MODE__ == self.MODE.hardware :
                 msg.name = ['outer_yaw', 'outer_pitch', 'outer_insertion', 'outer_roll', 'outer_wrist_pitch', 'outer_wrist_yaw', 'jaw']
                 self.__pub_psm2__.publish(msg)
@@ -717,7 +717,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
                 
@@ -747,7 +747,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
                 
@@ -764,7 +764,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
             
@@ -782,7 +782,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
                 
@@ -798,7 +798,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
     
@@ -814,7 +814,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
     
@@ -830,7 +830,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.node_handler.spin()
         
         def kill(self):
-            if self.node_handler != None:
+            if self.node_handler is not None:
                 self.node_handler.shutdown()
                 self.quit()
                 
@@ -1034,7 +1034,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
 
         self.thread.node_handler.set_autocamera_params(inner_zone, dead_zone)
     def get_autocamera_params(self):
-        while self.thread.node_handler == None:
+        while self.thread.node_handler is  None:
                 pass
             
         dead_zone, inner_zone = self.thread.node_handler.get_autocamera_params()
@@ -1100,9 +1100,9 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     def exit_program(self):
         rospy.Publisher('/dvrk/console/power_off', Empty, latch=True, queue_size=1).publish()
         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(False))
-        if self.thread != None:
+        if self.thread is not None:
             self.thread.kill()
-        if self.homing_thread != None:
+        if self.homing_thread is not None:
             self.homing_thread.kill()
 #         if self.console_homing != None:
 #             self.console_homing.kill()
@@ -1143,7 +1143,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
     def on_simulation_select(self):
         if self.__mode__ != self.MODE.simulation :
             self.__mode__ = self.MODE.simulation
-            if self.__control_mode__ != None:
+            if self.__control_mode__ is not None:
                 self.thread.kill()
                 self.start_node_handler(self.__control_mode__)
     
@@ -1152,7 +1152,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         if self.__mode__ != self.MODE.hardware :
             self.__mode__ = self.MODE.hardware
             print(self.__control_mode__)
-            if self.__control_mode__ != None:
+            if self.__control_mode__ is not None:
                 self.thread.kill()
                 self.start_node_handler(self.__control_mode__)
     
@@ -1161,7 +1161,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         msg.setText('running ' + name)
         retval = msg.exec_()
         
-        if self.thread != None:
+        if self.thread is not None:
             self.thread.kill()
 
         # start teleop
@@ -1169,7 +1169,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
 #         rospy.Publisher('/dvrk/console/teleop/set_scale', Float32, latch=True, queue_size=1).publish(Float32(0.3))
 #         rospy.Publisher('/dvrk/console/teleop/enable', Bool, latch=True, queue_size=1).publish(Bool(True))
 
-        if self.thread_tel == None and name != self.node_name.clutchless:
+        if self.thread_tel is  None and name != self.node_name.clutchless:
             self.thread_tel = self.thread_teleop(self.__mode__)
             self.thread_tel.start()
         
