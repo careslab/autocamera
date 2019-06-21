@@ -432,12 +432,16 @@ class Autocamera_node_handler:
             rospy.logerr(msg)
             
     def ecm_manual_control_lock(self, msg, fun):
+        """!
+            Switch between manual control and automatic control of the ECM
+        """
+        
         if fun == 'ecm':
             self.ecm_manual_control_lock_ecm_msg = msg
         elif fun == 'mtml':
             self.ecm_manual_control_lock_mtml_msg = msg
         
-        if self.ecm_manual_control_lock_mtml_msg != None and self.ecm_manual_control_lock_ecm_msg != None:
+        if self.ecm_manual_control_lock_mtml_msg is not None and self.ecm_manual_control_lock_ecm_msg is not None:
             self.ecm_manual_control(self.ecm_manual_control_lock_mtml_msg, self.ecm_manual_control_lock_ecm_msg)
             self.ecm_manual_control_lock_mtml_msg = None
             self.ecm_manual_control_lock_ecm_msg = None

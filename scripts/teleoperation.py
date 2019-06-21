@@ -463,8 +463,7 @@ class TeleopClass:
 #         msg = self.__delay_queue('mtml', msg)
 #         if msg is None:return
         
-        print(len(self.__delay_buffer__))
-        print(msg)
+#         print(msg)
         # Find mtm end effector position and orientation
         self.home_arms()
 #         self.__align_mtms_to_psms__()
@@ -603,7 +602,7 @@ class TeleopClass:
                 temp[3] = new_roll
 #                 self.__last_psm2_jnt__ = temp 
                 new_psm2_angles[3] = new_roll
-                print('target psm2 roll = {}, psm2 roll = {}, mtml roll = {}\n'.format(new_psm2_angles[3], self.__last_psm2_jnt__[3], self.__mtml_jnt__[6]))
+#                 print('target psm2 roll = {}, psm2 roll = {}, mtml roll = {}\n'.format(new_psm2_angles[3], self.__last_psm2_jnt__[3], self.__mtml_jnt__[6]))
                  
                 
 #                 print("revised new_psm2_angles = {}\n".format(new_psm2_angles))
