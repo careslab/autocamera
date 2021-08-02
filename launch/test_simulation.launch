@@ -3,7 +3,7 @@
   <include file="$(find autocamera)/launch/fakecam.launch"/>  
 
   <!-- ecm rviz -->
-  <include file="$(find dvrk_model)/launch/ecm.launch">
+  <include file="$(find autocamera)/launch/ecm.launch">
     <arg name="model" value="$(find autocamera)/model/ecm.xacro"/>
     <arg name="rviz" value="false"/>
     <arg name="rate" default="200" />
