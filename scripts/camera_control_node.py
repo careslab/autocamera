@@ -7,7 +7,7 @@ This file contains a GUI made using PyQt. This is used to power the system on,
 home the arms, switch between simulation and hardware and choose a camera control 
 method. It also provides the capability to record all the movements.
 """
-
+#QApplication
 from __common_imports__ import *
 
 import sys
@@ -21,16 +21,21 @@ import threading
 
 
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
-from PyQt4.QtCore import pyqtSlot, SIGNAL, pyqtSignal
-from PyQt4.QtCore import QThread
-from PyQt4.QtCore import Qt
-from PyQt4 import QtGui
-from PyQt4.QtGui import *
-from PyQt4.Qt import QObject
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+#from camera_control_gui  import Ui_Dialog
+#from PyQt5.QtCore import pyqtSlot, SIGNAL, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
+#from PyQt5.QtCore import Qt
+#from PyQt5 import QtGui
+#from PyQt5.QtGui import *
+#from PyQt5.Qt import QObject
 
 
 import configparser
 import camera_control_gui
+from camera_control_gui import Ui_Dialog
 import rosbag
 
 import pexpect
@@ -682,7 +687,7 @@ class Autocamera_node_handler:
 
            
 
-class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
+class camera_qt_gui(camera_control_gui.Ui_Dialog):
     
     class node_name:
         clutchNGo = 'clutch_control'
@@ -899,7 +904,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.quit()
             
     def __init__(self, parent=None):
-        super(camera_qt_gui, self).__init__(parent)
+        super(camera_qt_gui, self).__init__()
         self.setupUi(self)
 #         
         self.thread = None
@@ -1241,10 +1246,12 @@ def init_yappi():
             
 def main():
 #     init_yappi()
-    app = QtGui.QApplication(sys.argv)
-    form = camera_qt_gui()
-    form.show()
-    app.exec_()
+    app=QtWidgets.QApplication(sys.argv)
+    widget=QtWidgets.QWidget()
+    ui=Ui_Dialog()
+    ui.setupUi(widget)
+    widget.show()
+    sys.exit(app.exec_())
     """
     node_handler = Autocamera_node_handler()
     node_handler.set_mode(node_handler.MODE.hardware)
