@@ -23,7 +23,7 @@ import threading
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton
+from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton, QMessageBox
 
 #from camera_control_gui  import Ui_Dialog
 #from PyQt5.QtCore import pyqtSlot, SIGNAL, pyqtSignal
