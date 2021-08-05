@@ -23,6 +23,7 @@ import threading
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton
 
 #from camera_control_gui  import Ui_Dialog
 #from PyQt5.QtCore import pyqtSlot, SIGNAL, pyqtSignal
@@ -687,7 +688,7 @@ class Autocamera_node_handler:
 
            
 
-class camera_qt_gui(camera_control_gui.Ui_Dialog):
+class camera_qt_gui(QDialog, camera_control_gui.Ui_Dialog):
     
     class node_name:
         clutchNGo = 'clutch_control'
@@ -1247,10 +1248,9 @@ def init_yappi():
 def main():
 #     init_yappi()
     app=QtWidgets.QApplication(sys.argv)
-    widget=QtWidgets.QWidget()
-    ui=Ui_Dialog()
-    ui.setupUi(widget)
-    widget.show()
+    form = camera_qt_gui()
+    form.show()
+    #app.exec_()
     sys.exit(app.exec_())
     """
     node_handler = Autocamera_node_handler()
