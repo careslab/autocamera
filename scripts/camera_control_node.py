@@ -964,7 +964,7 @@ class camera_qt_gui(QDialog, camera_control_gui.Ui_Dialog):
         except Exception:
             pass
 
-        
+     
     @pyqtSlot()
     def on_record(self):
         if self.recording == False:
