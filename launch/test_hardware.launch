@@ -51,11 +51,11 @@
   <node name="rviz" pkg="rviz" type="rviz"
 	args="-d $(find autocamera)/rviz/simulation.rviz"/>  
 
-  <!-- console json -->
-  <node name="dVRKBridge" pkg="dvrk_robot" type="dvrk_console_json" args="-j /home/dvrk/dev/Working\ Settings\ Files/Oct-2016/console-full-wsu.json"/>
+  <!-- console json 
+  <node name="dVRKBridge" pkg="dvrk_robot" type="dvrk_console_json" args="-j /home/dvrk/dev/Working\ Settings\ Files/Oct-2016/console-full-wsu.json"/>-->
 
-  <!-- joystick node -->
-  <node name="joy" pkg="joy" type="joy_node"/>
+  <!-- joystick node
+  <node name="joy" pkg="joy" type="joy_node"/> -->
 </launch>
 
 
