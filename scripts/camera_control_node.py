@@ -554,7 +554,7 @@ class Autocamera_node_handler:
                 self.add_jnt('ecm', msg)
             else:
                 temp = list(msg.position[:2]+msg.position[-2:])
-                r = self.hw_ecm.move_joint_list(temp, interpolate=first_run)
+                r = self.hw_ecm.move_joint_list(temp, interpolate=self.first_run)
                 if r == True:
                     self.first_run = False
         else:

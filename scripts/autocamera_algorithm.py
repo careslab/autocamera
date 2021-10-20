@@ -28,7 +28,7 @@ class Autocamera:
         surgical robot
     """
     DEBUG = False # Print debug messages?
-    
+
     def __init__(self):
         """!
             Class initialization function
@@ -83,10 +83,10 @@ class Autocamera:
         return sum((a*b) for a, b in zip(v1, v2))
     
     def length(self, v):
-        return math.sqrt(dotproduct(v, v))
+        return math.sqrt(self.dotproduct(v, v))
     
     def angle(self, v1, v2):
-        return math.acos(dotproduct(v1, v2) / (length(v1) * length(v2)))
+        return math.acos(self.dotproduct(v1, v2) / (self.length(v1) * self.length(v2)))
       
     def column(self, matrix, i):
         return [row[i] for row in matrix]
@@ -216,10 +216,10 @@ class Autocamera:
 #             mid_point = (psm1_pos + psm2_pos)/2
 #             
 #         l1,l2,lm, r1,r2,rm = self.find_2d_tool_coordinates_in_3d(cam_info, clean_joints)
-        
 
 
-        
+
+
 #         if np.linalg.norm(mid_point-self.last_midpoint) <  self.pan_tilt_deadzone_radius:
 #             mid_point = self.last_midpoint
 #         self.logerror("Distance is " + np.linalg.norm(mid_point-self.last_midpoint).__str__(), debug=True)
@@ -273,14 +273,15 @@ class Autocamera:
         t = l/m
         
         new_ecm_position = np.array([x(t), y(t), z(t)]).reshape(3,1)
-        
-        ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3]  
-        ecm_pose[0:3,3] = new_ecm_position
+
+        ecm_pose[0:3,0:3] =  r* ecm_pose[0:3,0:3]     #Row 0-3 and column 0-3 for a 3x3 rotation matrix
+        ecm_pose[0:3,3] = new_ecm_position            #Entire fourth column (position vector)
         self.add_marker(ecm_pose, '/target_ecm_pose', [0,0,1], Marker.ARROW, scale=[.1,.005,.005])
         output_msg = clean_joints['ecm']
         
         try:
-            p = self.ecm_kin.inverse(ecm_pose)
+            p = self.ecm_kin.inverse(ecm_pose, q_guess=output_msg.position, min_joints=None, max_joints=None, maxiter=10000,eps=.01)
+            
         except Exception as e:
             rospy.logerr('error')
         if p is not None:  
@@ -476,7 +477,7 @@ class Autocamera:
     #         l1 = add_100(l1)
     #         l2 = add_100(l2)
     #         lm = add_100(lm)
-    
+
             self.zoom_level_positions = {'l1':l1, 'r1':r1, 'l2':l2, 'r2':r2, 'lm':lm, 'rm':rm}    
 
             test1_l, test1_r = ig.project3dToPixel( [1,0,0])
@@ -609,7 +610,7 @@ class Autocamera:
         
         distances = {'left':f( bottom_left, top_left), 'top': f(top_left, top_right), 'right': f(top_right, bottom_right), 'bottom': f(bottom_right, bottom_left)}
         
-        print("distances = {}\n".format( distances))
+        #print("distances = {}\n".format( distances))
         
         return distances
             
@@ -679,11 +680,11 @@ class Autocamera:
     #         output_msg.position = [joint['ecm'].position[x] for x in [0,1,5,6]]
             return output_msg
         
-        print("tool 1 : \n")
+        #print("tool 1 : \n")
         self.find_tool_relation_to_3d_deadzone(cam_info, psm1_pos)
         
-#         print("tool 2 : \n")
-#         self.find_tool_relation_to_3d_deadzone(cam_info, psm2_pos)
+        #print("tool 2 : \n")
+        #self.find_tool_relation_to_3d_deadzone(cam_info, psm2_pos)
         
         output_msg = clean_joints['ecm']
         
@@ -692,7 +693,6 @@ class Autocamera:
         
         # Track when the tools are stationary
         self.track_tool_times(clean_joints)
-        
         if gripper == gripper or gripper != gripper: # luke was here
             output_msg = self.point_towards_midpoint(clean_joints, psm1_pos, psm2_pos, key_hole, ecm_pose, cam_info)
 #             output_msg.position =list( np.array(output_msg.position) + ( -np.array(output_msg.position)+ np.array(goal_joints.position)) *.0001)
