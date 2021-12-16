@@ -511,7 +511,7 @@ def main():
 
     #def run(self):
     node_handler = Autocamera_node_handler()
-    __mode__ = node_handler.MODE.simulation
+    __mode__ = node_handler.MODE.hardware
     print('\nRunning {} in {}\n'.format("Autocamera",__mode__))
     node_handler.set_mode(__mode__)
     node_handler.debug_graphics(True)
