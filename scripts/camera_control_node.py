@@ -7,7 +7,7 @@ This file contains a GUI made using PyQt. This is used to power the system on,
 home the arms, switch between simulation and hardware and choose a camera control 
 method. It also provides the capability to record all the movements.
 """
-
+#QApplication
 from __common_imports__ import *
 
 import sys
@@ -19,18 +19,23 @@ import tf
 import threading
 
 
-
 from Crypto.Signature.PKCS1_PSS import PSS_SigScheme
-from PyQt4.QtCore import pyqtSlot, SIGNAL, pyqtSignal
-from PyQt4.QtCore import QThread
-from PyQt4.QtCore import Qt
-from PyQt4 import QtGui
-from PyQt4.QtGui import *
-from PyQt4.Qt import QObject
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QPushButton, QMessageBox
+
+#from camera_control_gui  import Ui_Dialog
+#from PyQt5.QtCore import pyqtSlot, SIGNAL, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
+#from PyQt5.QtCore import Qt
+#from PyQt5 import QtGui
+#from PyQt5.QtGui import *
+#from PyQt5.Qt import QObject
 
 
 import configparser
 import camera_control_gui
+from camera_control_gui import Ui_Dialog
 import rosbag
 
 import pexpect
@@ -66,7 +71,7 @@ class bag_writer:
             os.system( ('mkdir -p '+ dir ).__str__())
         
         record_command = """rosbag record /dvrk/MTML/state_joint_current /dvrk/MTMR/state_joint_current /dvrk/PSM1/state_joint_current /dvrk/PSM2/state_joint_current /dvrk/ECM/state_joint_current /dvrk/footpedals/clutch /dvrk/footpedals/camera /dvrk/footpedals/coag /joy /camera1/usb_cam_left/image_raw/compressed /camera2/usb_cam_right/image_raw/compressed  --lz4 --duration=600 -O {}""".format(dir + bag_name + '_sim.bag' )
-        print record_command
+        print(record_command)
         self.p = pexpect.spawn( record_command)
         return
         self.bag_sim = rosbag.Bag(dir + bag_name + '_sim.bag', 'w')
@@ -259,8 +264,8 @@ class Autocamera_node_handler:
         self.config_file = '../config/autocamera.conf'
         self.config.read(self.config_file)
         
-        inner = self.config.getfloat('ZOOM', 'inner_zone')
-        outer = self.config.getfloat('ZOOM', 'dead_zone')
+        inner = 0.08
+        outer = 0.08
         
         self.set_autocamera_params(inner, outer)
         
@@ -374,11 +379,11 @@ class Autocamera_node_handler:
         self.autocamera.zoom_deadzone_radius = dead_zone
         self.autocamera.zoom_innerzone_radius = inner_zone
         
-        self.config.set('ZOOM', 'inner_zone', inner_zone.__str__())
-        self.config.set('ZOOM', 'dead_zone', dead_zone.__str__())
+        #self.config.set('ZOOM', 'inner_zone', inner_zone.__str__())
+        #self.config.set('ZOOM', 'dead_zone', dead_zone.__str__())
         
-        with open(self.config_file,'w') as cfile:
-            self.config.write(cfile)
+        #with open(self.config_file,'w') as cfile:
+        #    self.config.write(cfile)
         
     def get_autocamera_params(self):
         return self.autocamera.zoom_deadzone_radius, self.autocamera.zoom_innerzone_radius
@@ -549,7 +554,7 @@ class Autocamera_node_handler:
                 self.add_jnt('ecm', msg)
             else:
                 temp = list(msg.position[:2]+msg.position[-2:])
-                r = self.hw_ecm.move_joint_list(temp, interpolate=first_run)
+                r = self.hw_ecm.move_joint_list(temp, interpolate=self.first_run)
                 if r == True:
                     self.first_run = False
         else:
@@ -682,7 +687,7 @@ class Autocamera_node_handler:
 
            
 
-class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
+class camera_qt_gui(QDialog, camera_control_gui.Ui_Dialog):
     
     class node_name:
         clutchNGo = 'clutch_control'
@@ -899,7 +904,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
             self.quit()
             
     def __init__(self, parent=None):
-        super(camera_qt_gui, self).__init__(parent)
+        super(camera_qt_gui, self).__init__()
         self.setupUi(self)
 #         
         self.thread = None
@@ -959,7 +964,7 @@ class camera_qt_gui(QtGui.QMainWindow, camera_control_gui.Ui_Dialog):
         except Exception:
             pass
 
-        
+     
     @pyqtSlot()
     def on_record(self):
         if self.recording == False:
@@ -1241,10 +1246,11 @@ def init_yappi():
             
 def main():
 #     init_yappi()
-    app = QtGui.QApplication(sys.argv)
+    app=QtWidgets.QApplication(sys.argv)
     form = camera_qt_gui()
     form.show()
-    app.exec_()
+    #app.exec_()
+    sys.exit(app.exec_())
     """
     node_handler = Autocamera_node_handler()
     node_handler.set_mode(node_handler.MODE.hardware)
